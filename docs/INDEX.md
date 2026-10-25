@@ -73,12 +73,6 @@ khác vai trò, không gộp. Cả hai đều thuộc họ IF-04.
 |---|---|---|---|---|---|---|---|
 | VER-001 | Kế hoạch kiểm thử gateway | `verification/GATEWAY_TEST_PLAN.md` | ACTIVE | DESIGN | Thịnh | 2026-10-25 | `firmware/gateway_esp32/` |
 
-## Quy trình
-
-| ID | Tài liệu | Đường dẫn | Trạng thái | Bằng chứng | Owner | Kiểm tra gần nhất | Code liên quan |
-|---|---|---|---|---|---|---|---|
-| WFL-001 | Workflow CODER / review / fix | `KVC_AI_WORKFLOW.md` | ACTIVE | SOURCE-VERIFIED | — | 2026-10-25 | `scripts/kvc-review.ps1` |
-
 ## Planned — chưa triển khai
 
 Các mục dưới **chưa có source hoặc tài liệu**. Không tạo file giả để lấp chỗ.

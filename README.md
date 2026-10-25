@@ -23,11 +23,8 @@ Bản copy này **không** chứng minh bất kỳ mức BUILT hay HARDWARE-VERI
 ```text
 KVC_PRODUCT/
 ├── README.md                      trang này
-├── AGENTS.md                      luật AI/owner/scope
 ├── pytest.ini                     testpaths = gcs/backend/tests tests
-├── .agents/rules/kvc.md           adapter rule cho Antigravity
 ├── scripts/
-│   ├── kvc-review.ps1             review Codex (PowerShell 7+)
 │   └── manual/                    script tích hợp/debug
 ├── firmware/
 │   ├── mcu_payload/               MCU tải UAV — Sonix SN34F788 (Keil)

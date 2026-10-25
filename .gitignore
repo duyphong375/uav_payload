@@ -60,6 +60,13 @@ docs/hardware/vendor/**/*
 media/
 review/
 
+# AI agent rules and workflow tooling (kept local, not published)
+AGENTS.md
+.agents/
+.kilo/
+docs/KVC_AI_WORKFLOW.md
+scripts/kvc-review.ps1
+
 # Credentials and local environment (examples can be versioned)
 .env
 .env.*

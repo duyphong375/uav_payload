@@ -1,0 +1,94 @@
+﻿{
+  "$schema": "kvc_model_release_v1",
+  "release_id": "KVC-MODEL-REL-YYYYMMDD-001",
+  "model_name": "yolo11n_2class_hardware",
+  "model_hash_sha256": "PENDING_CHECKPOINT_HASH",
+  "architecture": "yolo11n",
+  "training_framework": "ultralytics_8.3",
+  "dataset_metadata": {
+    "version": "dataset_4k_yolo_v1_hardware_2class",
+    "evidence_status": "FILE_INVENTORY_ONLY_SEMANTIC_QA_PENDING",
+    "train_images": 4800,
+    "train_labels": 4800,
+    "val_images": 1547,
+    "val_labels": 1547,
+    "negative_ratio_train_pct": null,
+    "negative_ratio_val_pct": null,
+    "imbalance_ratio_person_to_lifebuoy": null,
+    "locked_test_status": "NOT_VERIFIED",
+    "calibration_status": "NOT_VERIFIED"
+  },
+  "classes": {
+    "0": {
+      "model_id": 0,
+      "name": "person",
+      "wire_id": 1,
+      "wire_id_status": "PROPOSED_PENDING_G1_ABI",
+      "definition": "Người thật nhìn thấy được trên mặt nước, thuyền hoặc bờ; vật mẫu/mannequin phải được ghi và đánh giá riêng theo ontology"
+    },
+    "1": {
+      "model_id": 1,
+      "name": "lifebuoy",
+      "wire_id": 2,
+      "wire_id_status": "PROPOSED_PENDING_G1_ABI",
+      "definition": "Phao cứu sinh hình vòng hoặc móng ngựa"
+    }
+  },
+  "preprocessing_contract": {
+    "input_resolution": [640, 640],
+    "input_shape": [1, 3, 640, 640],
+    "color_space": "RGB",
+    "normalization": "pixel / 255.0 (0.0 to 1.0)",
+    "letterbox": {
+      "aspect_ratio_preserving": true,
+      "pad_value": [114, 114, 114],
+      "center_padded": true
+    }
+  },
+  "inference_thresholds": {
+    "nms_iou_threshold": 0.45,
+    "confidence_threshold_person": 0.25,
+    "confidence_threshold_lifebuoy": 0.25,
+    "consecutive_confirmation_frames": 3
+  },
+  "evaluation_metrics": {
+    "per_class": {
+      "person": {
+        "precision": null,
+        "recall": null,
+        "mAP50": null,
+        "mAP50_95": null
+      },
+      "lifebuoy": {
+        "precision": null,
+        "recall": null,
+        "mAP50": null,
+        "mAP50_95": null
+      }
+    },
+    "overall": {
+      "mAP50": null,
+      "mAP50_95": null
+    }
+  },
+  "runtime_targets": {
+    "fpga_goai": {
+      "supported": null,
+      "quantization": "INT8_PTQ_DESIGN_TARGET",
+      "calibration_manifest": "ai/manifests/calibration_manifest.csv",
+      "status": "NOT_VERIFIED"
+    },
+    "mcu_sonix": {
+      "supported": false,
+      "note": "Sonix đóng vai trò định tuyến telemetry và điều khiển UART, không trực tiếp chạy NPU"
+    },
+    "pc_companion": {
+      "supported": null,
+      "precision": "FP16 / FP32",
+      "target_gpu": "NVIDIA GeForce RTX 4060 Laptop",
+      "status": "HISTORICAL_RESULTS_NOT_REVERIFIED"
+    }
+  },
+  "release_status": "EVIDENCE_BLOCKED",
+  "notes": "Template chưa phải release. Cần provenance/license, session hashes, human QA, locked-test, calibration manifest hợp lệ, checkpoint hash và metric tái lập trước khi đổi trạng thái."
+}

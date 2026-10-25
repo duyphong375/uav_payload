@@ -1,0 +1,51 @@
+schema_version: "1.2.0"
+task: object_detection
+active_profile: dataset_2class_hardware_abi_pending
+
+hardware_contract_profile:
+  status: "DESIGN_PENDING_G1_ABI"
+  description: "Mapping dữ liệu/model 2 lớp. Khả năng GoAI, vị trí wire bit và gói Telemetry 32-byte chưa được xác minh hoặc phê duyệt G1."
+  classes:
+    - id: 0
+      name: person
+      wire_id: 1
+      wire_id_status: "PROPOSED_PENDING_G1_ABI"
+      definition: "Người thật nhìn thấy được trên mặt nước, thuyền hoặc bờ; vật mẫu/mannequin phải được ghi và đánh giá riêng theo ontology."
+      annotate: "BBox ôm sát phần nhìn thấy; không đoán phần chìm."
+    - id: 1
+      name: lifebuoy
+      wire_id: 2
+      wire_id_status: "PROPOSED_PENDING_G1_ABI"
+      definition: "Phao cứu sinh hình vòng hoặc móng ngựa."
+      annotate: "Không gộp phao đánh dấu/phao neo biển, lốp xe hoặc vật nổi khác."
+  hard_negative_ratio_target: "20% - 30% ảnh âm tính là mục tiêu; phải đo báo động giả trên dữ liệu đã QA."
+  empirical_dataset_distribution:
+    status: "NOT_VERIFIED_FOR_RELEASE"
+    class_imbalance_ratio: null
+    negative_ratio_current: null
+    evidence_note: "Phải tái lập từ input/version đã khóa và QA ngữ nghĩa; không dùng số liệu lịch sử trong ontology làm release evidence."
+    evaluation_protocol: "BẮT BUỘC báo cáo metric độc lập theo từng lớp (Per-Class Precision, Recall, mAP50, mAP50-95); không đánh giá chung mAP all để tránh thiên lệch do person áp đảo."
+
+pc_reference_profile:
+  description: "Tham chiếu 5 lớp cho Dashboard PC (chỉ dùng khi có PC Adapter ánh xạ trước khi nạp MCU)."
+  classes:
+    - id: 0
+      name: person
+    - id: 1
+      name: lifebuoy
+    - id: 2
+      name: boat
+    - id: 3
+      name: life_jacket
+    - id: 4
+      name: person_model
+
+annotation_rules:
+  negative_image: "Ảnh không có lớp mục tiêu giữ annotation rỗng; không tạo class background."
+  occluded: "Ghi metadata/tag occluded khi đối tượng bị che khuất đáng kể; vẫn gán class nếu nhận dạng được."
+  truncated: "Ghi metadata/tag truncated khi đối tượng bị cắt ở mép ảnh."
+  reflection: "Không gán phản chiếu như đối tượng thứ hai."
+  uncertain: "Ca không đủ bằng chứng đưa vào review_queue, không đoán nhãn."
+  drowning: "Không dùng lớp drowning/needs_rescue chỉ từ một ảnh; cần xác minh vận hành riêng."
+
+compatibility_note: "Source adapter hiện ánh xạ class 0 -> wire candidate 1 và class 1 -> wire candidate 2. Telemetry length, Flags bits, serializer và tương thích FPGA/MCU vẫn là DESIGN_PENDING_G1_ABI; không dùng file này làm bằng chứng hardware contract đã khóa."

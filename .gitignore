@@ -1,0 +1,70 @@
+# Build outputs, caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+node_modules/
+dist/
+build/
+build_*/
+coverage/
+*.log
+.vscode/
+tmp/
+*.exe
+*.tsbuildinfo
+.vite/
+
+# GCS runtime session databases (local-only; schema lives in source)
+gcs/backend/data/sessions/
+**/data/sessions/
+*.db
+*.db-wal
+*.db-shm
+
+# Embedded build outputs (keep source, project and constraints)
+.pio/
+impl/
+Objects/
+Listings/
+*.fs
+*.bit
+*.elf
+*.axf
+*.hex
+*.o
+*.vcd
+*.fst
+*.vvp
+*.uvgui.*
+*.uvguix.*
+
+# Model artifacts and datasets are acquired separately; keep code and manifests
+*.pt
+*.pth
+*.onnx
+*.tflite
+ai/datasets/
+ai/runs/
+ai/weights/
+
+# Vendor SDKs, installers, drivers and datasheets stay outside the repo.
+# docs/hardware/vendor/VENDOR_PACKAGES.md records version, source and checksum.
+docs/hardware/vendor/**/*
+!docs/hardware/vendor/VENDOR_PACKAGES.md
+
+# Local media and review evidence
+media/
+review/
+
+# Credentials and local environment (examples can be versioned)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.lic

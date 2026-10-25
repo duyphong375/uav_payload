@@ -1,0 +1,108 @@
+﻿# Đặc tả giao diện: ESP32 Trạm Đất ↔ Backend GCS Laptop (Wi-Fi SoftAP / WebSocket)
+
+- **Mã giao diện:** `IF-03`
+- **Hai đầu kết nối:** ESP32-C3 Gateway Trạm Đất (kit/board TBD; **Đoàn Thanh Trường Thịnh** - Wi-Fi SoftAP & WebSocket Server) ↔ Dịch vụ Backend Python trên Laptop GCS (**Đoàn Thanh Trường Thịnh** - WebSocket Client Ingress)
+- **Trạng thái:** `SOURCE-VERIFIED` — cả firmware Gateway (`main.cpp`) và module Ingress (`esp32_ingress.py`) đều đã có code và `pytest` hiện hành pass. Chưa có `HARDWARE-VERIFIED`: chưa capture frame LoRa thật hoặc chạy ESP32 trên bo trong task này.
+- **Liên kết ABI:** payload RF bên trong envelope là frame 32 byte theo [IF-02](IF_MCU_LORA_RF.md) mục 2 và golden vector GV-01 mục 3. Backend không đổi endian/field/layout.
+
+---
+
+## 1. Kiến trúc kết nối và Topology mạng
+
+```text
++------------------------------------+
+|    ESP32-C3 Gateway                |
+|    - Nguồn độc lập (Pin/Power Bank)|
+|    - Thu LoRa SX1278 (SPI)         |
+|    - Phát Wi-Fi SoftAP / Kết nối STA|
+|    - WebSocket Server (:8080/telemetry) |
++-----------------+------------------+
+                  │
+                  │  Sóng Wi-Fi 802.11 b/g/n (SSID: KVC_GCS_AP hoặc Wi-Fi STA)
+                  │  Giao thức: WebSocket (:8080/telemetry)
+                  ▼
++------------------------------------+
+|    Backend GCS trên Laptop (Host)  |
+|    - Kết nối Wi-Fi vào Gateway     |
+|    - Chạy Client esp32_ingress.py  | ──► Ghi nhật ký vào SQLite WAL (sqlite_logger.py)
+|    - Quản lý trạng thái State      | ──► Động cơ phát lại (replay_engine.py)
+|    - Mở WebSocket Server nội bộ    |
+|      (ws://127.0.0.1:8000/ws/telemetry) |
++-----------------+------------------+
+                  │
+                  │  Localhost WebSocket nội bộ máy tính
+                  ▼
++------------------------------------+
+|    Frontend Dashboard trên Browser |
+|    - React + TypeScript + Vite     |
+|    - Vẽ Radar Canvas, Bản đồ OSM   |
+|    - Bảng cảnh báo và trạng thái   |
++------------------------------------+
+```
+
+> ⚠️ **QUY TẮC CỐT LÕI:**
+> 1. Trình duyệt Web (Dashboard) **tuyệt đối không kết nối trực tiếp vào ESP32**. Trình duyệt chỉ kết nối vào Backend Python tại `ws://127.0.0.1:8000/ws/telemetry` (route chuẩn: [IF-04](IF_GCS_DATA_CONTRACT.md)).
+> 2. Backend Python trên laptop chạy module Ingress `esp32_ingress.py` để kết nối vào ESP32, giải mã RF 32 bytes và chuyển tiếp dữ liệu vào Hub hệ thống.
+
+---
+
+## 2. Cấu hình mạng Wi-Fi và Endpoint của ESP32
+
+Gateway ESP32 hỗ trợ hai chế độ mạng linh hoạt:
+
+1. **Chế độ Dã ngoại Thực địa (SoftAP Mode - Mặc định khi không có router ngoài):**
+   - **SSID:** `KVC_GCS_AP` (hoặc `KVC_GROUND_STATION`)
+   - **Mật khẩu (Password):** Cấu hình bảo mật nội bộ
+   - **Địa chỉ IP ESP32:** `192.168.4.1`
+   - **WebSocket Endpoint:** `ws://192.168.4.1:8080/telemetry`
+
+2. **Chế độ Phòng Lab / Thử nghiệm (Station Mode - STA):**
+   - ESP32 kết nối trực tiếp vào mạng Wi-Fi của phòng Lab hoặc điểm phát sóng Hotspot điện thoại.
+   - Backend Python tích hợp cơ chế Auto-Discovery (`discover_esp32_gateway`) tự động dò quét địa chỉ IP của ESP32 trên mạng cục bộ để kết nối ngay lập tức mà không cần cấu hình IP thủ công.
+
+---
+
+## 3. Transport envelope WebSocket v1
+
+Mỗi message JSON UTF-8 chuyển tiếp một RF payload 32 byte còn nguyên vẹn. ESP32 loại bỏ các payload không qua được kiểm tra CRC-16 trước khi tạo message. `rf_payload_hex` giữ đúng thứ tự 32 byte nhận được. Phía Backend Python tiếp nhận và giải mã qua module `gcs/backend/esp32_ingress.py`, có bộ test `test_esp32_ingress.py` (chạy trong task `KVC-FIX-ABI-20261025-001`: **14 passed**).
+
+> **Golden vector dùng chung:** `rf_payload_hex` trong ví dụ dưới là vector toàn-zero của IF-02 và đã kiểm CRC-16/CCITT-FALSE = `0x8F79` (lưu LE `79 8f`). Vector đầy đủ có dữ liệu là **GV-01** ở [IF-02](IF_MCU_LORA_RF.md) mục 3: `aa55012ae8030000baba6b06d4b3923f96004001f000015c0f7e000000004e30` (CRC `0x304E`).
+
+> **Cảnh báo lịch sử:** ví dụ `aa55012a78e10100...a1b2` từng nằm trong `docs/architecture/GATEWAY_DESIGN.md` và `KE_HOACH_TEST_VA_TIEN_DO_GATEWAY_ESP32.md` có CRC **sai** (`0x91F5` tính lại ≠ `0xB2A1` khai báo). Không dùng vector đó làm fixture.
+
+```json
+{
+  "transport_version": 1,
+  "gateway_session_id": 3,
+  "gateway_sequence": 42,
+  "rx_monotonic_ms": 125430,
+  "rf_payload_hex": "aa5501010000000000000000000000000000000000000000000000000000798f",
+  "rssi_dbm": -76,
+  "snr_db": 8.5,
+  "rx_drop_count": 0
+}
+```
+
+| Trường | Kiểu / quy tắc |
+| --- | --- |
+| `transport_version` | Integer; hiện bằng `1`. |
+| `gateway_session_id` | `uint32`; thay đổi khi ESP32 khởi động lại. |
+| `gateway_sequence` | `uint32`; tăng theo message, wrap modulo `2^32`. |
+| `rx_monotonic_ms` | `uint32`; thời gian monotonic kể từ lúc ESP32 boot, không phải UTC. |
+| `rf_payload_hex` | 64 ký tự hex thường, đúng 32 byte đã qua kiểm tra CRC-16; không sửa field/endian. |
+| `rssi_dbm`, `snr_db` | Số đo nhận từ SX1278 theo đơn vị dBm và dB. |
+| `rx_drop_count` | `uint32`; số message hợp lệ bị loại ở ESP32 do buffer đầy kể từ boot. |
+
+Heartbeat riêng không thuộc envelope v1 đã mô tả. Link stale/disconnect được suy ra ở backend theo thời gian nhận message hợp lệ; muốn thêm loại message trạng thái cần schema/version được duyệt.
+
+---
+
+## 4. Xử lý mất kết nối và tự động phục hồi (Reconnection & Fallback)
+
+1. **Khi laptop tắt hoặc mất sóng Wi-Fi:**
+   - ESP32 trạm đất vẫn duy trì nguồn pin riêng, tiếp tục nhận và đếm gói LoRa.
+   - Thiết kế mục tiêu giữ tối đa 64 message hợp lệ trong FIFO RAM; đầy thì loại message cũ nhất và tăng `rx_drop_count`. Chưa triển khai/xác minh.
+2. **Phía Backend Python trên laptop:**
+   - Khởi chạy client ingress mục tiêu tới `ws://192.168.4.1:8080/telemetry`.
+   - Thiết kế đề xuất reconnect backoff 1–5 giây; trạng thái sequence reset khi `gateway_session_id` đổi.
+   - Backend đánh dấu dữ liệu stale khi không có message RF hợp lệ trong 3 giây. Buffer/reconnect/stale values chưa được xác minh bằng integration test.

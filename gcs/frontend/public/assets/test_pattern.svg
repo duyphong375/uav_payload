@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 720" width="1280" height="720">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#334155" stroke-width="0.8" opacity="0.4"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)" />
+  <rect width="1280" height="720" fill="url(#grid)" />
+
+  <!-- Optical Center / Crosshair -->
+  <circle cx="640" cy="360" r="180" fill="none" stroke="#0ea5e9" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.6"/>
+  <circle cx="640" cy="360" r="60" fill="none" stroke="#0ea5e9" stroke-width="2" opacity="0.8"/>
+  <circle cx="640" cy="360" r="4" fill="#38bdf8"/>
+  <line x1="640" y1="120" x2="640" y2="300" stroke="#38bdf8" stroke-width="1.5"/>
+  <line x1="640" y1="420" x2="640" y2="600" stroke="#38bdf8" stroke-width="1.5"/>
+  <line x1="400" y1="360" x2="580" y2="360" stroke="#38bdf8" stroke-width="1.5"/>
+  <line x1="700" y1="360" x2="880" y2="360" stroke="#38bdf8" stroke-width="1.5"/>
+
+  <!-- Corner Brackets -->
+  <path d="M 60 120 L 60 60 L 120 60" fill="none" stroke="#0ea5e9" stroke-width="3"/>
+  <path d="M 1220 120 L 1220 60 L 1160 60" fill="none" stroke="#0ea5e9" stroke-width="3"/>
+  <path d="M 60 600 L 60 660 L 120 660" fill="none" stroke="#0ea5e9" stroke-width="3"/>
+  <path d="M 1220 600 L 1220 660 L 1160 660" fill="none" stroke="#0ea5e9" stroke-width="3"/>
+
+  <!-- Info Text -->
+  <text x="80" y="100" fill="#38bdf8" font-family="monospace" font-size="20" font-weight="bold">KVC SAR PAYLOAD OPTICAL FEED [SIMULATED]</text>
+  <text x="80" y="130" fill="#94a3b8" font-family="monospace" font-size="14">CAMERA: SONY IMX219 (45° DOWNWARD) | RESOLUTION: 1280x720 30FPS</text>
+  <text x="80" y="640" fill="#94a3b8" font-family="monospace" font-size="14">STANDALONE TEST PATTERN - NO ACTIVE RF/WIFI FEED</text>
+  <text x="1200" y="640" text-anchor="end" fill="#10b981" font-family="monospace" font-size="14">OPTICAL STATUS: NORMAL</text>
+</svg>

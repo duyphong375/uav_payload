@@ -1,0 +1,21 @@
+// ============================================================================
+// KVC Project - OneKiwi Primer 20K V1.1 (Gowin GW2A-LV18PG256)
+// Physical Constraints (.cst) for FPGA ↔ MCU Payload Interface (IF-01)
+// 
+// Reference: 
+//   - docs/hardware/KVC_MASTER_PINOUT_WIRING.md (Section 3.5)
+//   - docs/interfaces/IF_FPGA_MCU_UART.md (Section 1)
+// ============================================================================
+
+// --- Giao tiếp UART BBox kết nối MCU Sonix SN34F788 ---
+// UART TX (FPGA phát sang MCU URXD1 - P2.3 / JP3 Pin 7-8)
+IO_LOC "uart_tx" R13;
+IO_PORT "uart_tx" IO_TYPE=LVCMOS33 DRIVE=8;
+
+// UART RX (FPGA nhận từ MCU UTXD1 - P2.2 / JP3 Pin 5-6, kênh phản hồi dự phòng)
+IO_LOC "uart_rx" T13;
+IO_PORT "uart_rx" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+// Tín hiệu báo ngắt khung ảnh mới sẵn sàng (DATA_READY sang MCU EXTI - P0.12 / JP1 Pin 11-12)
+IO_LOC "data_ready" R12;
+IO_PORT "data_ready" IO_TYPE=LVCMOS33 DRIVE=8;

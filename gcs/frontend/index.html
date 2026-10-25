@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="vi" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KVC — Trạm Giám Sát Tải Nhiệm Vụ UAV Cứu Nạn Bão Lũ</title>
+    <meta
+      name="description"
+      content="Hệ thống giám sát tải nhiệm vụ cứu nạn bão lũ: Video stream, bản đồ GNSS vị trí cụm camera, telemetry cảm biến và phát hiện mục tiêu."
+    />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('kvc_gcs_theme')
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          var isDark = saved === 'dark' || (!saved || saved === 'system') && prefersDark
+          if (isDark) {
+            document.documentElement.classList.add('dark')
+            document.documentElement.classList.remove('light')
+          } else {
+            document.documentElement.classList.add('light')
+            document.documentElement.classList.remove('dark')
+          }
+        } catch (e) {}
+      })()
+    </script>
+  </head>
+  <body class="bg-background text-foreground antialiased selection:bg-cyan-500/30 selection:text-cyan-200">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -1,9 +1,8 @@
 # Danh mục datasheet cảm biến KVC
 
-> Các file PDF trong thư mục này **được version hóa trong repo** để clone mới có
-> đủ tài liệu đối chiếu driver. Bản quyền vẫn thuộc nhà sản xuất; repo chỉ lưu bản
-> dùng nội bộ cho mục đích kỹ thuật. Cột SHA-256 dùng để phát hiện file bị thay thế
-> và đối chiếu khi tải lại từ nguồn gốc.
+> Các file PDF trong thư mục này **bị Git ignore** (`docs/hardware/sensors/**/*.pdf`)
+> vì chưa xác minh quyền phân phối lại. Đây là bản dùng cục bộ để đối chiếu driver.
+> Clone mới phải tải lại theo URL ở cột "Nguồn" và **đối chiếu SHA-256** trước khi dùng.
 
 Cập nhật: 26/10/2026.
 

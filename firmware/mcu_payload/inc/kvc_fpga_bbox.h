@@ -43,11 +43,11 @@ extern "C" {
 
 /* KVC-M2-20261025-001: RX qua ngắt + ring buffer.
  * Định cỡ theo cửa sổ KHÔNG-CONSUMER dài nhất trong main hiện tại:
- *   - kvc_usound_read_robust: 3 mẫu x 100 ms chờ + 2 x 20 ms giãn cách = 340 ms
+ *   - kvc_usound_read_robust: 1 lần đo, cửa sổ nghe tối đa 250 ms
  *   - sx1278_send_packet: chờ TxDone tối đa 300 ms
  *   - sx1278_init_tx() khi timeout: 2 x delay_ms(50) = 100 ms
- *   Tổng worst-case ~740 ms.
- * Ở 38400 8N1 (3840 byte/s): 3840 x 0,74 = ~2842 byte -> ring 4096 byte (biên 1,44x).
+ *   Tổng worst-case ~650 ms.
+ * Ở 38400 8N1 (3840 byte/s): 3840 x 0,65 = ~2496 byte -> ring 4096 byte (biên 1,64x).
  * Nếu main không bị chặn (trường hợp thường), ring gần như luôn rỗng. */
 #define KVC_FPGA_RX_RING_SIZE       4096U
 /* Trần số byte xử lý mỗi nhịp poll 1 ms, tránh một nhịp bị chiếm quá lâu.

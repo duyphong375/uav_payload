@@ -86,8 +86,20 @@ Mô-đun GY-87 tích hợp 3 chip trên cùng 1 bus I2C:
 * **Địa chỉ I2C (khi triển khai):** `0x1E` (HMC5883L) hoặc `0x0D` (nếu dùng chip tương đương QMC5883L — phải kiểm tra chip thực tế trên bo).
 * **Mục đích dự kiến:** Cung cấp góc hướng Bắc từ trường (Heading / **Yaw ($\psi$)**) để xác định phương vị quang học.
 * **Vì sao hoãn:** cần hiệu chuẩn hard/soft iron bằng cách xoay UAV 360° tại chỗ — việc này bắt buộc phải làm trên kit thật. Viết driver trước khi có kit là code chưa kiểm chứng.
-* **Hướng thay thế đã chọn (khi cần):** lấy Yaw từ GNSS **`track_made_good`** (trường 7 của câu RMC) — không cần phần cứng thêm, không cần hiệu chuẩn, và test được bằng câu NMEA dựng sẵn như 70 test GNSS hiện có. Giới hạn: không có Yaw khi UAV đứng yên hoặc bay thẳng đứng.
-* **Hệ quả hiện tại của việc chưa có Yaw:** georef trong `main.c` giả định camera hướng Bắc. Nếu UAV xoay, toạ độ mục tiêu sẽ lệch theo hướng vuông góc. Xem ghi chú "chưa đủ nghiệm thu (M3)" tại khối georef.
+* **Hướng thay thế đã chọn (khi cần):** lấy Yaw từ GNSS **`track_made_good`**
+  (trường **8** của câu RMC — trường 7 là `speed over ground`) — không cần phần cứng thêm,
+  không cần hiệu chuẩn, và test được bằng câu NMEA dựng sẵn như 87 assert GNSS hiện có.
+  Giới hạn: không có Yaw khi UAV đứng yên hoặc bay thẳng đứng.
+* **Trạng thái triển khai (26/10/2026): ĐÃ DÙNG trong firmware.**
+  `kvc_gnss_get_course_deg10()` trả Yaw 0,1° khi RMC status 'A', course còn mới ≤ 3 s
+  và tốc độ mặt đất ≥ 0,5 knot. Georef trong `main.c` gọi `kvc_geo_rotate_to_ne()`
+  (lượng giác số nguyên, `src/kvc_geo_math.c`) để xoay vector ảnh sang hệ Đông/Bắc.
+  Khi `kvc_gnss_get_course_deg10()` trả false, georef **từ chối** tính toạ độ mục tiêu
+  và giữ toạ độ UAV — không còn giả định hướng Bắc.
+* **Hệ quả còn lại:** `track_made_good` là hướng **chuyển động**, không phải hướng camera.
+  Nếu camera lệch trục thân UAV, georef sai đúng góc lệch đó — phải hiệu chuẩn
+  extrinsic camera→body. Ngoài ra ngưỡng 0,5 knot là kinh nghiệm, **chưa đo trên kit**:
+  chưa rõ ở tốc độ nào NEO-M10 bắt đầu cho `track_made_good` ổn định.
 
 #### C. BMP180 (Cảm biến áp suất khí quyển) — **ĐÃ LOẠI BỎ**
 

@@ -73,6 +73,12 @@ khác vai trò, không gộp. Cả hai đều thuộc họ IF-04.
 |---|---|---|---|---|---|---|---|
 | VER-001 | Kế hoạch kiểm thử gateway | `verification/GATEWAY_TEST_PLAN.md` | ACTIVE | DESIGN | Thịnh | 2026-10-25 | `firmware/gateway_esp32/` |
 
+## Kế hoạch và phân công
+
+| ID | Tài liệu | Đường dẫn | Trạng thái | Bằng chứng | Owner | Kiểm tra gần nhất | Code liên quan |
+|---|---|---|---|---|---|---|---|
+| PLAN-001 | Phân công MCU Payload + Gateway ESP32 | `planning/KVC_PHAN_CONG_2_NGUOI.md` | ACTIVE | SOURCE-VERIFIED (hiện trạng đo trên kit 26/10/2026) | Phong + Thịnh | 2026-10-26 | `firmware/mcu_payload/`, `firmware/gateway_esp32/` |
+
 ## Planned — chưa triển khai
 
 Các mục dưới **chưa có source hoặc tài liệu**. Không tạo file giả để lấp chỗ.

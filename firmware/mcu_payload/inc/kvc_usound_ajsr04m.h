@@ -1,21 +1,35 @@
 ﻿/**
  * @file kvc_usound_ajsr04m.h
- * @brief Driver giao tiếp UART 9600 bps cho Cảm biến Siêu âm chống nước AJ-SR04M trên MCU Sonix SN34F788.
+ * @brief Driver UART 9600 8N1 cho cảm biến siêu âm chống nước **AJ-SR04M**
+ *        (board xanh có pad chọn mode `R19`) trên MCU Sonix SN34F788.
  *
- * Chế độ hoạt động: Serial UART 9600 bps (8N1) sau khi hàn điện trở 47 kΩ tại pad R19 trên bo cảm biến.
+ * PHẦN CỨNG NGƯỜI DÙNG ĐANG DÙNG (chốt 26/10/2026):
+ * - Board: AJ-SR04M (không phải JSN-SR04T-2.0 — xem cảnh báo cuối file).
+ * - Đã hàn **47 kΩ tại pad `R19`** -> chế độ **Mode 4 (Serial Trigger)**.
+ *   Mode 4: module ngủ, chỉ đo khi nhận byte `0x01` trên chân RX, rồi phát
+ *   đúng 1 khung 4 byte ra TX và quay lại ngủ. Tiêu thụ 20 µA khi chờ.
+ * - Cầu phân áp trên đường TX (5 V -> 3.3 V): **1 kΩ nối tiếp, 2 kΩ xuống GND**
+ *   -> V_out = 5 × 2/(1+2) = **3,33 V**, an toàn cho GPIO Sonix.
+ *
  * Sơ đồ chân theo docs/hardware/wiring/KVC_MASTER_PINOUT_WIRING.md (Mục 3.2):
- * - VCC  -> 5.0V (Nguồn Buck DC-DC ngoài, cấm cấp 3.3V)
+ * - VCC  -> 5.0 V (Buck DC-DC ngoài; KHÔNG cấp 3.3 V, module cần 5 V cho mạch áp cao)
  * - GND  -> VSS / GND chung toàn hệ thống
- * - TX cảm biến (chân Echo cũ, xuất mức 5V TTL) -> Cầu phân áp 4.7kΩ nối tiếp và 10kΩ xuống GND
- *                                                -> P2.15 (URXD2, Pin 31 LQFP64 | JP3 Pin 31/32)
- * - RX cảm biến (chân Trig cũ, nhận mức 3.3V)   -> P2.14 (UTXD2, Pin 30 LQFP64 | JP3 Pin 29/30)
+ * - TX cảm biến (5 V TTL) -> cầu phân áp 1 kΩ / 2 kΩ -> P2.15 (URXD2, Pin 31)
+ * - RX cảm biến (nhận 3.3 V)                            -> P2.14 (UTXD2, Pin 30)
  *
- * Đặc tả khung truyền nhận 4 byte từ cảm biến:
- * - Byte 0: 0xFF (Start Header cố định)
- * - Byte 1: Data_H (Byte cao khoảng cách tính bằng mm)
- * - Byte 2: Data_L (Byte thấp khoảng cách tính bằng mm)
- * - Byte 3: Checksum = (0xFF + Data_H + Data_L) & 0xFF
+ * Đặc tả khung 4 byte (Mode 3 và Mode 4 dùng chung định dạng):
+ * - Byte 0: `0xFF` — header
+ * - Byte 1: `Data_H` — byte cao của khoảng cách, đơn vị **mm**
+ * - Byte 2: `Data_L` — byte thấp
+ * - Byte 3: `Checksum = (0xFF + Data_H + Data_L) & 0xFF`
  * Distance_mm = (Data_H << 8) | Data_L; Distance_cm = Distance_mm / 10.
+ *
+ * CƠ SỞ CÔNG THỨC CHECKSUM: hai tài liệu hãng mâu thuẫn nhau (xem
+ * docs/hardware/sensors/SENSOR_PACKAGES.md §1.1). Bản Anji viết công thức
+ * `H + L` nhưng ví dụ khung của chính nó là `FF 07 A1 A7`, và chỉ công thức
+ * cộng thêm 0xFF mới cho ra `0xA7`. Firmware bám theo khung mẫu.
+ * **Chưa xác minh trên kit** — nếu khung thật không khớp, `s_usound_last_err`
+ * sẽ là `KVC_USOUND_ERR_CHECKSUM` (2) và đây là chỗ cần xem lại đầu tiên.
  *
  * Người phụ trách: Nguyễn Tá Duy Phong
  */
@@ -28,6 +42,11 @@
 #include "SN34F780.h"
 #include "kvc_pinout.h"
 #include "kvc_uart_ring.h"
+
+/* KVC-F6b: driver này báo thời gian chờ vào time base dùng chung, nên mọi
+ * target/host test có gọi kvc_usound_delay_us() phải link thêm
+ * firmware/mcu_payload/src/kvc_timebase.c. */
+#include "kvc_timebase.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,12 +73,17 @@ static inline void kvc_usound_delay_us(uint32_t us) {
     /* Xung nhịp 12 MHz: 1 µs tương đương 12 chu kỳ clock CPU Cortex-M4.
      * Vòng lặp decrement volatile tốn khoảng 3-4 chu kỳ -> nhân hệ số 4.
      * Tuyệt đối không dùng DWT CYCCNT để tránh bị treo khi MCU chạy standalone không cắm mạch nạp.
+     *
+     * KVC-F6b: thời gian chờ này PHẢI được báo vào time base dùng chung, nếu
+     * không thì mỗi lần đo siêu âm (tới 100 ms) sẽ mất khỏi timestamp_ms và
+     * time base chạy chậm ~9-10 % so với thời gian thật.
      */
     volatile uint32_t count = us * 4U;
     while (count > 0U) {
         count--;
         __NOP();
     }
+    kvc_timebase_add_us(us);
 }
 
 /* ============================================================================
@@ -98,6 +122,10 @@ static KvcUartRing s_usound_rx_ring;
 static volatile uint32_t s_usound_rx_overrun_count = 0U;  /* LS.OE */
 static volatile uint32_t s_usound_rx_framing_count = 0U;  /* LS.FE */
 static volatile uint32_t s_usound_rx_isr_count     = 0U;
+/* Số byte THẬT SỰ lấy ra khỏi RB (bằng số byte vào ring nếu ring không tràn).
+ * Cần để phân biệt "ISR bắn nhiều vì có byte" với "ISR bắn nhiều vì nhiễu trên
+ * đường RX khi module nghỉ" — xem chẩn đoán UART5. */
+static volatile uint32_t s_usound_rx_byte_count    = 0U;
 
 static inline void kvc_usound_init(void) {
     /* 1. Cấp xung nhịp cho khối UART2 (APB0CLKG bit 5) và GPIO Port 2 (APB1CLKG bit 19) */
@@ -131,6 +159,7 @@ static inline void kvc_usound_init(void) {
     s_usound_rx_overrun_count = 0U;
     s_usound_rx_framing_count = 0U;
     s_usound_rx_isr_count     = 0U;
+    s_usound_rx_byte_count    = 0U;
 
     /* 7. Bật ngắt RX (RDAIE) + ngắt lỗi đường truyền (RLSIE) */
     SN_UART2->IE = (1U << 0) | (1U << 2);
@@ -156,6 +185,16 @@ static inline void kvc_usound_uart2_isr(void) {
 
     s_usound_rx_isr_count++;
 
+    /* ĐỌC LS ĐÚNG MỘT LẦN CHO MỖI BYTE.
+     *
+     * Cờ FE/PE/BI/OE trong LS là **sticky gắn với byte ở đỉnh RX FIFO** và chỉ
+     * được xoá khi đọc LS kế tiếp (§15.11.13). Vòng lặp cũ đọc LS ở đầu mỗi
+     * lượt, nên nếu luồng ngắt bắn lại khi FIFO còn byte đó, cùng một byte bị
+     * đếm lỗi hai lần — làm `fe` tiến gần bằng `isr` dù dữ liệu vẫn đúng.
+     *
+     * Nay mỗi lượt: đọc LS một lần, nếu có byte thì đếm lỗi + lấy RB + đếm byte,
+     * rồi mới sang lượt sau. Nhờ vậy `fe` và `bytes` phản ánh đúng số byte.
+     */
     for (uint32_t guard = 0U; guard < 64U; guard++) {
         ls = SN_UART2->LS;
         if ((ls & 0x01U) == 0U) {
@@ -168,6 +207,7 @@ static inline void kvc_usound_uart2_isr(void) {
             s_usound_rx_framing_count++;
         }
         (void)kvc_ring_push_from_isr(&s_usound_rx_ring, (uint8_t)(SN_UART2->RB & 0xFFU));
+        s_usound_rx_byte_count++;
     }
 
     (void)SN_UART2->LS;
@@ -253,8 +293,7 @@ static inline void kvc_usound_feed_byte(uint8_t b) {
  * @brief Đọc cạn toàn bộ byte trong bộ đệm nhận FIFO UART2 (Polling không chặn).
  *        Cần gọi đều đặn trong vòng lặp 1ms để giữ bộ đệm luôn rỗng và bắt gói tin mới nhất.
  */
-static inline void kvc_usound_poll(void) {
-    s_usound_poll_count++;
+static inline void kvc_usound_poll(void) {    s_usound_poll_count++;
 
     /* KVC-M2: tiêu thụ từ ring (ISR đã rút FIFO phần cứng). Có trần mỗi lượt. */
     uint16_t budget = KVC_USOUND_RX_DRAIN_PER_POLL;
@@ -285,11 +324,18 @@ static inline uint8_t kvc_usound_measure(uint16_t *dist_cm, uint16_t *dist_mm) {
         return KVC_USOUND_OK;
     }
 
-    /* 3. Nếu chưa có dữ liệu hợp lệ trong FIFO (vừa bật nguồn hoặc mất tín hiệu),
-     *    gửi byte trigger 0x01 (phục vụ nếu cảm biến dùng Mode 3) và chờ tối đa 100 ms */
+    /* 3. Mode 4: chưa có khung trong ring (vừa boot hoặc đã bỏ lỡ khung trước).
+     *    Mode 4 CHỈ đo khi được kích hoạt, nên phải gửi byte 0x01 rồi chờ.
+     *    (Nếu board đang ở Mode 3 - không phải cấu hình đang dùng - module tự phát
+     *    100 ms/lần và byte 0x01 bị bỏ qua, không gây hại.)
+     *
+     *    Chờ tối đa 100 ms. GIỚI HẠN: datasheet Anji KHÔNG ghi thời gian đáp ứng
+     *    của Mode 4; con số 100 ms được chọn theo chu kỳ danh định của Mode 3.
+     *    Đo ở 5-6 m có thể cần lâu hơn — chưa xác minh được khi không có kit.
+     *    Nếu hay bị KVC_USOUND_ERR_TIMEOUT ở cự ly xa, tăng hằng số này. */
     kvc_usound_uart_tx_byte(0x01);
 
-    uint32_t wait_us = 100000U; /* 100 ms (đúng 1 chu kỳ phát của AJ-SR04M) */
+    uint32_t wait_us = 100000U; /* 100 ms */
     while (wait_us > 0U) {
         uint8_t b;
         while (kvc_ring_pop(&s_usound_rx_ring, &b)) {
@@ -396,6 +442,7 @@ typedef struct {
     uint32_t overrun_count;   /**< LS.OE: FIFO 16 byte phần cứng đã tràn */
     uint32_t framing_count;   /**< LS.FE: sai stop bit */
     uint32_t isr_count;       /**< Số lần vào UART2_IRQHandler */
+    uint32_t byte_count;      /**< Byte thật sự lấy ra khỏi RB */
     uint32_t bytes_pending;   /**< Byte còn trong ring tại thời điểm đọc */
 } KvcUsoundRxStats;
 
@@ -411,6 +458,28 @@ static inline void kvc_usound_get_rx_stats(KvcUsoundRxStats *out) {
     out->overrun_count = s_usound_rx_overrun_count;
     out->framing_count = s_usound_rx_framing_count;
     out->isr_count     = s_usound_rx_isr_count;
+    out->byte_count    = s_usound_rx_byte_count;
+}
+
+/**
+ * @brief Xả ring RX và đặt lại máy trạng thái giải mã về đầu khung.
+ *
+ * DÙNG KHI NÀO: sau một khoảng thời gian dài KHÔNG gọi `kvc_usound_poll()`, ring
+ * 1024 byte có thể đã tràn và byte bị mất giữa khung khiến FSM lệch trạng thái.
+ * Ví dụ điển hình: `kvc_gnss_init()` chạy autobaud 11–15 s ngay sau
+ * `kvc_usound_init()`, trong lúc UART2 ISR vẫn bật nhưng không ai tiêu thụ ring.
+ *
+ * Gọi hàm này một lần trước khi vào vòng lặp chính để bắt đầu lại từ khung mới,
+ * thay vì giải mã tiếp phần đuôi khung bị cắt.
+ *
+ * Chỉ gọi ở main context khi không có ai đang đọc ring. Không làm mất dữ liệu
+ * thật đang cần: chỉ bỏ các byte đã cũ trong ring.
+ */
+static inline void kvc_usound_discard_stale_rx(void) {
+    kvc_ring_reset(&s_usound_rx_ring);
+    s_usound_rx_state = KVC_USOUND_STATE_HEADER;
+    s_usound_has_fresh_data = false;
+    s_usound_last_err = KVC_USOUND_ERR_TIMEOUT;
 }
 
 #ifdef __cplusplus

@@ -19,9 +19,9 @@
 flowchart TD
     subgraph TAI_UAV ["CỤM TẢI NHIỆM VỤ TRÊN UAV"]
         subgraph SENSORS ["Cụm Cảm Biến Định Vị"]
-            JSN["Cảm biến Siêu âm JSN-SR04T<br/>5V Power, UART 9600 bps"]
-            GY87["Module IMU 10-DOF GY-87<br/>3.3V, I2C 400 kHz"]
-            GNSS["Module NEO-M10 (NEO-M10N)<br/>5V Power (LDO on-board hạ 3.3V), UART 9600 bps logic 3.3V"]
+            US["Cảm biến Siêu âm AJ-SR04M<br/>5V Power, UART 9600 bps"]
+            GY87["Module GY-87 (10-DOF)<br/>Chỉ dùng MPU-6050 — 3.3V, I2C0"]
+            GNSS["Bo GNSS u-blox M10 (chip UBX-M10050)<br/>5V Power (LDO on-board hạ 3.3V), UART 9600 bps logic 3.3V"]
         end
 
         subgraph AI_BLOCK ["Khối Xử Lý Quang Học & AI"]
@@ -38,7 +38,7 @@ flowchart TD
             LORA_TX --- ANT_UAV
         end
 
-        JSN -->|"TX qua Cầu Phân Áp 3.3V"| SONIX
+        US -->|"TX qua cầu phân áp 1k/2k"| SONIX
         GY87 <-->|"I2C0: SDA / SCL"| SONIX
         GNSS -->|"UART3: TX đến RX"| SONIX
         FPGA -->|"UART1: BBox Frame 38.4k/115.2k"| SONIX
@@ -77,12 +77,12 @@ Vi điều khiển **Sonix SN34F788FG** (gói LQFP 64 chân) bố trí các cổ
 | | `SPI0_MOSI` | **Pin 23** | `P2.7` | `JP3` Pin 15 hoặc 16 | `MO0` | Chân `MOSI` trên Ra-02 |
 | | `LORA_DIO0` | **Pin 24** | `P2.8` | `JP3` Pin 17 hoặc 18 | GPIO Input (EXTI) | Chân `DIO0` (Ngắt TxDone/RxDone) |
 | | `LORA_RST` | **Pin 25** | `P2.9` | `JP3` Pin 19 hoặc 20 | GPIO Output | Chân `RST` trên Ra-02 |
-| **Siêu âm JSN-SR04T** | `SONIX_URXD2` | **Pin 31** | `P2.15` | `JP3` Pin 31 hoặc 32 | `URXD2` | Nhận cự ly từ chân `TX` cảm biến (qua cầu phân áp) |
+| **Siêu âm AJ-SR04M** | `SONIX_URXD2` | **Pin 31** | `P2.15` | `JP3` Pin 31 hoặc 32 | `URXD2` | Nhận cự ly từ chân `TX` cảm biến (qua cầu phân áp) |
 | | `SONIX_UTXD2` | **Pin 30** | `P2.14` | `JP3` Pin 29 hoặc 30 | `UTXD2` | Gửi xung kích hoạt `RX/Trig` (nếu dùng chế độ xung) |
 | **IMU GY-87 (I2C0)** | `I2C0_SCL` | **Pin 38** | `P0.10` | `JP1` Pin 7 hoặc 8 | `SCL0` | Pull-up `R3` = 1 kΩ đã có trên kit; kiểm tra pull-up trên module |
 | | `I2C0_SDA` | **Pin 39** | `P0.11` | `JP1` Pin 9 hoặc 10 | `SDA0` | Pull-up `R4` = 1 kΩ đã có trên kit; kiểm tra pull-up trên module |
-| **GNSS NEO-M10N (UART3)**| `GNSS_RXD` | **Pin 15** | `P2.1` | `JP3` Pin 3 hoặc 4 | `URXD3` | Nhận dữ liệu NMEA từ chân `TX` của NEO-M10N |
-| | `GNSS_TXD` | **Pin 14** | `P2.0` | `JP3` Pin 1 hoặc 2 | `UTXD3` | Gửi cấu hình sang chân `RX` của NEO-M10N |
+| **GNSS u-blox M10 (UART3)**| `GNSS_RXD` | **Pin 15** | `P2.1` | `JP3` Pin 3 hoặc 4 | `URXD3` | Nhận dữ liệu NMEA từ chân `TX` của NEO-M10N |
+| | `GNSS_TXD` | **Pin 14** | `P2.0` | `JP3` Pin 1 hoặc 2 | `UTXD3` | Gửi cấu hình sang chân `RX` của bo GNSS |
 | **FPGA BBox (UART1)** | `FPGA_URXD` | **Pin 17** | `P2.3` | `JP3` Pin 7 hoặc 8 | `URXD1` | Nhận luồng khung BBox từ `UART_TX` của FPGA (38.4k / 115.2k) |
 | | `FPGA_UTXD` | **Pin 16** | `P2.2` | `JP3` Pin 5 hoặc 6 | `UTXD1` | Gửi lệnh phản hồi sang `UART_RX` của FPGA (dự phòng) |
 | | `DATA_READY` | **Pin 3** | `P0.12` | `JP1` Pin 11 hoặc 12 | GPIO Input (EXTI) | Chân báo ngắt khung ảnh sẵn sàng từ FPGA |
@@ -121,33 +121,58 @@ Vi điều khiển **Sonix SN34F788FG** (gói LQFP 64 chân) bố trí các cổ
 
 ---
 
-### 3.2. Cảm Biến Siêu Âm Chống Nước JSN-SR04T (AJ-SR04M) ↔ Sonix MCU
+### 3.2. Cảm Biến Siêu Âm Chống Nước AJ-SR04M ↔ Sonix MCU
 
-Cảm biến JSN-SR04T cần nguồn **5.0V** để mạch dao động áp cao tạo sóng siêu âm 40 kHz phản xạ tốt trên bề mặt nước lũ. Do chân GPIO của vi điều khiển Sonix **chỉ chịu được 3.3V**, chân TX của cảm biến phải đi qua **cầu phân áp điện trở**.
+> [!IMPORTANT]
+> **Board đang dùng là AJ-SR04M** (board xanh có pad chọn mode `R19`), **không phải
+> JSN-SR04T-2.0**. Hai board dùng chung định dạng khung 4 byte nhưng **khác pad và
+> khác ý nghĩa điện trở** — xem bảng so sánh ở cuối mục này trước khi hàn.
 
-#### Sơ đồ mạch cầu phân áp:
+Cảm biến cần nguồn **5.0 V** để mạch dao động áp cao tạo sóng siêu âm 40 kHz phản xạ tốt trên bề mặt nước lũ. Do chân GPIO của vi điều khiển Sonix **chỉ chịu được 3.3 V**, chân TX của cảm biến phải đi qua **cầu phân áp điện trở**.
+
+#### Sơ đồ mạch cầu phân áp (giá trị đã hàn thực tế: 1 kΩ / 2 kΩ):
 ```text
-Chân TX (JSN-SR04T, mức 5V) ────[ Điện trở R1: 1.0 kΩ ]────┬──── Nối vào chân P2.15 (Sonix URXD2, mức ~3.3V)
-                                                            │
-                                                   [ Điện trở R2: 2.0 kΩ ]
-                                                            │
-                                                           GND (J5)
+Chân TX (AJ-SR04M, mức 5V) ────[ Điện trở R1: 1.0 kΩ ]────┬──── Nối vào chân P2.15 (Sonix URXD2, mức ~3.3V)
+                                                           │
+                                                  [ Điện trở R2: 2.0 kΩ ]
+                                                           │
+                                                          GND (J5)
 ```
-*Điện áp ngõ ra tại điểm phân áp:* `V_out = 5.0V × 2.0kΩ / (1.0kΩ + 2.0kΩ) ≈ 3.33 V` (cực kỳ an toàn cho chân MCU).
+*Điện áp ngõ ra tại điểm phân áp:* `V_out = 5.0 V × 2.0 kΩ / (1.0 kΩ + 2.0 kΩ) ≈ 3.33 V`
+(an toàn cho chân MCU 3.3 V). Dòng tiêu thụ qua cầu phân áp ~1,67 mA khi TX ở mức cao —
+chấp nhận được với nguồn 5 V của hệ thống.
 
-#### Bảng đấu dây JSN-SR04T:
-| Chân Module JSN-SR04T | Chân trên MCU Sonix | Tên chân Kit Sonix | Mức điện áp | Ghi chú cấu hình |
+#### Bảng đấu dây AJ-SR04M:
+| Chân Module AJ-SR04M | Chân trên MCU Sonix | Tên chân Kit Sonix | Mức điện áp | Ghi chú cấu hình |
 | :--- | :--- | :--- | :---: | :--- |
-| **5V / VCC** | Ngõ ra 5V Buck DC-DC | - | 5.0 V | **Không cắm vào chân 3.3V** của Sonix (thiếu áp cảm biến không đo được) |
+| **5V / VCC** | Ngõ ra 5V Buck DC-DC | - | 5.0 V | **Không cắm vào chân 3.3 V** của Sonix (thiếu áp, cảm biến không đo được) |
 | **GND** | `VSS` (GND) | **`J5`** Pin 1, 2, 3 hoặc 4 | 0 V | Nối chung đất toàn hệ thống |
-| **TX / Echo** | `P2.15` (URXD2, Pin 31) | `JP3` Pin 31 hoặc 32 | **3.3 V (sau phân áp)** | Hàn điện trở 47 kΩ tại vị trí **`R19`** (trên bo AJ-SR04M v3.0) hoặc **`R27`** (trên bo JSN-SR04T v2.0) để kích hoạt chế độ tự phát Serial 9600 bps |
-| **RX / Trig** | `P2.14` (UTXD2, Pin 30) | `JP3` Pin 29 hoặc 30 | 3.3 V | Kết nối để gửi byte kích hoạt dự phòng (0x01) khi cần |
+| **TX** | `P2.15` (URXD2, Pin 31) | `JP3` Pin 31 hoặc 32 | **3.3 V (sau phân áp 1k/2k)** | Phát khung 4 byte `0xFF H L SUM` @ 9600 8N1 |
+| **RX** | `P2.14` (UTXD2, Pin 30) | `JP3` Pin 29 hoặc 30 | 3.3 V | Firmware gửi **`0x01`** để kích hoạt mỗi lần đo (Mode 4) |
+
+#### Chọn chế độ bằng pad `R19` (chỉ áp dụng cho AJ-SR04M):
+| Mode | `R19` | Hành vi | Firmware có gửi lệnh? |
+| :--- | :--- | :--- | :--- |
+| 1 | Hở | HC-SR04: xung Trig 10 µs, đọc Echo | Không (driver này không hỗ trợ) |
+| 2 | 300 kΩ | Low-power, xung Trig/Echo | Không |
+| 3 | 120 kΩ | **Tự phát** 100 ms/lần | Không cần |
+| **4** | **47 kΩ** | **Ngủ; đo khi nhận `0x01`, phát 1 khung rồi ngủ** | **Có — cấu hình đang dùng** |
+| 5 | 0 Ω | In ASCII liên tục | Không |
+
+> [!WARNING]
+> **Không nhầm với JSN-SR04T-2.0.** Board đó dùng pad `R27`, và ở đó:
+> `47 kΩ` = Mode 2 (tự phát 100 ms), `120 kΩ` = Mode 3 (chờ lệnh **`0x55`**, không phải `0x01`).
+> Hàn 47 kΩ vào `R27` của JSN-SR04T **không** cho hành vi Mode 4.
+
 
 ---
 
-### 3.3. Cụm Cảm Biến Tư Thế IMU 10-DOF GY-87 ↔ Sonix MCU
+### 3.3. Cụm Cảm Biến Tư Thế GY-87 (10-DOF) ↔ Sonix MCU
 
-Module GY-87 tích hợp 3 chip: **MPU6050** (Gia tốc + Con quay hồi chuyển), **HMC5883L/QMC5883L** (La bàn số 3 trục), và **BMP180** (Áp suất khí quyển). Toàn bộ giao tiếp qua cùng 1 đường truyền I2C0:
+Module GY-87 tích hợp 3 chip: **MPU-6050** (Gia tốc + Con quay hồi chuyển), **HMC5883L/QMC5883L** (La bàn số 3 trục), và **BMP180** (Áp suất khí quyển). Toàn bộ giao tiếp qua cùng 1 đường truyền I2C0.
+
+> [!IMPORTANT]
+> **Firmware hiện chỉ dùng MPU-6050.** HMC5883L **hoãn** (cần hiệu chuẩn trên kit) và BMP180 **đã loại khỏi thiết kế**. Việc đấu dây I2C0 vẫn giữ nguyên vì cả 3 chip nằm sẵn trên module GY-87 — không cần thay đổi phần cứng khi bật lại sau này. Chi tiết và lý do: [IF_MCU_SENSORS.md §3.2 B–C](../../interfaces/IF_MCU_SENSORS.md).
 
 > ⚠️ Starter-Kit V1.1 đã có `R3` và `R4` = **1 kΩ** kéo lên cho I2C0. **Không lắp thêm điện trở kéo ngoài.** Nếu module GY-87 thực tế cũng có pull-up, kiểm tra cấu hình/điện trở tương đương và cô lập một bộ khi cần; không giả định mọi biến thể GY-87 giống nhau.
 
@@ -161,16 +186,36 @@ Module GY-87 tích hợp 3 chip: **MPU6050** (Gia tốc + Con quay hồi chuyể
 
 ---
 
-### 3.4. Module Định Vị Vệ Tinh NEO-M10 (NEO-M10N) GNSS ↔ Sonix MCU
+### 3.4. Module Định Vị Vệ Tinh u-blox M10 (bo breakout, chip UBX-M10050) ↔ Sonix MCU
 
-Bo breakout NEO-M10N tích hợp sẵn IC hạ áp LDO và diode bảo vệ với chân nguồn được in rõ nhãn **`5V`**. Yêu cầu cấp nguồn **5.0 V DC** vào chân `5V` (không cấp 3.3 V vào chân này vì sụt áp qua LDO sẽ khiến chip hoạt động chập chờn). Tín hiệu `TX`/`RX` hoạt động ở mức logic **3.3 V LVTTL**, cắm trực tiếp an toàn vào GPIO Sonix SN34F788. [u-blox NEO-M10N Integration Manual / Data Sheet UBX-21035619](https://content.u-blox.com/sites/default/files/NEO-M10N_DataSheet_UBX-21035619.pdf).
+> [!CAUTION]
+> **Tên gọi:** u-blox **không** có sản phẩm `NEO-M10` hay `NEO-M10N`. Kiểm ngày
+> 26/10/2026: `u-blox.com/en/product/neo-m10-series` trả **404**. Dòng M10 chỉ có
+> `MAX-M10M`, `MAX-M10S`, `MAX-M10N` (đã ngừng kinh doanh) và chip `UBX-M10050`.
+>
+> Bo đang dùng là **bo breakout thương mại** gắn chip `UBX-M10050` (nhãn in trên
+> bo: "Ublox-10th generation"; chân `5V GND TX RX`, kèm header I2C). Bo này
+> **không có datasheet chính thức**; thông số dưới đây lấy từ datasheet chip
+> `MAX-M10N-10B` (cùng silicon M10), lưu tại
+> [`docs/hardware/sensors/ublox_m10/`](../sensors/SENSOR_PACKAGES.md).
 
-| Chân Module NEO-M10N | Chân trên MCU Sonix | Tên chân Kit Sonix | Ghi chú kỹ thuật |
+Bo tích hợp sẵn IC hạ áp LDO và diode bảo vệ, chân nguồn in rõ nhãn **`5V`**. Cấp
+**5.0 V DC** vào chân `5V` (không cấp 3.3 V trực tiếp vì sụt áp qua LDO sẽ khiến chip
+chập chờn). Tín hiệu `TX`/`RX` ở mức logic **3.3 V LVTTL**, đấu trực tiếp an toàn vào
+GPIO Sonix SN34F788 — **không cần cầu phân áp**.
+
+| Chân bo GNSS | Chân trên MCU Sonix | Tên chân Kit Sonix | Ghi chú kỹ thuật |
 | :--- | :--- | :--- | :--- |
-| **5V** | Nguồn 5V DC | Mạch Buck 5V hoặc chân 5V Kit | Cấp nguồn 5.0 V DC (IC LDO trên bo hạ áp xuống 3.3 V nuôi chip) |
+| **5V** | Nguồn 5 V DC | Mạch Buck 5 V hoặc chân 5 V Kit | Cấp 5.0 V DC (LDO trên bo hạ xuống 3.3 V nuôi chip) |
 | **GND** | `VSS` (GND) | **`J5`** Pin 1, 2, 3 hoặc 4 | Nối chung GND toàn hệ thống |
-| **TX (Module)** | `P2.1` (URXD3, Pin 15) | `JP3` Pin 3 hoặc 4 | Tín hiệu NMEA truyền về MCU Sonix (Baudrate mặc định: 9600 bps, logic 3.3 V) |
-| **RX (Module)** | `P2.0` (UTXD3, Pin 14) | `JP3` Pin 1 hoặc 2 | Cấu hình tần số lấy mẫu (1 Hz – 10 Hz, logic 3.3 V) |
+| **TX (Module)** | `P2.1` (URXD3, Pin 15) | `JP3` Pin 3 hoặc 4 | NMEA về MCU. **Mặc định 9600 8N1, không flow control** (datasheet MAX-M10N). Firmware đặt `KVC_GNSS_BAUD_RATE = 9600`. |
+| **RX (Module)** | `P2.0` (UTXD3, Pin 14) | `JP3` Pin 1 hoặc 2 | Gửi cấu hình UBX sang module (hiện firmware chưa dùng) |
+
+> [!NOTE]
+> Nếu module đã bị đổi tốc độ bằng u-center trước đó, firmware 9600 sẽ **không nhận
+> được gì**. Dấu hiệu: `[RING] GNSS isr=` giữ nguyên 0 sau 10 giây. Khi đó dùng
+> u-center đọc lại `CFG-UART1` rồi đặt về 9600. Chỉ xác minh được khi có kit.
+
 
 ---
 
@@ -238,7 +283,7 @@ Tại trạm mặt đất, module LoRa Ra-02 thứ hai kết nối với chip vi
          ▼
 [ Khối Hạ Áp Buck DC-DC 5V / 3A ]
          │
-         ├───► [ 5.0V ]: Cấp cho Cảm biến Siêu âm JSN-SR04T và Module GNSS NEO-M10N (chân 5V)
+         ├───► [ 5.0V ]: Cấp cho cảm biến siêu âm AJ-SR04M và bo GNSS M10 (chân 5V) (chân 5V)
          │
          └───► [ Khối Hạ Áp LDO 3.3V / 2A ]
                    │
@@ -249,7 +294,7 @@ Tại trạm mặt đất, module LoRa Ra-02 thứ hai kết nối với chip vi
 Nguồn USB SN-Link dùng lựa chọn khác: `J4` đóng 1–2 (`3V3_LINK`). `3V3_EXT` phải là nguồn 3.3 V đã ổn áp từ buck/LDO; tuyệt đối không đưa pin LiPo thô vào J6 Pin 4.
 
 [ ĐƯỜNG TIẾP ĐỊA CHUNG - STAR GROUND ]:
-Nối toàn bộ chân GND của Pin, Buck 5V, LDO 3.3V, Sonix, JSN-SR04T, GY-87, NEO-M10N, OneKiwi về 1 điểm chung.
+Nối toàn bộ chân GND của Pin, Buck 5V, LDO 3.3V, Sonix, AJ-SR04M, GY-87, bo GNSS M10, OneKiwi về 1 điểm chung.
 ```
 
 ---
@@ -257,13 +302,13 @@ Nối toàn bộ chân GND của Pin, Buck 5V, LDO 3.3V, Sonix, JSN-SR04T, GY-87
 ## 6. Danh Mục Kiểm Tra An Toàn Trước Khi Cấp Nguồn (Pre-Power Checklist)
 
 - [ ] **Ăng-ten LoRa:** Đã gắn cáp IPX và vặn chặt ăng-ten vào cả 2 module Ra-02 (UAV và Trạm đất) chưa? *(Nếu chưa: DỪNG LẠI, KHÔNG CẤP NGUỒN).*
-- [ ] **Mức điện áp JSN-SR04T:** Đã gắn cầu phân áp (1kΩ / 2kΩ) trên đường tín hiệu TX của cảm biến siêu âm trước khi cắm vào chân `P2.15` của Sonix chưa?
+- [ ] **Mức điện áp AJ-SR04M:** Đã gắn cầu phân áp (1kΩ / 2kΩ) trên đường tín hiệu TX của cảm biến siêu âm trước khi cắm vào chân `P2.15` của Sonix chưa?
 - [ ] **Nguồn và jumper trên Kit Sonix:** `J4` đóng 1–2 để chọn `3V3_LINK` từ LDO SN-Link, hoặc đóng 2–3 để chọn `3V3_EXT` 3.3 V đã ổn áp từ buck/LDO ngoài. Sơ đồ nguồn UAV ở mục 5 dùng lựa chọn 2–3; không cấp LiPo thô vào `3V3_EXT`. `JP9` mở (Open) để MCU chạy chương trình người dùng.
 - [ ] **J1 / VDDIO1:** Xác nhận `J1` đóng short, nối `VDDIO1` với `VDD` (cấu hình mặc định 3.3 V); nếu jumper mở thì dừng cấp nguồn cho đến khi rail được cấp đúng thiết kế.
 - [ ] **J6:** Dùng chân 1–3 làm ngõ ra `VDD`; chỉ dùng chân 4 làm ngõ vào `3V3_EXT`, với J4 đóng 2–3.
 - [ ] **Tiếp địa (GND):** Đã kiểm tra thông mạch giữa tất cả các điểm GND của các bo mạch bằng đồng hồ đo VOM chưa?
 - [ ] **Trở kéo I2C:** `R3`/`R4` = 1 kΩ đã có sẵn trên Starter-Kit cho I2C0; **không cắm thêm trở kéo ngoài**. Nếu GY-87 có pull-up tích hợp, xác minh và cô lập một bộ nếu điện trở song song quá thấp.
-- [ ] **Cực tính nguồn:** Đã kiểm tra đúng chiều (+) và (-), đồng thời xác nhận module NEO-M10N được cấp đúng nguồn 5.0 V DC vào chân 5V (LDO trên bo hạ về 3.3 V), các đường tín hiệu TX/RX giữ chuẩn logic 3.3 V.
+- [ ] **Cực tính nguồn:** Đã kiểm tra đúng chiều (+) và (-), đồng thời xác nhận bo GNSS M10 được cấp đúng nguồn 5.0 V DC vào chân 5V (LDO trên bo hạ về 3.3 V), các đường tín hiệu TX/RX giữ chuẩn logic 3.3 V.
 
 ---
 *Trạng thái: DRAFT HARDWARE SPECIFICATION (DESIGN BASELINE - SOURCE-VERIFIED). SOURCE-VERIFIED chỉ phản ánh đối chiếu tài liệu/sơ đồ; chưa có phép đo hoặc xác minh trên bo thật. Chờ Human approval trước khi dùng làm wiring release.*

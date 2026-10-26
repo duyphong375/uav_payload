@@ -107,7 +107,7 @@ npm run dev
    - Backend tự động sinh luồng tọa độ UAV bay quỹ đạo quanh khu vực lũ lụt giả lập và phát hiện người/phao giả lập.
    - Thích hợp phát triển giao diện, kiểm thử tính năng HUD, bản đồ mà không cần phần cứng.
 2. **REAL ingress (chưa triển khai):**
-   - IF-03 nêu endpoint mục tiêu `ws://192.168.4.1:8080/telemetry` và SSID `KVC_GCS_AP`; đây là baseline thiết kế, chưa xác minh trên thiết bị.
+   - IF-03 nêu gateway chọn mạng theo thứ tự ưu tiên: STA vào Wi-Fi 2.4 GHz trước, SoftAP `KVC_GROUND_STATION` (IP `192.168.4.1`, mật khẩu `kvc123456`) chỉ là dự phòng khi STA thất bại. Endpoint mục tiêu `ws://192.168.4.1:8080/telemetry`; chưa xác minh trên thiết bị.
    - Backend hiện chưa kết nối gateway hoặc giải mã gói LoRa. Không dùng source hiện tại để nghiệm thu đường dữ liệu phần cứng.
 3. **REPLAY Mode (Phát lại dữ liệu lịch sử):**
    - Đọc dữ liệu bay đã ghi trong tệp SQLite để tua lại toàn bộ phiên cứu nạn phục vụ đánh giá sau nhiệm vụ.

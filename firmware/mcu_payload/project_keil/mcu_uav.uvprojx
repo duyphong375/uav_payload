@@ -389,6 +389,16 @@
               <FilePath>.\main.c</FilePath>
             </File>
             <File>
+              <FileName>kvc_timebase.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\kvc_timebase.c</FilePath>
+            </File>
+            <File>
+              <FileName>kvc_ubx_cfg.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\kvc_ubx_cfg.c</FilePath>
+            </File>
+            <File>
               <FileName>kvc_gnss_neo_m10.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\src\sensors\kvc_gnss_neo_m10.c</FilePath>

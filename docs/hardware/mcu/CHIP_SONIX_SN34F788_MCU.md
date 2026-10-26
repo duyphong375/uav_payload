@@ -504,7 +504,13 @@ Hồ sơ kỹ thuật, gói cài đặt và tài liệu gốc của hãng **khô
 Git (bị ignore, chưa xác minh quyền phân phối). Danh mục phiên bản, checksum và
 cách khôi phục nằm ở [VENDOR_PACKAGES.md](../vendor/VENDOR_PACKAGES.md) mục 1.
 
-Sau khi khôi phục theo manifest, các file nằm trong `docs/hardware/sonix_sn34f788/`:
+**Trạng thái cục bộ ngày 26/10/2026:** hai file quan trọng nhất đã có trong
+workspace và hash khớp manifest — `SN34F780_V1.7.pdf` (User Manual) và
+`SN34F780_STARTKIT_V1.1.pdf` (schematic). Chúng vẫn bị Git ignore, nên clone mới
+phải khôi phục lại theo manifest. Các file còn lại trong danh sách dưới đây
+(QuickStart PDF, DFP pack, SN-Link driver) hiện **chưa** có trong workspace này.
+
+Vị trí các file (đường dẫn tương đối trong `docs/hardware/sonix_sn34f788/`):
 
 *   `SN34F780_StartKit_Package_V1.10R/Document/SN34F780_V1.7.pdf`: User Manual v1.7 của dòng SN34F780 Series (521 trang PDF; nội dung áp dụng theo từng mã biến thể).
 *   `SN34F780_StartKit_Package_V1.10R/Document/QuickStart/SN34F780_QuickStart_V1.1R_EN.pdf`: Hướng dẫn khởi động nhanh thiết lập phần cứng Starter Kit và cài đặt Keil MDK (26 trang).

@@ -202,7 +202,7 @@ static void test_buffer_overflow_protection(void) {
  * TEST CASE 6: KIỂM TRA TOÀN BỘ CÁC NGƯỠNG TIÊU CHUẨN ĐỊNH VỊ 3D
  * ============================================================================ */
 static void test_fix_thresholds(void) {
-    printf("[TEST 6] Fix thresholds (quality >= 1, mode >= 2, sats >= 4, HDOP <= 5.00)...\n");
+    printf("[TEST 6] Fix thresholds (quality >= 1, mode >= 2, sats >= 5, HDOP <= 2.50)...\n");
 
     /* 6.1: Fix quality < 1 */
     kvc_gnss_reset();
@@ -216,24 +216,33 @@ static void test_fix_thresholds(void) {
     send_nmea("GNGSA,A,1,,,,,,,,,,,,,1.80,1.20,1.00", 1010);
     TEST_ASSERT(!kvc_gnss_is_valid(), "Mode=1 (No fix) must NOT be valid");
 
-    /* 6.3: Satellites < 4 (Ví dụ 3 vệ tinh) */
+    /* 6.3: Satellites < 5 (ví dụ 4 vệ tinh) */
     kvc_gnss_reset();
-    send_nmea("GNGGA,074522.00,1604.43112,N,10808.99526,E,1,03,1.20,12.5,M,0.0,M,,", 1000);
-    send_nmea("GNGSA,A,3,01,02,03,,,,,,,,,,1.80,1.20,1.00", 1010);
-    TEST_ASSERT(!kvc_gnss_is_valid(), "Sats=3 (< 4) must NOT be valid");
+    send_nmea("GNGGA,074522.00,1604.43112,N,10808.99526,E,1,04,1.20,12.5,M,0.0,M,,", 1000);
+    send_nmea("GNGSA,A,3,01,02,03,04,,,,,,,,,1.80,1.20,1.00", 1010);
+    TEST_ASSERT(!kvc_gnss_is_valid(), "Sats=4 (< 5) must NOT be valid");
+    TEST_ASSERT(!kvc_gnss_is_3d_fix(), "Sats=4 must NOT be 3D fix");
 
-    /* 6.4: HDOP > 5.00 (Ví dụ 5.01) */
+    /* 6.4: HDOP > 2.50 (ví dụ 2.51) */
     kvc_gnss_reset();
-    send_nmea("GNGGA,074522.00,1604.43112,N,10808.99526,E,1,08,5.01,12.5,M,0.0,M,,", 1000);
-    send_nmea("GNGSA,A,3,01,02,03,04,05,06,07,08,,,,,6.00,5.01,2.00", 1010);
-    TEST_ASSERT(!kvc_gnss_is_valid(), "HDOP=5.01 (> 5.00) must NOT be valid");
+    send_nmea("GNGGA,074522.00,1604.43112,N,10808.99526,E,1,08,2.51,12.5,M,0.0,M,,", 1000);
+    send_nmea("GNGSA,A,3,01,02,03,04,05,06,07,08,,,,,3.00,2.51,2.00", 1010);
+    TEST_ASSERT(!kvc_gnss_is_valid(), "HDOP=2.51 (> 2.50) must NOT be valid");
+    TEST_ASSERT(!kvc_gnss_is_3d_fix(), "HDOP=2.51 must NOT be 3D fix");
 
-    /* 6.5: HDOP đúng ngưỡng biên 5.00 và 4 vệ tinh với Mode 2 (2D fix) -> Phải VALID */
+    /* 6.5: Mode 2 (2D fix) với sats/HDOP đạt -> vị trí dùng được nhưng KHÔNG phải 3D fix */
     kvc_gnss_reset();
-    send_nmea("GNGGA,074522.00,1604.43112,N,10808.99526,E,1,04,5.00,12.5,M,0.0,M,,", 1000);
-    send_nmea("GNGSA,A,2,01,02,03,04,,,,,,,,,6.00,5.00,2.00", 1010);
-    TEST_ASSERT(kvc_gnss_is_valid(), "Boundary sats=4 and HDOP=5.00 with Mode=2 must be VALID");
+    send_nmea("GNGGA,074522.00,1604.43112,N,10808.99526,E,1,06,1.20,12.5,M,0.0,M,,", 1000);
+    send_nmea("GNGSA,A,2,01,02,03,04,05,06,,,,,,1.80,1.20,1.00", 1010);
+    TEST_ASSERT(kvc_gnss_is_valid(), "Mode=2 with sats=6 and HDOP=1.20 must still be a usable position");
     TEST_ASSERT(!kvc_gnss_is_3d_fix(), "Mode=2 must NOT be 3D fix");
+
+    /* 6.6: Ngưỡng biên đúng 2.50 và đúng 5 vệ tinh với Mode 3 -> 3D fix hợp lệ */
+    kvc_gnss_reset();
+    send_nmea("GNGGA,074522.00,1604.43112,N,10808.99526,E,1,05,2.50,12.5,M,0.0,M,,", 1000);
+    send_nmea("GNGSA,A,3,01,02,03,04,05,,,,,,,2.80,2.50,1.00", 1010);
+    TEST_ASSERT(kvc_gnss_is_valid(), "Boundary sats=5 and HDOP=2.50 must be VALID");
+    TEST_ASSERT(kvc_gnss_is_3d_fix(), "Boundary sats=5 and HDOP=2.50 with Mode=3 must be 3D fix");
 }
 
 /* ============================================================================

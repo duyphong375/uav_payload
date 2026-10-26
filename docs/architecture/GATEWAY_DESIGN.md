@@ -17,7 +17,7 @@ Phân hệ **Gateway ESP32** đóng vai trò là "cầu nối biên vô tuyến"
 1. **Thu sóng LoRa độc lập:** Sử dụng nguồn pin riêng, liên tục thu các bản tin cứu nạn (32 byte) do MCU Sonix SN34F788 trên UAV bắn xuống ở tần số **433.0 MHz**.
 2. **Đo đạc chất lượng kết nối:** Trích xuất chỉ số cường độ sóng **`RSSI (dBm)`** và tỷ số tín hiệu trên nhiễu **`SNR (dB)`** từ chip SX1278.
 3. **Kiểm tra tính toàn vẹn:** Xác minh mã **`CRC-16/CCITT-FALSE`** của gói tin trước khi cho phép dữ liệu đi tiếp.
-4. **Phát Wi-Fi SoftAP nội bộ:** Khởi tạo mạng Wi-Fi riêng `KVC_GCS_AP` (IP: `192.168.4.1`) không cần Internet hay router.
+4. **Thiết lập mạng theo thứ tự ưu tiên:** (1) kết nối Wi-Fi 2.4 GHz đã cấu hình sẵn (tối đa 4 mạng; "4G" của dự án là hotspot do điện thoại phát, không cần module 4G); (2) nếu không có credential hoặc hết ngân sách khởi động mà chưa nối được thì tự phát SoftAP `KVC_GROUND_STATION` (IP `192.168.4.1`, mật khẩu `kvc123456`). Khi ưu tiên 1 nối lại được, firmware tự đóng SoftAP. ESP32-C3 chỉ hỗ trợ 2.4 GHz.
 5. **Mở WebSocket Server (:8080):** Đóng gói payload kèm metadata sóng vô tuyến thành bản tin JSON **Transport Envelope v1** để bắn sang Backend GCS chạy trên laptop qua đường truyền WebSocket.
 6. **Bộ đệm chống mất dữ liệu (Offline FIFO - Mục tiêu mở rộng):** Đề xuất lưu tạm tối đa 64 gói vào RAM khi laptop ngắt kết nối Wi-Fi; bản firmware v1 hiện hành trong `src/main.cpp` thực hiện phát trực tiếp (broadcast) tới các client đang kết nối.
 
@@ -51,7 +51,7 @@ Firmware của bạn được chia thành 4 khối chức năng độc lập:
 | :--- | :--- | :--- |
 | **`lora_receiver`** | Thu sóng LoRa SX1278 | • Khởi tạo chip SX1278 qua SPI (433MHz, BW 125kHz, SF7, CR 4/5, Sync 0x12).<br>• Bắt ngắt nhận gói `DIO0 (RxDone)`.<br>• Đọc 32 byte dữ liệu thô, đọc RSSI và SNR. |
 | **`crc16`** | Kiểm tra lỗi gói tin | • Thuật toán `CRC-16/CCITT-FALSE` (Poly `0x1021`, Init `0xFFFF`).<br>• Tính trên 30 byte đầu tiên, so khớp với 2 byte CRC ở cuối gói tin. |
-| **`wifi_softap`** | Trạm phát Wi-Fi | • Cấu hình Access Point: SSID `KVC_GCS_AP`, bảo mật WPA2.<br>• Cấu hình IP tĩnh: `192.168.4.1`, Subnet: `255.255.255.0`. |
+| **`wifi_softap`** | Trạm phát Wi-Fi | • Cấu hình Access Point: SSID `KVC_GROUND_STATION`, bảo mật WPA2.<br>• Cấu hình IP tĩnh: `192.168.4.1`, Subnet: `255.255.255.0`. |
 | **`ws_server`** | WebSocket Server | • Mở cổng TCP `8080`, endpoint `/telemetry`.<br>• Lắng nghe kết nối từ Backend Python trên laptop.<br>• Chuyển đổi 32 byte thành chuỗi Hex 64 ký tự và broadcast JSON Envelope v1. |
 
 ---
@@ -166,8 +166,12 @@ Dưới đây là mã nguồn chuẩn chỉnh từng file bạn có thể lưu t
 #define RF_PAYLOAD_SIZE  32       // Kích thước chuẩn 32 bytes
 
 // =================== CẤU HÌNH WI-FI & WEBSOCKET ===================
-#define WIFI_SSID        "KVC_GCS_AP"
-#define WIFI_PASS        "kvc@2026sar"     // Mật khẩu Wi-Fi
+// Ưu tiên 1: STA (Wi-Fi 2.4 GHz có sẵn) qua build flag, không hardcode.
+// Ưu tiên 2: SoftAP dự phòng dưới đây, bật khi STA thất bại sau 10 s.
+#define WIFI_SSID        ""                // Nạp bằng -D KVC_WIFI_SSID=\"...\"
+#define WIFI_PASS        ""                // Nạp bằng -D KVC_WIFI_PASS=\"...\"
+#define AP_SSID          "KVC_GROUND_STATION"
+#define AP_PASS          "kvc123456"       // Mật khẩu SoftAP dự phòng
 #define WS_PORT          8080              // Cổng WebSocket
 ```
 
@@ -397,10 +401,10 @@ void setup() {
     Serial.println("   KVC UAV RESCUE - ESP32 GROUND GATEWAY     ");
     Serial.println("=============================================");
 
-    // 1. Khởi tạo Wi-Fi SoftAP
-    Serial.print("[INIT] Starting Wi-Fi SoftAP (KVC_GCS_AP)... ");
-    wifi_softap_init();
-    Serial.println("OK! IP: 192.168.4.1");
+    // 1. Thiết lập mạng theo thứ tự ưu tiên (STA 2.4 GHz trước, SoftAP dự phòng)
+    Serial.print("[INIT] Starting network (priority 1: STA 2.4 GHz)... ");
+    wifi_begin();
+    Serial.println("OK!");
 
     // 2. Khởi tạo WebSocket Server
     Serial.print("[INIT] Starting WebSocket Server on port 8080... ");
@@ -446,7 +450,7 @@ void loop() {
 
 ## 8. KỊCH BẢN KIỂM THỬ ĐẦU-CUỐI (END-TO-END TEST)
 
-1. Cấp nguồn cho ESP32 $\to$ Đèn Serial in ra `OK! IP: 192.168.4.1`.
-2. Dùng laptop quét Wi-Fi $\to$ Thấy mạng **`KVC_GCS_AP`** $\to$ Kết nối với mật khẩu `kvc@2026sar`.
+1. Cấp nguồn cho ESP32 $\to$ Serial in ra `[WIFI-STA] Ket noi STA THANH CONG` (đã nối Wi-Fi 2.4 GHz) hoặc `[WIFI-AP] Phat SoftAP du phong THANH CONG` với IP `192.168.4.1` (khi không nối được STA sau 10 s).
+2. Dùng laptop quét Wi-Fi $\to$ Nếu ở chế độ dự phòng, thấy mạng **`KVC_GROUND_STATION`** $\to$ Kết nối với mật khẩu `kvc123456`.
 3. Bật mạch phát LoRa của Phong (hoặc bấm Mock Target trên Kit MCU Sonix) $\to$ Serial Monitor của ESP32 báo `[LORA] Valid Packet!`.
 4. Mở trình duyệt trên máy tính kết nối vào Dashboard GCS $\to$ Bản đồ và Radar hiển thị tức thời tọa độ mục tiêu cứu nạn!

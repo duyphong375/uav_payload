@@ -66,6 +66,7 @@ typedef struct {
     uint32_t framing_count;   /**< LS.FE: sai stop bit */
     uint32_t parity_count;    /**< LS.PE: sai parity */
     uint32_t isr_count;       /**< Số lần vào UART1_IRQHandler */
+    uint32_t byte_count;      /**< Byte thật sự lấy ra khỏi RB */
     uint32_t bytes_pending;   /**< Byte còn trong ring tại thời điểm đọc */
 } KvcBBoxRxStats;
 

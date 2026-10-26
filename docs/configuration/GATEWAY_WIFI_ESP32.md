@@ -47,43 +47,68 @@ Toàn bộ hệ thống trạm mặt đất KVC hoạt động theo mô hình **
 
 ---
 
-## 2. CHỌN PHƯƠNG ÁN KẾT NỐI KHI THAY ĐỔI MÔI TRƯỜNG
+## 2. THỨ TỰ ƯU TIÊN KẾT NỐI (FIRMWARE TỰ QUYẾT ĐỊNH)
 
-Mỗi khi bạn di chuyển địa điểm (ở nhà, phòng Lab, trường học, bờ sông, sa bàn), bạn chọn **1 trong 2 phương án** dưới đây:
+Firmware gateway chạy theo đúng thứ tự sau, **không cần chọn tay**:
+
+| Ưu tiên | Điều kiện | Hành vi |
+| :--- | :--- | :--- |
+| **1** | Có Wi-Fi **2.4 GHz** đã thiết lập sẵn (truyền qua build flag `KVC_WIFI_SSID` / `KVC_WIFI_PASS`, hỗ trợ tới 4 mạng `..._SSID2..4`) | ESP32 lần lượt thử từng mạng đã khai báo. **Không phát SoftAP** nếu một mạng kết nối thành công. |
+| **2** | Không có credential, hoặc hết `15 s` ngân sách khởi động mà chưa nối được mạng nào | ESP32 tự phát SoftAP `KVC_GROUND_STATION` để laptop bắt vào. Đồng thời vẫn thử lại ưu tiên 1 mỗi `30 s`, luân phiên qua các mạng; nếu nối được thì **tự đóng SoftAP**. |
+
+> [!NOTE]
+> **"4G" trong dự án là do điện thoại phát hotspot Wi-Fi 2.4 GHz** — không phải module 4G/LTE gắn vào ESP32. Điện thoại lo phần sóng di động, ESP32-C3 chỉ cần bắt Wi-Fi của điện thoại, nên **không cần thêm phần cứng nào**.
+>
+> Cách dùng: bật hotspot trên điện thoại (nhớ chọn băng tần **2.4 GHz**, nhiều máy Android mặc định 5 GHz), rồi nạp firmware kèm SSID/mật khẩu hotspot đó. Gateway sẽ ưu tiên bắt hotspot điện thoại trước, và chỉ phát SoftAP khi không bắt được.
+>
+> **ESP32-C3 chỉ hỗ trợ 2.4 GHz**, không hỗ trợ 5 GHz. Đây là giới hạn phần cứng, không sửa được bằng firmware.
 
 ---
 
-### PHƯƠNG ÁN 1: DÙNG WI-FI SOFTAP CỦA ESP32 (KHUYẾN NGHỊ SỐ 1 — KHÔNG CẦN SỬA CODE)
+### PHƯƠNG ÁN DỰ PHÒNG: DÙNG WI-FI SOFTAP CỦA ESP32 (TỰ ĐỘNG, KHÔNG CẦN SỬA CODE)
 
-Đây là phương án chuẩn nhất của dự án. ESP32 tự phát Wi-Fi độc lập, bạn không cần quan tâm xung quanh có Wi-Fi hay không.
+Đây là chế độ **ưu tiên 2**: ESP32 chỉ phát mạng này khi không kết nối được Wi-Fi 2.4 GHz ở ưu tiên 1. Bạn không cần quan tâm xung quanh có Wi-Fi hay không.
 
 #### A. Thông số mạng cố định:
 | Tham số | Giá trị thiết lập | Ghi chú kỹ thuật |
 | :--- | :--- | :--- |
-| **Tên Wi-Fi (SSID)** | **`KVC_GCS_AP`** | Phát trực tiếp từ chip ESP32-C3 |
-| **Mật khẩu (Password)** | **`kvc12345678`** | Chuẩn bảo mật WPA2-PSK |
+| **Tên Wi-Fi (SSID)** | **`KVC_GROUND_STATION`** | Phát trực tiếp từ chip ESP32-C3 |
+| **Mật khẩu (Password)** | **`kvc123456`** | Chuẩn bảo mật WPA2-PSK |
 | **Địa chỉ IP của ESP32** | **`192.168.4.1`** | Luôn luôn cố định 100% |
 | **Cổng WebSocket** | **`8080`** | Cổng dịch vụ đo xa |
 | **Đường dẫn Ingress** | **`ws://192.168.4.1:8080/telemetry`** | Endpoint mục tiêu |
 
 #### B. Các bước thực hiện:
-1. **Cắm nguồn ESP32-C3:** Cắm cáp Type-C vào Laptop hoặc pin sạc dự phòng. Sau 10 giây nếu không thấy Wi-Fi cũ, ESP32 sẽ tự động kích hoạt chế độ SoftAP `KVC_GCS_AP`.
-2. **Laptop bắt Wi-Fi:** Mở danh sách mạng Wi-Fi trên thanh Taskbar Windows $\rightarrow$ Chọn mạng **`KVC_GCS_AP`** $\rightarrow$ Nhập mật khẩu: `kvc12345678`.
+1. **Cắm nguồn ESP32-C3:** Cắm cáp Type-C vào Laptop hoặc pin sạc dự phòng. Sau 10 giây không kết nối được Wi-Fi 2.4 GHz ở ưu tiên 1, ESP32 tự kích hoạt SoftAP `KVC_GROUND_STATION`.
+2. **Laptop bắt Wi-Fi:** Mở danh sách mạng Wi-Fi trên thanh Taskbar Windows $\rightarrow$ Chọn mạng **`KVC_GROUND_STATION`** $\rightarrow$ Nhập mật khẩu: `kvc123456`.
 3. **Khởi động Backend và Frontend:** (Xem Mục 3 bên dưới) $\rightarrow$ Hệ thống tự động kết nối và chạy ngay lập tức.
 4. **Sửa code:** **HOÀN TOÀN KHÔNG CẦN SỬA BẤT KỲ DÒNG CODE NÀO.**
 
 ---
 
-### PHƯƠNG ÁN 2: BẮT CHUNG WI-FI CỦA ROUTER (KHI MUỐN VỪA CÓ INTERNET VỪA BẮT ESP32)
+### PHƯƠNG ÁN ƯU TIÊN 1: BẮT WI-FI 2.4 GHz CÓ SẴN (HOTSPOT ĐIỆN THOẠI HOẶC ROUTER)
 
-Áp dụng khi bạn làm việc tại bàn học/phòng Lab, muốn Laptop vừa lướt web tải tài liệu vừa giao tiếp với ESP32 qua cùng một Router Wi-Fi cục bộ.
+Áp dụng khi bạn muốn ESP32 vào chung mạng với laptop. Hai trường hợp phổ biến:
 
-#### Bước 1: Cấu hình SSID & Mật khẩu qua Build Flag của PlatformIO (Không sửa code)
-Kể từ bản vá Task F11, thông tin Wi-Fi không còn hardcode trong mã nguồn `firmware/gateway_esp32/src/main.cpp`. Bạn truyền trực tiếp thông tin mạng lúc nạp code:
+- **Hotspot 4G từ điện thoại:** điện thoại phát Wi-Fi 2.4 GHz, laptop và ESP32 cùng bắt vào. Đây là cách "dùng 4G" của dự án — **không cần module 4G**.
+- **Router Wi-Fi phòng Lab/nhà:** vừa có Internet vừa giao tiếp với ESP32.
+
+#### Bước 1: Bật hotspot 2.4 GHz trên điện thoại (nếu dùng 4G)
+- Android: Cài đặt → Điểm phát sóng/Chia sẻ mạng → bật **băng tần 2.4 GHz** (nhiều máy mặc định 5 GHz — nếu để 5 GHz, ESP32-C3 sẽ **không** thấy mạng).
+- iPhone: Cài đặt → Điểm truy cập cá nhân → bật "Tối đa hóa khả năng tương thích" (bắt buộc phát 2.4 GHz).
+
+#### Bước 2: Cấu hình SSID & Mật khẩu qua Build Flag của PlatformIO (Không sửa code)
+Kể từ bản vá Task F11, thông tin Wi-Fi không còn hardcode trong mã nguồn `firmware/gateway_esp32/src/main.cpp`. Bạn truyền trực tiếp thông tin mạng lúc nạp code. Có thể khai báo **tới 4 mạng**, gateway thử lần lượt theo thứ tự:
 
 ```powershell
-# Nạp code kèm thông tin Wi-Fi phòng Lab/nhà bạn:
-pio run -d firmware/gateway_esp32 -e esp32-c3-devkitm-1 -t upload -D "KVC_WIFI_SSID=\"Ten_Wifi_Cua_Ban\"" -D "KVC_WIFI_PASS=\"Mat_Khau_Wifi\""
+# Chỉ hotspot điện thoại:
+.venv\Scripts\python.exe -m platformio run -d firmware/gateway_esp32 -t upload `
+  -D "KVC_WIFI_SSID=\"hotspot-dien-thoai\"" -D "KVC_WIFI_PASS=\"mat-khau-1\""
+
+# Hotspot điện thoại + Wi-Fi phòng Lab (tự chuyển khi một mạng không có):
+.venv\Scripts\python.exe -m platformio run -d firmware/gateway_esp32 -t upload `
+  -D "KVC_WIFI_SSID=\"hotspot-dien-thoai\""  -D "KVC_WIFI_PASS=\"mat-khau-1\"" `
+  -D "KVC_WIFI_SSID2=\"wifi-phong-lab\""     -D "KVC_WIFI_PASS2=\"mat-khau-2\""
 ```
 *Hoặc đặt vào file cấu hình PlatformIO cục bộ mà không commit lên Git.*
 *Lưu ý: ESP32-C3 chỉ hỗ trợ băng tần sóng 2.4 GHz (không hỗ trợ 5 GHz).*
@@ -228,5 +253,5 @@ INFO:kvc.esp32_ingress:ESP32 Handshake received: {'status': 'CONNECTED', 'gatewa
 | **Giao diện báo `MẤT SÓNG ESP32 (>3.0s)`** | ESP32 chưa nhận được gói LoRa hoặc đang tắt chế độ Self-Mock. | Bật cờ `enableSelfMock = true;` trong code ESP32 hoặc nhấn nút reset trên bo mạch ESP32. |
 | **Backend báo `[WinError 1225] Connection refused`** | Sai cổng port (8080) hoặc sai IP ESP32. | Kiểm tra lại IP in ra trên Serial Monitor ESP32. |
 | **PowerShell báo lỗi đỏ `running scripts is disabled`** | Chính sách bảo mật Windows chặn lệnh `npm`. | Dùng lệnh `npm.cmd run dev` thay vì `npm run dev`. |
-| **ESP32 liên tục in dấu chấm `.....` không bắt được Wi-Fi** | Wi-Fi đang phát sóng 5GHz hoặc gõ sai mật khẩu. | Chuyển điện thoại/router sang phát chuẩn **2.4 GHz**, hoặc chuyển hẳn sang dùng **Phương án 1 (SoftAP `KVC_GCS_AP`)**. |
-| **Laptop bắt Wi-Fi `KVC_GCS_AP` báo "No Internet"** | Đây là mạng cục bộ nội bộ, không có Internet. | **Hiện tượng hoàn toàn bình thường**, hệ thống chỉ cần mạng LAN nội bộ để truyền telemetry, không cần kết nối Internet ra ngoài. |
+| **ESP32 liên tục in dấu chấm `.....` không bắt được Wi-Fi** | Wi-Fi đang phát sóng 5GHz hoặc gõ sai mật khẩu. | Chuyển điện thoại/router sang phát chuẩn **2.4 GHz**, hoặc chuyển hẳn sang dùng **Phương án 1 (SoftAP `KVC_GROUND_STATION`)**. |
+| **Laptop bắt Wi-Fi `KVC_GROUND_STATION` báo "No Internet"** | Đây là mạng cục bộ nội bộ, không có Internet. | **Hiện tượng hoàn toàn bình thường**, hệ thống chỉ cần mạng LAN nội bộ để truyền telemetry, không cần kết nối Internet ra ngoài. |

@@ -20,6 +20,7 @@ khác thì **không** dùng để build/flash cho tới khi xác minh lại ngu�
 | `SN34F780_SDK_V2.1.4/SN34F780_SDK_V2.1.4.exe` | SDK V2.1.4 | 14.348.852 B | `BD6D9393F4C7B1742DF9E728DA3AC9B44FCF0CDFFA73B899F03AA0C448DAB9D6` | SDK/driver ngoại vi cho SN34F780 |
 | `SN34F780_StartKit_Package_V1.10R/` (cây) | Package V1.10R | 51,0 MB / 138 file | checksum từng file thiết yếu ở các dòng dưới | Bộ Starter-Kit chính thức |
 | `SN34F780_StartKit_Package_V1.10R/Document/SN34F780_V1.7.pdf` | User Manual V1.7 | 10.374.743 B | `164004C609E9E8DFBE10595B1FD8D955D86129CEEF98A5D10590E7FC3178635C` | Nguồn tham chiếu chính cho `CHIP_SONIX_SN34F788_MCU.md` |
+| `SN34F780_StartKit_Package_V1.10R/Reference Circuit/SN34F780_STARTKIT_V1.1.pdf` | Schematic V1.1 | 315.045 B | `ABE03D9A1880B01E60FDFA6CCA29E2928601F5627EBE28245D08A153F7129E15` | Sơ đồ nguyên lý bo Starter-Kit V1.1 (3 trang) |
 | `SN34F780_StartKit_Package_V1.10R/Pack/SONiX.SN34F7_DFP.2.0.4.pack` | DFP 2.0.4 | 1.874.504 B | `C82F086C2EE29F6F63D12578A8649AC90C7812A2E91F4ABD586181A0B4112EA5` | Device Family Pack cho Keil MDK |
 | `SN34F780_StartKit_Package_V1.10R/SN34F780_Readme.pdf` | V1.10R | 61.439 B | `B75AE913BA105F0363CD29572DBDFDEF0EFD127119B3010A951DBC42EAEA464B` | Ghi chú phát hành gói kit |
 | `SN-Link ICP_V3.12.exe` | ICP V3.12 | 22.105.593 B | `2DD0D031DBC248041B1D536E2F6DD3A4D5FB3458F440C7958C5667404AA2D1C1` | Công cụ nạp/flash SN-Link |
@@ -28,8 +29,16 @@ khác thì **không** dùng để build/flash cho tới khi xác minh lại ngu�
 Ghi chú:
 - `SN34F780_StartKit_Package_V1.10R/Tools/` và `Reference Circuit/` là một phần của
   gói V1.10R; checksum từng file công cụ **chưa** ghi ở đây vì không cần cho build.
+  Riêng schematic `Reference Circuit/SN34F780_STARTKIT_V1.1.pdf` đã ghi checksum ở
+  bảng trên vì tài liệu `.md` dẫn chiếu tới nó khi đối chiếu chân phần cứng.
 - Project Keil của KVC (`firmware/mcu_payload/project_keil/mcu_uav.uvprojx`) build được
   khi đã cài DFP 2.0.4 và driver SN-Link ở trên.
+
+**Đã có cục bộ trong workspace** (ngày 26/10/2026): `SN34F780_V1.7.pdf` và
+`SN34F780_STARTKIT_V1.1.pdf` đã được chép vào đúng đường dẫn trên và hash khớp
+bảng này. Chúng **bị Git ignore** theo `.gitignore` (mục "Vendor binaries and
+datasheets unpacked under their own folders"), nên clone mới vẫn phải khôi phục
+lại — đúng như quy ước ở đầu tài liệu này.
 
 ## 2. OneKiwi Primer 20K (FPGA)
 

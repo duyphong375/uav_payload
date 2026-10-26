@@ -1,4 +1,4 @@
-# TÀI LIỆU THIẾT KẾ HỆ THỐNG CHI TIẾT
+﻿# TÀI LIỆU THIẾT KẾ HỆ THỐNG CHI TIẾT
 ## CUỘC THI THIẾT KẾ FPGA VÀ MCU MỞ RỘNG KHU VỰC MIỀN TRUNG 2026
 
 *Dự án:* **Hệ thống tích hợp cho UAV hỗ trợ phát hiện, theo dõi và định vị người bị cuốn trôi trong bão lũ sử dụng FPGA và MCU (KVC)**<br>
@@ -29,7 +29,7 @@ KVC hướng tới tình huống cứu nạn bão lũ khi kết nối Internet h
 
 Kiến trúc mục tiêu sử dụng **xử lý tại biên**. Các khối dưới đây cần triển khai và kiểm thử:
 - **Phát hiện tại chỗ trên UAV:** Camera quang học thu hình ảnh mặt nước → FPGA OneKiwi Primer 20K tiền xử lý và chạy mạng nơ-ron tích chập (CNN) tăng tốc phần cứng để phát hiện người trôi dạt (`person`) và phao cứu sinh (`lifebuoy`).
-- **Định vị không gian:** MCU Sonix SN34F788 nhận kết quả Bounding Box từ FPGA qua UART, đọc đồng bộ các cảm biến đo đạc (cảm biến siêu âm chống nước AJ-SR04M, GY-87 IMU 10-DOF, GNSS NEO-M10N) và giải bài toán giao điểm tia quang học với mặt phẳng nước để xác định tọa độ thực tế.
+- **Định vị không gian:** MCU Sonix SN34F788 nhận kết quả Bounding Box từ FPGA qua UART, đọc đồng bộ các cảm biến đo đạc (cảm biến siêu âm chống nước AJ-SR04M, GY-87 IMU 10-DOF, GNSS NEO-M10-0-10) và giải bài toán giao điểm tia quang học với mặt phẳng nước để xác định tọa độ thực tế.
 - **Truyền tin vô tuyến tầm xa:** Thay vì truyền video, hệ thống chỉ đóng gói các thông tin cứu nạn quan trọng thành các gói tin nhị phân siêu nhỏ (**32 byte/gói**) và truyền metadata qua **LoRa 433 MHz**. RF 32 byte là dự thảo; cự ly, tỷ lệ nhận và độ trễ chưa được xác nhận bằng phép đo.
 - **Trạm giám sát mặt đất (GCS):** ESP32-C3 trạm đất giải mã gói LoRa, đọc RSSI/SNR và gửi dữ liệu sang laptop qua **Wi-Fi SoftAP/WebSocket**. ESP32 có nguồn riêng và hoạt động độc lập với laptop. Laptop chạy Dashboard web và dịch vụ GCS để nhận dữ liệu, hiển thị, lưu log và replay; không tham gia xử lý nhiệm vụ trên UAV hay điều khiển ESP32.
 
@@ -106,8 +106,8 @@ flowchart TB
         end
         subgraph SENSORS["CẢM BIẾN ĐỊNH VỊ & KHÔNG GIAN"]
             ULTRASONIC["AJ-SR04M Siêu âm chống nước<br/>(Cự ly mặt nước — UART 9600 bps)"]
-            IMU["GY-87 IMU 10-DOF<br/>(MPU6050 + HMC5883L + BMP180 — I2C0 400 kHz)"]
-            GNSS["GNSS u-blox NEO-M10N<br/>(Tọa độ WGS-84 — UART 9600/38400 bps NMEA/UBX, 1–10 Hz)"]
+            IMU["GY-87 IMU<br/>(MPU-6050 Accel+Gyro — I2C0 400 kHz)<br/>HMC5883L hoãn, BMP180 loại bỏ"]
+            GNSS["GNSS u-blox NEO-M10-0-10<br/>(Tọa độ WGS-84 — UART 9600/38400 bps NMEA/UBX, 1–10 Hz)"]
         end
         RF1["LoRa Ra-02 (Air TX)<br/>SX1278 433 MHz (SPI)"]
         LED_STATUS["LED Chỉ báo Trạng thái (PWR / GNSS / Ready)<br/>& Serial Debug (SN-LINK Lite)"]
@@ -116,7 +116,7 @@ flowchart TB
         TX -->|UART 115200 bps + GPIO DATA_READY| FUSION
         ULTRASONIC -->|UART 9600 bps| FUSION
         IMU -->|I2C0 400 kHz| FUSION
-        GNSS -->|UART 38400 bps UBX/NMEA| FUSION
+        GNSS -->|UART 9600 bps UBX/NMEA| FUSION
         PACKET -->|SPI Bus + DIO0| RF1
         FUSION -.->|GPIO / UART| LED_STATUS
     end
@@ -183,7 +183,7 @@ Kênh truyền LoRa (Long Range) đóng vai trò là xương sống thông tin l
      - `RegPktRssiValue` (Offset 0x1A): Cường độ tín hiệu nhận được (tính ra dBm).
      - `RegPktSnrValue` (Offset 0x19): Tỷ số tín hiệu trên tạp âm (tính ra dB).
    - ESP32 đẩy thông số nhanh lên màn hình OLED 0.96 inch tại chỗ (phục vụ cứu hộ viên quan sát độc lập ngoài trời).
-    - ESP32 đóng vai trò Wi-Fi SoftAP cục bộ `KVC_GCS_AP`, mở WebSocket Server `ws://192.168.4.1:8080/telemetry`. Backend GCS trên laptop là client nhận telemetry; browser Dashboard chỉ kết nối với backend local.
+    - ESP32 đóng vai trò gateway mạng theo thứ tự ưu tiên: (1) STA vào Wi-Fi 2.4 GHz có sẵn; (2) nếu không nối được thì phát SoftAP `KVC_GROUND_STATION` (IP `192.168.4.1`, mật khẩu `kvc123456`) và tự đóng SoftAP khi STA nối lại. ESP32 mở WebSocket Server `ws://192.168.4.1:8080/telemetry`. Backend GCS trên laptop là client nhận telemetry; browser Dashboard chỉ kết nối với backend local.
 
 ---
 
@@ -199,8 +199,8 @@ Kênh truyền LoRa (Long Range) đóng vai trò là xương sống thông tin l
 | **Tải UAV — Camera Quang học** | **Camera quang học — model TBD** | Sensor, giao diện, connector/cáp và rail cấp nguồn chưa chốt; không mặc định OV2640/OV5640, DVP/MIPI hay FPC trên OneKiwi | Thu nhận hình ảnh mặt nước sau khi xác minh camera, board, cáp, nguồn và pin map thực tế. |
 | **Tải UAV — MCU Điều khiển & Dung hợp** | **Sonix STK SN34F788** | ARM Cortex-M4F 192 MHz, Flash 512 KB, SRAM 160 KB, FPU phần cứng, tích hợp SN-LINK Lite | Giải mã BBox từ UART, đọc và lọc cảm biến AHRS/Siêu âm/GNSS, giải bài toán giao điểm chiếu tia 3D, đóng gói LoRa 32-byte. |
 | **Tải UAV — Cảm biến cự ly siêu âm** | **AJ-SR04M (JSN-SR04T)** | Siêu âm chống nước IP67, 40 kHz, dải 0,2–6 m, UART 9600 bps / Trig-Echo, nguồn 5V logic 3,3V/5V | Đo khoảng cách thẳng đứng từ UAV xuống mặt nước để xác định độ cao mặt phẳng phục vụ chiếu tia, phản xạ tốt trên bề mặt nước. |
-| **Tải UAV — IMU 10-DOF** | **GY-87** | Tích hợp MPU6050 (3-axis Accel + 3-axis Gyro), HMC5883L (3-axis Compass), BMP180 (Áp suất), I2C 400 kHz | Cung cấp gia tốc, vận tốc góc và hướng từ trường để ước lượng ma trận xoay tư thế $\mathbf{R}_{\text{camera}}$. |
-| **Tải UAV — GNSS Định vị** | **u-blox NEO-M10N** | Thu đồng thời 4 chòm sao GPS + GLONASS + Galileo + BeiDou, cập nhật 1–10 Hz, UART 9600 bps (mặc định) / 38400 bps NMEA/UBX, anten SMA ngoài trời | Xác định tọa độ vị trí toàn cầu WGS-84 của UAV ngoài trời khi đạt 3D fix (`GPS_VALID = 1`). |
+| **Tải UAV — IMU 10-DOF** | **GY-87** | MPU-6050 (Accel 3 trục + Gyro 3 trục), I2C 400 kHz. Module còn có HMC5883L (la bàn) và BMP180 (áp suất) nhưng **firmware không dùng**: HMC5883L hoãn tới khi có kit để hiệu chuẩn, BMP180 đã loại khỏi thiết kế (xem [IF_MCU_SENSORS.md](../interfaces/IF_MCU_SENSORS.md) §3.2 B–C). | Cung cấp gia tốc để ước lượng Roll/Pitch. **Chưa có Yaw tuyệt đối**, nên $\mathbf{R}_{\text{camera}}$ hiện chỉ đủ khi camera hướng Bắc; muốn đủ 3 góc phải bổ sung Yaw (dự kiến từ GNSS `track_made_good`). |
+| **Tải UAV — GNSS Định vị** | **u-blox NEO-M10-0-10** | Thu đồng thời GPS + GLONASS + Galileo + BeiDou + QZSS + SBAS (theo datasheet module), cập nhật 1–10 Hz (mặc định 1 Hz), UART TTL 8N1 — firmware chạy 9600 sau khi gửi UBX CFG-PRT đổi từ 38400 mặc định, anten SMA ngoài trời | Xác định tọa độ vị trí toàn cầu WGS-84 của UAV ngoài trời khi đạt 3D fix (`GPS_VALID = 1`). |
 | **Tải UAV — Module phát LoRa (TX)** | **Ai-Thinker Ra-02 (SX1278)** | Dải 410–525 MHz, SPI, nguồn 3,3V; datasheet V1.1: công suất tối đa 18 ± 1 dBm tại 433 MHz | Phát metadata dự thảo 32 byte xuống trạm đất theo chu kỳ được đo/duyệt. |
 | **Tải UAV — Chỉ báo & Debug tại chỗ** | **LED Trạng thái & UART Debug (SN-LINK Lite)** | LED GPIO (Power, GNSS Fix, Ready/Error) + Cổng UART Debug ảo (VCOM) tích hợp | Chỉ báo trực quan trạng thái tải trước bay; in log chẩn đoán chi tiết qua terminal PC khi debug bàn lab (lược bỏ OLED trên tải để tối ưu khối lượng và chống rung lắc). |
 | **Trạm Mặt Đất — Gateway MCU** | **ESP32-C3 DevKit (mã kit TBD)** | CPU RISC-V đơn nhân tối đa 160 MHz, 400 KB SRAM (16 KB cache), Wi-Fi 2.4 GHz 802.11 b/g/n, Bluetooth LE 5; flash/GPIO khả dụng theo module và kit | Thu gói LoRa qua SPI, đọc RSSI/SNR, phát Wi-Fi SoftAP và WebSocket telemetry tới dịch vụ GCS trên laptop. Đây là cấu hình mục tiêu; cần xác minh tài nguyên, nguồn và GPIO trên đúng kit trước khi tích hợp. |
@@ -228,7 +228,7 @@ Danh mục dưới đây phân loại chính xác linh kiện theo 5 phân hệ 
 | **B1** | **Sonix STK SN34F788** | 1 kit | 5V vào kit / 3.3V VDD | MCU tải chính: Dung hợp cảm biến, tính toán chiếu tia định vị và đóng gói LoRa. | Nguồn 5V qua ổn áp; UART từ FPGA; UART từ Siêu âm/GNSS; I2C từ IMU. | Bus SPI điều khiển LoRa Ra-02; GPIO điều khiển LED trạng thái; UART Debug qua SN-LINK Lite. | Cortex-M4F 192 MHz có FPU; nạp qua SN-LINK Lite tích hợp; kiểm tra đúng sơ đồ nguồn VDD 3.3V. |
 | **B2** | **AJ-SR04M (JSN-SR04T)** | 1 bộ | 5V nguồn / 3.3V UART | Đo cự ly thẳng đứng từ UAV xuống mặt nước (hỗ trợ giải mặt phẳng $Z=0$). | Nguồn 5V DC; Sóng siêu âm 40 kHz phản xạ từ mặt nước; UART 9600 bps. | Dữ liệu cự ly (cm) qua khung UART 4 byte hoặc xung Echo. | Hoạt động dải 0.2–6 m, chuẩn chống nước IP67; kiểm tra vùng mù < 20 cm và góc mở chùm sóng 75°; tránh đọc giá trị rác khi mặt nước xao động. |
 | **B3** | **Module IMU 10-DOF GY-87** | 1 module | 3.3V / I2C0 400 kHz | Đo gia tốc 3 trục, vận tốc góc và từ trường để ước lượng góc nghiêng Roll/Pitch/Yaw. | Nguồn 3.3V; Chuyển động cơ học và từ trường Trái Đất. | Dữ liệu thô Accel, Gyro, Mag qua I2C0 (P0.10 Pin 38 SCL0, P0.11 Pin 39 SDA0; địa chỉ 0x68 và 0x1E). | Gắn cố định trên gá 3D cùng camera; kit đã có trở kéo R3/R4 = 1 kΩ trên I2C0; xem [KVC_MASTER_PINOUT_WIRING.md](../hardware/wiring/KVC_MASTER_PINOUT_WIRING.md). |
-| **B4** | **GNSS u-blox NEO-M10N** | 1 bộ | 5V DC (LDO 3.3V on-board) / UART 9600 (mặc định) | Cung cấp tọa độ WGS-84 toàn cầu ngoài trời và đồng bộ thời gian vệ tinh. | Nguồn 5V DC; Tín hiệu vệ tinh RF từ anten ngoài trời chuẩn SMA. | Tọa độ Lat, Lon, Alt, Fix status qua UART (mặc định 1 Hz, cấu hình tối đa 10 Hz, NMEA/UBX). | Sử dụng anten ngoài trời cổng SMA hướng lên trời; chỉ dùng dữ liệu khi đạt 3D Fix (`GPS_VALID=1`). |
+| **B4** | **GNSS u-blox NEO-M10-0-10** | 1 bộ | 5V DC (LDO 3.3V on-board) / UART 9600 (mặc định) | Cung cấp tọa độ WGS-84 toàn cầu ngoài trời và đồng bộ thời gian vệ tinh. | Nguồn 5V DC; Tín hiệu vệ tinh RF từ anten ngoài trời chuẩn SMA. | Tọa độ Lat, Lon, Alt, Fix status qua UART (mặc định 1 Hz, cấu hình tối đa 10 Hz, NMEA/UBX). | Sử dụng anten ngoài trời cổng SMA hướng lên trời; chỉ dùng dữ liệu khi đạt 3D Fix (`GPS_VALID=1`). |
 | **B5** | **Module LoRa Ai-Thinker Ra-02** | 1 module | 3.3V / SPI Bus | Phát gói tin nhị phân 32-byte chứa metadata cứu nạn từ tải xuống trạm đất. | Nguồn 3.3V; Lệnh cấu hình và dữ liệu gói qua SPI; Chân Reset. | Sóng vô tuyến RF 433 MHz qua cổng anten U.FL/IPEX; Chân ngắt DIO0. | Sử dụng chip Semtech SX1278; gắn tụ hóa 220 µF sát chân VCC/GND; hàn bo chuyển breakout 2.54mm. |
 | **B6** | **Anten râu LoRa 433 MHz + Cáp IPEX** | 1 bộ | RF 433 MHz | Bức xạ sóng vô tuyến 433 MHz từ module Ra-02 ra không gian. | Tín hiệu RF từ module Ra-02 qua đầu cắm IPEX. | Sóng điện từ bức xạ trong không gian (Polarization dọc). | Anten râu omni 433 MHz chuẩn SMA đực, gain 3 dBi; cáp chuyển IPEX sang SMA cái dài 10–15 cm. |
 | **B7** | **LED Chỉ báo Trạng thái (Air)** | 2–3 chiếc | 3.3V GPIO (kèm trở 1 kΩ) | Chỉ báo trực quan trạng thái trước khi bay (Nguồn, GNSS 3D-Fix, Sẵn sàng / Lỗi). | Mức logic điều khiển từ chân GPIO Sonix MCU. | Đèn LED phát sáng (Đỏ / Vàng / Xanh). | Thay thế màn hình OLED trên tải UAV để giảm trọng lượng, tránh nứt vỡ do rung chấn và loại bỏ nguy cơ treo bus I2C. Debug chi tiết sử dụng Serial Console qua SN-LINK Lite. |
@@ -331,7 +331,7 @@ Gói Status dùng chung Sync (0–1), Version (2), Type `0x03` (3), Sequence (4�
 
 #### 4. Giao diện dữ liệu ESP32 trạm đất → laptop (Wi-Fi SoftAP/WebSocket v1)
 
-Dự thảo USB Ground Envelope 48 byte trước đây thuộc kiến trúc STM32F103 + CP2102 và **không còn là giao diện mục tiêu**. V1 dùng ESP32-C3 làm Wi-Fi SoftAP `KVC_GCS_AP` với WPA2-PSK cấu hình khi triển khai; không ghi mật khẩu vào source, log hoặc tài liệu. ESP32 mở endpoint `ws://192.168.4.1:8080/telemetry`; backend GCS trên laptop kết nối như WebSocket client. Dashboard trong browser chỉ nhận dữ liệu từ backend local, không kết nối trực tiếp ESP32. Mã kit/board và pinout cần xác minh theo phần cứng thực tế; thay SoC không tự thay đổi schema transport v1.
+Dự thảo USB Ground Envelope 48 byte trước đây thuộc kiến trúc STM32F103 + CP2102 và **không còn là giao diện mục tiêu**. V1 dùng ESP32-C3 làm gateway Wi-Fi theo thứ tự ưu tiên: (1) STA vào Wi-Fi 2.4 GHz đã cấu hình sẵn qua build flag (tối đa 4 mạng; "4G" của dự án là hotspot do điện thoại phát — điện thoại lo sóng di động, gateway không cần module 4G); (2) nếu không nối được trong ngân sách khởi động thì phát SoftAP `KVC_GROUND_STATION` (WPA2-PSK, mật khẩu `kvc123456`). Khi ưu tiên 1 nối lại được, firmware tự đóng SoftAP. Credential STA không ghi vào source/log. ESP32 mở endpoint `ws://192.168.4.1:8080/telemetry` (SoftAP) hoặc `ws://<IP_STA>:8080/telemetry`; backend GCS trên laptop kết nối như WebSocket client. Dashboard trong browser chỉ nhận dữ liệu từ backend local, không kết nối trực tiếp ESP32. ESP32-C3 chỉ hỗ trợ 2.4 GHz. Mã kit/board và pinout cần xác minh theo phần cứng thực tế; thay SoC không tự thay đổi schema transport v1.
 
 Mỗi message WebSocket là một JSON UTF-8 có đủ các trường sau:
 
@@ -373,7 +373,7 @@ Trong đó:
 - Nếu UAV bị nghiêng vượt ngưỡng hoặc cảm biến siêu âm đo lỗi/ngoài dải → Gán `POS_VALID = 0`, tọa độ gán `INT32_MIN`.
 3. **Phân biệt hai hệ quy chiếu tọa độ:**
 - **Chế độ tọa độ cục bộ (Local frame - `LOCAL_FRAME_ACTIVE = 1`):** Đơn vị tính là **centimet (cm)** so với gốc O(0, 0) của khu vực thử nghiệm đã đo, ví dụ bể bơi. Chế độ này độc lập với GNSS nhưng cần origin và hiệu chuẩn camera/pose gắn với `Origin ID`. Tại nơi thi không có sa bàn và không có hiệu chuẩn local phù hợp thì để `POS_VALID = 0`, không tự gán tọa độ hợp lệ.
-- **Chế độ Toàn cầu (WGS-84 frame - `LOCAL_FRAME_ACTIVE = 0`):** Đơn vị tính là **độ × 10⁷**. Chỉ kích hoạt khi GNSS NEO-M10N đạt `GPS_VALID = 1` (3D fix); kết hợp vị trí GNSS của UAV và vector khoảng cách để suy ra tọa độ Vĩ độ/Kinh độ của nạn nhân.
+- **Chế độ Toàn cầu (WGS-84 frame - `LOCAL_FRAME_ACTIVE = 0`):** Đơn vị tính là **độ × 10⁷**. Chỉ kích hoạt khi GNSS NEO-M10-0-10 đạt `GPS_VALID = 1` (3D fix); kết hợp vị trí GNSS của UAV và vector khoảng cách để suy ra tọa độ Vĩ độ/Kinh độ của nạn nhân.
 
 #### 2. Kiến trúc và cơ chế hoạt động của Dashboard GCS
 
@@ -480,7 +480,7 @@ Dữ liệu cần phản ánh hai bối cảnh trình diễn: video lũ lụt c�
 
 - **[S6]** [AJ-SR04M / JSN-SR04T Waterproof Ultrasonic Sensor Datasheet](https://www.makerfabs.com/desfile/files/JSN-SR04T-2.0.pdf): Cảm biến đo khoảng cách siêu âm chống nước IP67, dải đo 0,2–6 m, giao tiếp UART / xung Echo.
 - **[S7]** [ARM — Cortex-M4 Floating Point Unit (FPU) Guidelines](https://developer.arm.com/community/arm-community-blogs/b/architectures-and-processors-blog/posts/10-useful-tips-to-using-the-floating-point-unit-on-the-arm-cortex--m4-processor): Tối ưu hóa tính toán dấu phẩy động và hàm lượng giác trên ARM Cortex-M4.
-- **[S8]** [u-blox — NEO-M10N GNSS Module Datasheet](https://content.u-blox.com/sites/default/files/NEO-M10N_DataSheet_UBX-21035619.pdf): Thông số kỹ thuật độ chính xác định vị, thu đồng thời 4 chòm sao và giao thức NMEA/UBX.
+- **[S8]** [Datasheet module NEO-M10-0-10 (YXT-100-M10 v1.1)](../hardware/sensors/SENSOR_PACKAGES.md): Thông số kỹ thuật độ chính xác định vị, thu đồng thời nhiều chòm sao (GPS/GLONASS/Galileo/BeiDou + QZSS/SBAS) và giao thức NMEA/UBX.
 - **[S9]** [Varga et al. — SeaDronesSee: A Maritime Benchmark for Detecting Humans in Open Water (WACV 2022)](https://openaccess.thecvf.com/content/WACV2022/papers/Varga_SeaDronesSee_A_Maritime_Benchmark_for_Detecting_Humans_in_Open_Water_WACV_2022_paper.pdf): Bộ dữ liệu chuẩn đánh giá phát hiện người trên mặt nước từ UAV.
 - **[S10]** [Google — LiteRT / TensorFlow Post-Training Full-Integer Quantization](https://developers.google.com/edge/litert/conversion/tensorflow/quantization/post_training_quantization): Quy chuẩn kỹ thuật lượng tử hóa số nguyên đầy đủ INT8 và yêu cầu tập calibration.
 - **[S11]** [Gowin — GoAI Open Source Repository](https://github.com/gowinsemi/GoAI): Kho mã nguồn mở và ví dụ mẫu của Gowin GoAI.

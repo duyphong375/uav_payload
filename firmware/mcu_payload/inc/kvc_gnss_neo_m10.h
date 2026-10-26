@@ -1,6 +1,6 @@
 ﻿/**
  * @file kvc_gnss_neo_m10.h
- * @brief Driver định vị vệ tinh u-blox NEO-M10 (M10N) qua UART3 trên MCU Sonix SN34F788.
+ * @brief Driver định vị vệ tinh u-blox M10 (bo breakout chip UBX-M10050) qua UART3 trên MCU Sonix SN34F788.
  *
  * Nhiệm vụ thuộc Task KVC-GNSS-M10-001.
  * Đối chiếu tài liệu đặc tả chuẩn:
@@ -15,15 +15,28 @@
  * - Chân kết nối:
  *   + P2.1 (Pin 15 LQFP64 | JP3 Pin 3/4): URXD3 (Nhận dữ liệu NMEA từ chân TX của module).
  *   + P2.0 (Pin 14 LQFP64 | JP3 Pin 1/2): UTXD3 (Nối chân RX của module, không gửi lệnh đổi cấu hình).
- * - Cơ chế vận hành: Polling không chặn (non-blocking), không sử dụng ngắt (IRQ).
+ * - Cơ chế vận hành: RX qua ngắt UART3 + ring buffer SPSC (KVC-M2-20261025-001);
+ *   main tiêu thụ ring trong kvc_gnss_poll(), không đọc thẳng FIFO phần cứng.
  *
- * Tiêu chuẩn nghiệm thu 3D Fix hợp lệ (KVC_FLAG_GNSS_VALID):
- * 1. GGA Fix Quality >= 1 (1 = GPS SPS, 2 = DGPS, 4 = RTK Fix, 5 = RTK Float, 6 = Dead reckoning).
- * 2. GSA Fix Mode == 3 (3D Fix bắt buộc; Mode 1 = No fix, Mode 2 = 2D fix bị từ chối).
- * 3. Số vệ tinh đang theo dõi (Satellites in use) >= 5.
- * 4. Sai số hình học mặt ngang (HDOP) <= 2.50.
- * 5. Tọa độ nằm trong giới hạn chuẩn WGS-84 (-90° <= Lat <= +90°, -180° <= Lon <= +180°).
- * 6. Dữ liệu mới cập nhật trong vòng 3.0 giây (3000 ms). Quá 3 giây tự động hạ cờ valid.
+ * Tiêu chuẩn dữ liệu GNSS được chấp nhận (hai mức, không thay thế nhau):
+ *
+ * A. `kvc_gnss_is_valid()` — vị trí dùng được (kiểu TinyGPSPlus):
+ *    1. GGA Fix Quality >= 1 (RMC status 'A' cũng đặt quality = 1).
+ *    2. Nếu đã có câu GSA: Fix Mode >= 2 (Mode 1 = No fix bị từ chối).
+ *    3. Nếu có GGA: Số vệ tinh đang dùng >= 5.
+ *    4. Nếu biết HDOP: HDOP <= 2.50.
+ *    5. Tọa độ trong dải WGS-84 (-90..+90, -180..+180).
+ *    6. Dữ liệu mới trong 3.0 giây; quá 3 giây tự động hạ cờ.
+ *
+ * B. `kvc_gnss_is_3d_fix()` — đạt 3D fix để được công bố ra RF:
+ *    A đúng, VÀ Fix Mode == 3, VÀ sats >= 5, VÀ 0 < HDOP <= 2.50.
+ *
+ * Bit 0 (KVC_FLAG_GNSS_VALID) của IF-02 được định nghĩa là "GNSS 3D Fix hợp lệ",
+ * nên firmware chỉ được bật bit này khi `kvc_gnss_is_3d_fix()` trả true.
+ *
+ * Nguồn tiêu chí: docs/interfaces/IF_MCU_SENSORS.md §3.3 (Fix Status >= 1,
+ * sats >= 5, HDOP <= 2.5) và docs/interfaces/IF_MCU_LORA_RF.md byte 24 bit 0.
+ * Các hằng số dưới đây là nguồn duy nhất; không hard-code lại trong code khác.
  *
  * Người phụ trách phân hệ MCU UAV: Nguyễn Tá Duy Phong
  */
@@ -42,19 +55,55 @@ extern "C" {
 /* ============================================================================
  * 1. HẰNG SỐ CẤU HÌNH GIAO TIẾP VÀ NGƯỠNG AN TOÀN FIX
  * ============================================================================ */
-#define KVC_GNSS_BAUD_RATE              38400UL /* Tốc độ Baud mặc định của module u-blox M10 (38400 bps) */
+/* Tốc độ UART3 mà firmware CHẠY (sau khi đổi module).
+ *
+ * BỐI CẢNH PHẦN CỨNG (chốt theo datasheet module — xem SENSOR_PACKAGES.md §1.3):
+ * Module là `NEO-M10-0-10` (bo YXT-100-M10, chip UBX-M10050-KB). Datasheet của
+ * module ghi rõ: "波特率 4800bps-921600bps (默认38400bps)" — tức **mặc định
+ * 38400 bps**, khác với dòng MAX-M10N (mặc định 9600).
+ *
+ * VÌ SAO FIRMWARE CHẠY 9600 DÙ MODULE MẶC ĐỊNH 38400:
+ * UCLK = HCLK = IHRC 12 MHz (SystemInit không bật PLL; UART3CLKSEL = 0).
+ *
+ *   Baud    DLL   Thực tế   Sai số     + IHRC ±2 %
+ *   9600    78    9615      +0,16 %    ≈ 2,2 %   <-- chọn
+ *   19200   39    19231     +0,16 %    ≈ 2,2 %
+ *   38400   20    37500     −2,34 %    ≈ 4,3 %   VƯỢT giới hạn
+ *   57600   13    57692     +0,16 %    ≈ 2,2 %
+ *
+ * User Manual MCU §15.6: "The valid deviation ... is within |3.125%|".
+ * Ở 38400 sai số 4,34 % > 3,125 % nên KHÔNG dùng được khi UCLK 12 MHz.
+ *
+ * Vì vậy firmware chạy 9600 và gửi lệnh UBX CFG-PRT đổi module về 9600 ngay
+ * khi khởi động (kvc_gnss_send_baud_change). Lệnh mẫu lấy từ datasheet module
+ * §10.3, kiểm từng byte bằng test_kvc_ubx_cfg.
+ *
+ * Muốn dùng 38400 phải nâng UCLK bằng PLL >= 24 MHz — thay đổi cây xung nhịp
+ * toàn hệ, không làm ở đây. */
+#ifndef KVC_GNSS_BAUD_RATE
+#define KVC_GNSS_BAUD_RATE              9600UL
+#endif
+
+/* Tốc độ module dùng lúc xuất xưởng — cần biết để mở UART3 đúng tốc độ trước
+ * khi gửi lệnh đổi baud. Nếu module của bạn đã được đổi sẵn về 9600 và lưu vào
+ * flash của bo thì đặt macro này = 9600 để bỏ qua bước đổi. */
+#ifndef KVC_GNSS_MODULE_BOOT_BAUD
+#define KVC_GNSS_MODULE_BOOT_BAUD       38400UL
+#endif
 #define KVC_GNSS_TIMEOUT_MS             3000UL  /* Hạn định thời dữ liệu mới (3.0 giây) */
-#define KVC_GNSS_MIN_SATS               4U      /* Tối thiểu 4 vệ tinh cho định vị không gian 3 chiều và thời gian */
-#define KVC_GNSS_MAX_HDOP_CENTI         500U    /* Ngưỡng HDOP tối đa 5.00 (nhân 100) theo chuẩn TinyGPSPlus */
+#define KVC_GNSS_MIN_SATS               5U      /* Tối thiểu 5 vệ tinh (IF_MCU_SENSORS §3.3) */
+#define KVC_GNSS_MAX_HDOP_CENTI         250U    /* HDOP tối đa 2.50 (nhân 100), IF_MCU_SENSORS §3.3 */
 #define KVC_GNSS_MIN_FIX_QUALITY        1U      /* Fix quality tối thiểu của GGA (>= 1) */
-#define KVC_GNSS_REQ_FIX_MODE           2U      /* Fix mode tối thiểu của GSA (>= 2: 2D fix hoặc 3D fix) */
+#define KVC_GNSS_REQ_FIX_MODE           2U      /* GSA fix mode tối thiểu để có vị trí dùng được (2 = 2D) */
+#define KVC_GNSS_REQ_FIX_MODE_3D        3U      /* GSA fix mode bắt buộc cho 3D fix (IF-02 bit 0) */
 #define KVC_GNSS_MAX_SENTENCE_LEN       120U    /* Độ dài tối đa câu NMEA đệm (tránh tràn RAM) */
 
 /* KVC-M2-20261025-001: RX qua ngắt + ring buffer.
  * Định cỡ theo cửa sổ KHÔNG-CONSUMER dài nhất ~740 ms:
  *   kvc_usound_read_robust 340 ms + TxDone LoRa 300 ms + init lại LoRa 100 ms.
- * Ở 38400 8N1 (3840 byte/s): ~2842 byte -> ring 4096 byte (biên 1,44x).
- * NMEA 1 Hz thực tế chỉ ~500 byte/s nên đây là biên rất rộng. */
+ * Ở 9600 8N1 (960 byte/s): ~710 byte -> ring 4096 byte (biên ~5,7x).
+ * NMEA 1 Hz thực tế chỉ ~500 byte/s nên đây là biên rất rộng.
+ * Ở 38400 (nếu bật lại) biên vẫn đủ 1,44x; giữ nguyên 4096 cho cả hai tốc độ. */
 #define KVC_GNSS_RX_RING_SIZE           4096U
 #define KVC_GNSS_RX_DRAIN_PER_POLL      256U
 
@@ -87,7 +136,8 @@ typedef struct {
  * ============================================================================ */
 
 /**
- * @brief Khởi tạo ngoại vi UART3 (38400 8N1) và cấu hình chân P2.0/P2.1 trên MCU Sonix SN34F788.
+ * @brief Khởi tạo ngoại vi UART3 (9600 8N1 mặc định, cấu hình qua
+ *        KVC_GNSS_BAUD_RATE) và cấu hình chân P2.0/P2.1 trên MCU Sonix SN34F788.
  *        Xóa sạch bộ đệm và thiết lập trạng thái GNSS ban đầu.
  */
 void kvc_gnss_init(void);
@@ -160,6 +210,7 @@ typedef struct {
     uint32_t framing_count;   /**< LS.FE: sai stop bit */
     uint32_t parity_count;    /**< LS.PE: sai parity */
     uint32_t isr_count;       /**< Số lần vào UART3_IRQHandler */
+    uint32_t byte_count;      /**< Byte thật sự lấy ra khỏi RB */
     uint32_t bytes_pending;   /**< Byte còn trong ring tại thời điểm đọc */
 } KvcGnssRxStats;
 

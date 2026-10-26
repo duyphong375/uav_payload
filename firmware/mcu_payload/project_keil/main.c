@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file main.c
  * @brief Chương trình phát gói Telemetry 32-byte định kỳ để kiểm thử Anten LoRa Ra-02 trên MCU Sonix SN34F788.
  *
@@ -13,6 +13,7 @@
 #include "SN34F780.h"
 #include "kvc_pinout.h"
 #include "kvc_telemetry.h"
+#include "kvc_timebase.h"
 #include "kvc_imu_gy87.h"
 #include "kvc_usound_ajsr04m.h"
 #include "kvc_gnss_neo_m10.h"
@@ -50,17 +51,22 @@ void UART2_IRQHandler(void) {
 /* Cờ cho biết SX1278 đã khởi tạo được chưa. 0 = degraded mode. */
 static uint8_t s_lora_available = 0U;
 
+/* KVC-DIAG: giá trị RegVersion (0x42) đọc được từ SX1278 ở lần thử CUỐI CÙNG.
+ *
+ * VÌ SAO CẦN: khi `sx1278_init_tx()` thất bại, code cũ chỉ trả 0 mà không cho
+ * biết đọc ra gì — không phân biệt được "không thấy chip" với "dây sai" với
+ * "chip khác". In giá trị này ra UART5 giúp chẩn đoán ngay:
+ *   0x12 = chip SX1278 đúng (lỗi ở bước sau, không phải SPI)
+ *   0x00 = MISO kẹt thấp / chip mất nguồn / NSS sai
+ *   0xFF = MISO kẹt cao / không nối dây / thiếu pull-up
+ *   khác = chip khác hoặc SPI sai mode
+ *
+ * Chỉ ghi khi thử init (lúc boot). Không ảnh hưởng vòng lặp chính. */
+static uint8_t s_lora_last_version = 0U;
+
 /* Hàm trễ thời gian phần cứng chuẩn xác tuyệt đối qua bộ đếm SysTick của Cortex-M4 (Xung 12 MHz).
- * Đồng thời cộng dồn time base monotonic (xem kvc_tick_advance bên dưới) để
+ * Đồng thời cộng dồn thời gian đã tiêu vào time base dùng chung (kvc_timebase) để
  * timestamp_ms phản ánh thời gian trôi thật, kể cả thời gian chặn. */
-
-/* Time base monotonic của firmware (ms kể từ reset). Định nghĩa sớm để delay_ms
- * dùng được. Xem khối KVC-F6 bên dưới để biết giới hạn độ chính xác. */
-static volatile uint32_t s_kvc_tick_ms = 0U;
-
-static void kvc_tick_advance(uint32_t ms) {
-    s_kvc_tick_ms += ms;
-}
 
 static void delay_ms(uint32_t ms) {
     while (ms--) {
@@ -71,7 +77,7 @@ static void delay_ms(uint32_t ms) {
             __NOP();
         }
         SysTick->CTRL = 0UL;
-        kvc_tick_advance(1U);
+        kvc_timebase_add_ms(1U);
     }
 }
 
@@ -83,22 +89,25 @@ static void delay_ms(uint32_t ms) {
  * đo siêu âm 340 ms, ...). Hệ quả: các ngưỡng expiry 2 s / 3 s và cửa sổ TDM
  * 1.5 s bị lệch, và GCS nhận timestamp không khớp thời gian thực.
  *
- * CÁCH SỬA: đếm tick 1 ms bằng SysTick ở chế độ polling, cộng dồn vào một biến
- * monotonic. Không bật ngắt SysTick để không đụng NVIC/priority của các ISR
- * UART đã có ở M2.
+ * CÁCH SỬA (F6 rồi F6b): time base nằm trong module `kvc_timebase` dùng chung,
+ * KHÔNG còn là biến cục bộ của main.c. `delay_ms()` cộng ms, còn
+ * `kvc_usound_delay_us()` cộng µs (phần lẻ dưới 1 ms được giữ lại). Nhờ vậy
+ * thời gian chờ trong driver siêu âm — tới 100 ms mỗi chu kỳ — không còn bị
+ * mất khỏi time base như bản trước.
  *
  * GIỚI HẠN (phải ghi rõ, không được coi là đồng hồ chuẩn):
- *   - Nguồn đếm là IHRC 12 MHz ±2 % theo datasheet. Vì vậy tick_ms trôi tới
+ *   - Nguồn đếm là IHRC 12 MHz ±2 % theo datasheet. Vì vậy time base trôi tới
  *     ~±2 % (khoảng 1,2 s mỗi phút trong điều kiện xấu). Muốn chính xác ppm
  *     phải có thạch anh ngoài hoặc hiệu chuẩn bằng 1PPS của GNSS (task riêng).
  *   - `delay_ms()` và `kvc_usound_delay_us()` đều giả định 12 MHz; nếu UCLK
- *     thật khác thì cả hai và tick_ms đều lệch cùng một tỉ lệ.
- *   - Không phải phép đo: giá trị này suy ra từ số chu kỳ SysTick.
+ *     thật khác thì cả hai và time base đều lệch cùng một tỉ lệ.
+ *   - Bit-bang I2C của IMU chưa báo thời gian vào time base (xem kvc_timebase.h).
+ *   - Không phải phép đo: giá trị này suy ra từ số chu kỳ SysTick/vòng lặp.
  * ============================================================================ */
 
 /* Trả về time base monotonic hiện tại (ms kể từ reset). */
 static uint32_t kvc_millis(void) {
-    return s_kvc_tick_ms;
+    return kvc_timebase_ms();
 }
 
 /* ============================================================================
@@ -212,22 +221,80 @@ static void kvc_wdt_feed(void) {
  * BẬT CHẾ ĐỘ TEST ĐỘC LẬP (không chạy cảm biến/LoRa):
  *   Đặt KVC_M1_UART5_STANDALONE_TEST = 1 khi biên dịch. Mặc định 0.
  * ============================================================================ */
+/* KVC-M1 — CHẨN ĐOÁN CLOCK. ĐÂY LÀ CODE TẠM THỜI, PHẢI = 0 KHI PHÁT HÀNH.
+ * Bật =1 chỉ khi cần điều tra cây xung nhịp trên kit. Khi bật, firmware đọc
+ * thanh ghi SCU, gọi SystemCoreClockUpdate() và bơm text chẩn đoán ra UART5
+ * mỗi nhịp 1 ms — không phù hợp vận hành thật. */
 #ifndef KVC_M1_CLOCK_DIAG
-/* =1 trong task M1 để có thể nạp và test ngay trên kit. ĐÂY LÀ CODE CHẨN ĐOÁN
- * TẠM THỜI: phải đặt =0 (hoặc xoá khối KVC-M1 trong main()) trước khi dùng
- * firmware cho vận hành thật. */
-#define KVC_M1_CLOCK_DIAG            1
+#define KVC_M1_CLOCK_DIAG            0
 #endif
 #ifndef KVC_M1_UART5_BURST_LINES
 #define KVC_M1_UART5_BURST_LINES     5
+#endif
+/* KVC-M2 — THỐNG KÊ RX RING. GIỮ = 1 kể cả khi phát hành: đây là SỐ ĐO THẬT
+ * (counter phần mềm/phần cứng) dùng để nghiệm thu gate "oe/fe/drop = 0 trong
+ * 10 phút". Không phải code tạm, không đọc thanh ghi clock.
+ *
+ * Trước đây M1 và M2 dùng chung một cờ, nên tắt chẩn đoán clock là mất luôn
+ * thống kê ring. Nay tách riêng. */
+#ifndef KVC_M2_RX_STATS_DIAG
+#define KVC_M2_RX_STATS_DIAG         1
 #endif
 /* KVC-M2: chu kỳ công bố thống kê RX ring, tính bằng nhịp poll 1 ms.
  * 5000 nhịp ~ 5 giây. Đủ thưa để không chiếm UART5, đủ dày để thấy tràn sớm. */
 #ifndef KVC_M2_RX_STATS_PERIOD_TICKS
 #define KVC_M2_RX_STATS_PERIOD_TICKS 5000U
 #endif
+/* KVC-M3-20261026-001 — IN GIÁ TRỊ CẢM BIẾN QUA UART5.
+ *
+ * VÌ SAO: trước đây UART5 chỉ in thống kê ring (isr/oe/fe/drop). Bring-up trên
+ * bo không thể biết siêu âm đọc được bao nhiêu cm, IMU ra góc nào, GNSS có fix
+ * hay không — chỉ biết "có byte đến". Khối này in giá trị thật để nghiệm thu
+ * từng cảm biến mà không cần debugger.
+ *
+ * CHỈ ĐỌC giá trị đã được main loop cập nhật; KHÔNG đọc lại cảm biến, KHÔNG
+ * gọi driver, KHÔNG đổi chu kỳ phát, KHÔNG chạm ABI IF-02.
+ * =1 mặc định trong giai đoạn bring-up; đặt =0 khi phát hành nếu cần.
+ */
+#ifndef KVC_M3_VALUE_DIAG
+#define KVC_M3_VALUE_DIAG            1
+#endif
+
+/* Chu kỳ in giá trị cảm biến, mili-giây. Mặc định 1000 ms ~ 1 Hz, trùng nhịp
+ * telemetry để dễ đối chiếu log M3 với gói RF.
+ *
+ * Dùng kvc_millis() (time base chung) chứ KHÔNG đếm số lần được gọi: khối xử lý
+ * có thể vượt 1 s (siêu âm 340 ms + TX LoRa 300 ms), khi đó vòng chờ không chạy
+ * và bộ đếm theo lần gọi sẽ trôi. Time base vẫn tiến nhờ delay_ms/delay_us.
+ *
+ * RÀNG BUỘC BĂNG THÔNG UART5: 9615 bps 8N1 ~ 960 byte/s khả dụng. Một dòng M3
+ * cỡ ~110 ký tự ở 1 Hz là ~110 B/s; M2 ~200 ký tự mỗi 5 s là ~40 B/s. Tổng
+ * ~150 B/s, còn dư ~6x. Pump xả 8 byte/lượt (~8000 B/s) nên không nghẽn. */
+#ifndef KVC_M3_VALUE_PERIOD_MS
+#define KVC_M3_VALUE_PERIOD_MS       1000UL
+#endif
 #ifndef KVC_M1_UART5_STANDALONE_TEST
 #define KVC_M1_UART5_STANDALONE_TEST 0
+#endif
+
+/* Chu kỳ phát telemetry (ms). Một chỗ duy nhất để chỉnh tần số phát.
+ *
+ * RÀNG BUỘC PHÍA NHẬN (không được giảm dưới các ngưỡng này):
+ *   - Gateway coi mất sóng sau 3000 ms  (firmware/gateway_esp32/src/main.cpp).
+ *   - BBox của FPGA hết hạn sau 2000 ms (kvc_fpga_bbox.h) -> period phải nhỏ
+ *     hơn ngưỡng này, nếu không mục tiêu AI gần như luôn "cũ" khi tới trạm đất.
+ * Vì vậy 1000 ms là giá trị hợp lệ lớn nhất; tăng lên 1500 ms vẫn còn an toàn
+ * cho BBox nhưng sát ngưỡng hơn. Không đặt >= 3000 ms. */
+#ifndef KVC_TELEMETRY_PERIOD_MS
+#define KVC_TELEMETRY_PERIOD_MS      1000UL
+#endif
+
+/* PB-FIX (P1-2): trước đây cửa sổ TDM là 1500 ms, dài hơn một chu kỳ phát nên
+ * thực tế mục tiêu chỉ nhảy mỗi 2 gói. Nay TDM đếm theo SỐ GÓI: mỗi gói báo
+ * một mục tiêu kế tiếp, tất định và dễ kiểm chứng.
+ * =0: mỗi gói giữ nguyên mục tiêu, không luân phiên. */
+#ifndef KVC_TDM_ROTATE_EVERY_PACKET
+#define KVC_TDM_ROTATE_EVERY_PACKET  1
 #endif
 
 #define KVC_M1_UART5_TEST_PRE        1U
@@ -244,16 +311,27 @@ static void kvc_wdt_feed(void) {
 #define KVC_M1_UART_PRE_OFS          0x08U
 #define KVC_M1_UART_LC_OFS           0x0CU
 
-#if (KVC_M1_CLOCK_DIAG == 1)
+/* ============================================================================
+ * KÊNH CHẨN ĐOÁN UART5 (P0.15) — dùng chung cho M1 (clock, tạm thời),
+ * M2 (thống kê RX ring, giữ lâu dài) và M3 (giá trị cảm biến, KVC-M3-20261026-001).
+ * Cơ sở hạ tầng buffer/truyền nằm ở đây để chỉ có MỘT định nghĩa; phần thân nào
+ * thuộc M1/M2/M3 được bọc riêng.
+ * ============================================================================ */
+#if (KVC_M1_CLOCK_DIAG == 1) || (KVC_M2_RX_STATS_DIAG == 1) || (KVC_M3_VALUE_DIAG == 1)
 
+/* Lấy HCLK cho phần chẩn đoán clock. */
+#if (KVC_M1_CLOCK_DIAG == 1)
 /* system_SN34F780.c không có header khai báo hai ký hiệu này trong project hiện tại.
  * Khai báo extern cục bộ để không phải sửa header (ngoài allowed files của task). */
 extern void SystemCoreClockUpdate(void);
 extern uint32_t SystemCoreClock;
+#endif
 
 static uint8_t  s_m1_tx_ready   = 0;
+#if (KVC_M1_CLOCK_DIAG == 1)
 static uint32_t s_m1_pllclk     = 0;
 static uint8_t  s_m1_pllclk_ok  = 0;
+#endif
 
 /* Bộ đệm text của khối chẩn đoán.
  * Tách ĐỊNH DẠNG khỏi TRUYỀN: sau khi các driver cảm biến đã init, UART1/2/3
@@ -268,8 +346,10 @@ static uint8_t  s_m1_snap_ready = 0;
 
 /* Định nghĩa sớm để kvc_m2_stats_tick() dùng được trước khi hàm được viết. */
 static void kvc_m1_dump_rx_stats(void);
+#if (KVC_M1_CLOCK_DIAG == 1)
 /* KVC-FIX-ABI-20261025-001: self-check IF-02 được gọi trong khối clock dump. */
 static void kvc_m1_dump_abi_selfcheck(void);
+#endif
 
 static void kvc_m1_buf_putc(char c) {
     if (s_m1_snap_len < (uint16_t)(KVC_M1_SNAP_MAX - 1U)) {
@@ -285,6 +365,10 @@ static void kvc_m1_buf_puts(const char *s) {
     }
 }
 
+/* hex32: dùng bởi M1 (clock/ABI) VÀ M3 (in RegVersion LoRa dạng hex).
+ * Vì vậy phải biên dịch khi M1 hoặc M3 bật — trước đây chỉ theo M1 nên build
+ * với M1=0/M3=1 bị "Undefined symbol kvc_m1_buf_hex32". */
+#if (KVC_M1_CLOCK_DIAG == 1) || (KVC_M3_VALUE_DIAG == 1)
 static void kvc_m1_buf_hex32(uint32_t v) {
     static const char s_hex[] = "0123456789ABCDEF";
     int shift;
@@ -293,6 +377,7 @@ static void kvc_m1_buf_hex32(uint32_t v) {
         kvc_m1_buf_putc(s_hex[(v >> (uint32_t)shift) & 0x0FU]);
     }
 }
+#endif
 
 static void kvc_m1_buf_dec32(uint32_t v) {
     char buf[10];
@@ -319,7 +404,9 @@ static void kvc_m1_buf_reset(void) {
 }
 
 /* Xả toàn bộ buffer, chờ THRE từng byte. CHỈ dùng khi UART1/2/3 chưa nhận
- * dữ liệu (phase 0, trước khi init cảm biến) hoặc ở chế độ test độc lập. */
+ * dữ liệu (phase 0, trước khi init cảm biến) hoặc ở chế độ test độc lập.
+ * Chỉ M1 dùng: M2 luôn xả dần để không chặn polling cảm biến. */
+#if (KVC_M1_CLOCK_DIAG == 1)
 static void kvc_m1_flush_blocking(void) {
     uint16_t i;
     if (s_m1_tx_ready == 0U) {
@@ -340,10 +427,32 @@ static void kvc_m1_flush_blocking(void) {
     s_m1_snap_ready = 0;
 }
 
+#endif /* KVC_M1_CLOCK_DIAG */
+
 /* Xả dần buffer, KHÔNG chặn: mỗi lượt ghi tối đa vài byte nếu THRE sẵn sàng,
- * sau đó trả về ngay để main loop tiếp tục poll UART1/2/3. */
+ * sau đó trả về ngay để main loop tiếp tục poll UART1/2/3.
+ *
+ * KVC-M3-20261026-001 (P1 FIX): trước đây hàm này nằm TRONG `#if
+ * (KVC_M1_CLOCK_DIAG == 1)`, nhưng nó là bộ xả DUY NHẤT của buffer dùng chung.
+ * Với cấu hình mặc định M1 = 0, M2 = 1, `kvc_m2_stats_tick()` vẫn đặt
+ * s_m1_snap_ready = 1 mà KHÔNG có ai xả ra UART5; lần tick sau lại thấy
+ * s_m1_snap_ready != 0 và return. Kết quả: UART5 im lặng vĩnh viễn, gate
+ * "oe/fe/drop = 0 trong 10 phút" không đọc được. Nay pump thuộc mọi khối M1/M2/M3. */
+#if (KVC_M1_CLOCK_DIAG == 1) || (KVC_M2_RX_STATS_DIAG == 1) || (KVC_M3_VALUE_DIAG == 1)
 static void kvc_m1_diag_pump(void) {
-    uint32_t budget = 8U;
+    /* Budget 32 byte: TX FIFO của UART5 sâu 16 byte, nên một lượt có thể nạp
+     * đầy FIFO thay vì 8 byte. Ở chế độ bình thường (gọi mỗi 1 ms) tốc độ bị
+     * giới hạn bởi đường truyền ~960 B/s chứ không bởi budget. Ở chế độ vòng
+     * main bị overrun (gọi chỉ 1 lần/vòng >1 s), budget lớn giúp xả được cả FIFO
+     * mỗi vòng thay vì nhỏ giọt.
+     *
+     * GIỚI HẠN ĐÃ BIẾT: nếu khối xử lý vượt 1 s LIÊN TỤC thì hàm chỉ được gọi
+     * ~1 lần/vòng và mỗi dòng M3 (~110 ký tự) có thể mất vài giây mới ra hết.
+     * Không mất ký tự (chỉ ghi khi buffer sẵn sàng) nhưng log sẽ thưa. Muốn xả
+     * cả trong lúc chặn (TX LoRa 300 ms, siêu âm 340 ms) phải gọi pump từ
+     * delay_ms() — việc đó cần đưa macro điều khiển lên trước delay_ms, để task
+     * riêng vì chạm thứ tự khai báo của toàn file. */
+    uint32_t budget = 32U;
 
     if ((s_m1_snap_ready == 0U) || (s_m1_tx_ready == 0U)) {
         return;
@@ -360,16 +469,19 @@ static void kvc_m1_diag_pump(void) {
         s_m1_snap_ready = 0;
     }
 }
+#endif /* M1 || M2 || M3 */
 
 /* KVC-M2: công bố lại thống kê RX ring theo chu kỳ để có thể theo dõi gate
  * "oe/fe/drop = 0 trong 10 phút" mà không cần nạp lại firmware.
  *
- * Cách đếm thời gian: đếm số nhịp của vòng poll 1 ms, KHÔNG dùng timestamp_ms
- * (timestamp đó đang là hằng số cộng dồn giả). Vì delay_ms() nạp cố định 12000
- * chu kỳ cho 1 ms ở 12 MHz, một nhịp poll xấp xỉ 1 ms. Đây là ước lượng, không
- * phải phép đo: nếu HCLK khác 12 MHz thì chu kỳ thực sẽ lệch tương ứng.
+ * Cách đếm thời gian: đếm số nhịp của vòng poll 1 ms. Sau KVC-F6b, mốc thời
+ * gian duy nhất của firmware là kvc_timebase; hàm này vẫn đếm nhịp vì nó đo
+ * "số lần được gọi", không phải thời gian trôi, và chỉ dùng cho chẩn đoán.
+ * Đây là ước lượng, không phải phép đo: nếu HCLK khác 12 MHz thì chu kỳ thực
+ * sẽ lệch tương ứng.
  *
  * Không ghi đè buffer đang xả dở: chỉ định dạng khi s_m1_snap_ready == 0. */
+#if (KVC_M2_RX_STATS_DIAG == 1)
 static void kvc_m2_stats_tick(void) {
     static uint32_t s_ticks = 0U;
 
@@ -391,8 +503,151 @@ static void kvc_m2_stats_tick(void) {
     kvc_m1_dump_rx_stats();
     s_m1_snap_ready = 1;
 }
+#endif /* KVC_M2_RX_STATS_DIAG */
 
-/* Cấu hình UART5 cho bài test danh định. Chỉ tác động UART5 và P0.14/P0.15.
+/* ============================================================================
+ * KVC-M3-20261026-001 — IN GIÁ TRỊ CẢM BIẾN QUA UART5 (1 Hz)
+ * ============================================================================
+ * MỤC ĐÍCH: cho phép nghiệm thu từng cảm biến trên bo bằng log, không cần
+ * debugger. Trước đây chỉ có thống kê ring (có byte đến hay không), không có
+ * giá trị đo nên không phân biệt được "driver chạy đúng" với "driver trả rác".
+ *
+ * NGUYÊN TẮC:
+ *   - CHỈ ĐỌC snapshot do main loop đã tính trong vòng hiện tại. Không đọc lại
+ *     cảm biến, không gọi driver, không delay, không chặn RX UART1/2/3.
+ *   - Không ghi vào gói telemetry, không đổi reserved[], không đổi ABI IF-02.
+ *   - Dùng chung buffer và pump của khối M1/M2; nếu buffer đang bận thì bỏ nhịp
+ *     (không ghi đè text chưa xả).
+ *
+ * ĐỊNH DẠNG (một dòng, ~110 ký tự):
+ *   [M3] t=12345 US=142cm ok | IMU r=12 p=-3 v=1 | GNSS q1 f3 s9 hd0.85 \
+ *        la160738520 lo1081499210 v1 | BB n1 v1 crc0 | ovr0
+ * ============================================================================ */
+#if (KVC_M3_VALUE_DIAG == 1)
+
+/* Ảnh chụp giá trị của vòng main hiện tại, do main loop điền trước vòng chờ.
+ * Không dùng con trỏ tới biến cục bộ để tránh phụ thuộc thời gian sống.
+ * Thứ tự field xếp giảm dần theo kích thước/căn lệnh để không sinh padding
+ * (dự án build với -Wpadded, coi cảnh báo mới là nợ kỹ thuật). */
+typedef struct {
+    uint32_t cycle_overrun_count;/* Số vòng vượt chu kỳ phát */
+    int16_t  roll_deg10;         /* Roll, 0.1 độ */
+    int16_t  pitch_deg10;        /* Pitch, 0.1 độ */
+    uint16_t usound_cm;          /* Cự ly siêu âm, cm */
+    uint8_t  usound_ok;          /* 1 = KVC_USOUND_OK */
+    uint8_t  imu_ok;             /* 1 = có góc hợp lệ trong vòng này */
+} KvcM3Snapshot;
+
+/* In số có dấu. Xử lý INT32_MIN mà không tràn (không dùng -v trực tiếp). */
+static void kvc_m3_buf_dec32s(int32_t v) {
+    uint32_t m;
+    if (v < 0) {
+        kvc_m1_buf_putc('-');
+        m = (uint32_t)(-(v + 1)) + 1U;
+    } else {
+        m = (uint32_t)v;
+    }
+    kvc_m1_buf_dec32(m);
+}
+
+/* In HDOP dạng "1.20" từ đơn vị centi. Sentinel 0xFFFF in "na". */
+static void kvc_m3_buf_hdop(uint16_t centi) {
+    uint16_t frac;
+
+    if (centi == 0xFFFFU) {
+        kvc_m1_buf_puts("na");
+        return;
+    }
+    kvc_m1_buf_dec32((uint32_t)(centi / 100U));
+    kvc_m1_buf_putc('.');
+    frac = (uint16_t)(centi % 100U);
+    kvc_m1_buf_putc((char)('0' + (char)(frac / 10U)));
+    kvc_m1_buf_putc((char)('0' + (char)(frac % 10U)));
+}
+
+static void kvc_m3_value_tick(const KvcM3Snapshot *snap) {
+    static uint32_t s_last_ms = 0U;
+    static uint8_t  s_started = 0U;
+    const KvcGnssState *gnss;
+    const KvcFpgaFrameState *bbox;
+    const uint32_t now_ms = kvc_millis();
+
+    if ((s_m1_tx_ready == 0U) || (snap == NULL)) {
+        return;
+    }
+    if (s_started == 0U) {
+        s_started = 1U;      /* in dòng đầu ngay, không chờ hết chu kỳ */
+    } else if ((uint32_t)(now_ms - s_last_ms) < (uint32_t)KVC_M3_VALUE_PERIOD_MS) {
+        return;
+    }
+
+    if (s_m1_snap_ready != 0U) {
+        return;   /* buffer còn text chưa xả: bỏ nhịp, không ghi đè */
+    }
+    s_last_ms = now_ms;
+
+    kvc_m1_buf_reset();
+
+    kvc_m1_buf_puts("\r\n[M3] t=");
+    kvc_m1_buf_dec32(kvc_millis());
+
+    /* Siêu âm: giá trị + cờ hợp lệ. */
+    kvc_m1_buf_puts(" US=");
+    kvc_m1_buf_dec32((uint32_t)snap->usound_cm);
+    kvc_m1_buf_puts((snap->usound_ok != 0U) ? "cm ok" : "cm err");
+
+    /* IMU: roll/pitch 0.1 độ + cờ. */
+    kvc_m1_buf_puts(" | IMU r=");
+    kvc_m3_buf_dec32s((int32_t)snap->roll_deg10);
+    kvc_m1_buf_puts(" p=");
+    kvc_m3_buf_dec32s((int32_t)snap->pitch_deg10);
+    kvc_m1_buf_puts(" v=");
+    kvc_m1_buf_dec32((uint32_t)snap->imu_ok);
+
+    /* GNSS: quality, fix mode, số vệ tinh, HDOP, lat/lon, cờ 3D fix. */
+    gnss = kvc_gnss_get_state();
+    kvc_m1_buf_puts(" | GNSS q");
+    kvc_m1_buf_dec32((gnss != NULL) ? (uint32_t)gnss->fix_quality : 0U);
+    kvc_m1_buf_puts(" f");
+    kvc_m1_buf_dec32((gnss != NULL) ? (uint32_t)gnss->fix_mode : 0U);
+    kvc_m1_buf_puts(" s");
+    kvc_m1_buf_dec32((gnss != NULL) ? (uint32_t)gnss->satellites_tracked : 0U);
+    kvc_m1_buf_puts(" hd");
+    kvc_m3_buf_hdop((gnss != NULL) ? gnss->hdop_centi : 0xFFFFU);
+    kvc_m1_buf_puts(" la");
+    kvc_m3_buf_dec32s((gnss != NULL) ? gnss->lat_deg7 : 0);
+    kvc_m1_buf_puts(" lo");
+    kvc_m3_buf_dec32s((gnss != NULL) ? gnss->lon_deg7 : 0);
+    kvc_m1_buf_puts(" v");
+    kvc_m1_buf_dec32(kvc_gnss_is_3d_fix() ? 1U : 0U);
+
+    /* FPGA BBox: số candidate, cờ valid, số frame lỗi CRC. */
+    bbox = kvc_fpga_bbox_get_state();
+    kvc_m1_buf_puts(" | BB n");
+    kvc_m1_buf_dec32((bbox != NULL) ? (uint32_t)bbox->candidate_count : 0U);
+    kvc_m1_buf_puts(" v");
+    kvc_m1_buf_dec32(kvc_fpga_bbox_is_valid() ? 1U : 0U);
+    kvc_m1_buf_puts(" crc");
+    kvc_m1_buf_dec32((bbox != NULL) ? bbox->crc_err_count : 0U);
+
+    /* LoRa: cờ sẵn sàng + RegVersion thật đọc được lúc boot.
+     * ver=0x12 là đúng; 0x00/0xFF là dấu hiệu dây SPI hoặc nguồn. */
+    kvc_m1_buf_puts(" | LORA d");
+    kvc_m1_buf_dec32((uint32_t)s_lora_available);
+    kvc_m1_buf_puts(" ver=");
+    kvc_m1_buf_hex32((uint32_t)s_lora_last_version);
+
+    /* Chu kỳ: số vòng vượt hạn 1 s. >0 nghĩa là khối xử lý chậm hơn 1 Hz. */
+    kvc_m1_buf_puts(" | ovr");
+    kvc_m1_buf_dec32(snap->cycle_overrun_count);
+
+    s_m1_snap_ready = 1;
+}
+
+#endif /* KVC_M3_VALUE_DIAG */
+
+/* Cấu hình UART5 (P0.14/P0.15) cho kênh chẩn đoán. Dùng chung cho M1 và M2:
+ * M2 cần TX UART5 để công bố thống kê ring. Chỉ tác động UART5 và P0.14/P0.15.
  * Không đụng UART1/2/3, không đổi SYSCLK/PLL/HCLK. */
 static void kvc_m1_uart5_diag_init(void) {
     s_m1_tx_ready = 0;
@@ -422,6 +677,7 @@ static void kvc_m1_uart5_diag_init(void) {
     s_m1_tx_ready = 1;
 }
 
+#if (KVC_M1_CLOCK_DIAG == 1)
 /* PLLCLK suy ra từ PLLSTS. Không phụ thuộc SYSCLKSTS: một cổng UART có thể chọn
  * UCLK = PLLCLK qua UARTnCLKSEL riêng trong khi SYSCLK vẫn chạy IHRC, nên PLL
  * phải được giải mã độc lập với nguồn SYSCLK.
@@ -570,10 +826,12 @@ static void kvc_m1_dump_clock_regs(void) {
     kvc_m1_buf_puts("\r\n");
 }
 
+#endif /* KVC_M1_CLOCK_DIAG */
+
 /* In thống kê RX ring của 3 cổng cảm biến. Đây là SỐ ĐO THẬT từ counter phần
  * mềm/phần cứng, khác với các giá trị clock suy ra từ thanh ghi ở trên. */
 static void kvc_m1_dump_rx_stats(void) {
-#if (KVC_M1_CLOCK_DIAG == 1)
+#if (KVC_M2_RX_STATS_DIAG == 1)
     KvcBBoxRxStats   bbox;
     KvcGnssRxStats   gnss;
     KvcUsoundRxStats usd;
@@ -590,6 +848,8 @@ static void kvc_m1_dump_rx_stats(void) {
     kvc_m1_buf_dec32(bbox.overrun_count);
     kvc_m1_buf_puts(" fe=");
     kvc_m1_buf_dec32(bbox.framing_count);
+    kvc_m1_buf_puts(" byt=");
+    kvc_m1_buf_dec32(bbox.byte_count);
     kvc_m1_buf_puts(" isr=");
     kvc_m1_buf_dec32(bbox.isr_count);
     kvc_m1_buf_puts("\r\n");
@@ -602,6 +862,8 @@ static void kvc_m1_dump_rx_stats(void) {
     kvc_m1_buf_dec32(gnss.overrun_count);
     kvc_m1_buf_puts(" fe=");
     kvc_m1_buf_dec32(gnss.framing_count);
+    kvc_m1_buf_puts(" byt=");
+    kvc_m1_buf_dec32(gnss.byte_count);
     kvc_m1_buf_puts(" isr=");
     kvc_m1_buf_dec32(gnss.isr_count);
     kvc_m1_buf_puts("\r\n");
@@ -614,6 +876,8 @@ static void kvc_m1_dump_rx_stats(void) {
     kvc_m1_buf_dec32(usd.overrun_count);
     kvc_m1_buf_puts(" fe=");
     kvc_m1_buf_dec32(usd.framing_count);
+    kvc_m1_buf_puts(" byt=");
+    kvc_m1_buf_dec32(usd.byte_count);
     kvc_m1_buf_puts(" isr=");
     kvc_m1_buf_dec32(usd.isr_count);
     kvc_m1_buf_puts("\r\n");
@@ -629,7 +893,9 @@ static void kvc_m1_dump_rx_stats(void) {
  * thay vì phát frame sai xuống trạm đất.
  *
  * Hàm này CHỈ đọc/định dạng, không gửi LoRa, không đổi cấu hình phần cứng.
+ * Hiện được gọi từ khối chẩn đoán clock (M1) nên chỉ biên dịch khi M1 bật.
  */
+#if (KVC_M1_CLOCK_DIAG == 1)
 static void kvc_m1_dump_abi_selfcheck(void) {
     KvcTelemetryPacket32 pkt;
     uint16_t crc;
@@ -659,7 +925,9 @@ static void kvc_m1_dump_abi_selfcheck(void) {
     kvc_m1_buf_puts(kvc_telemetry_match_golden_gv01(&pkt) ? " PASS\r\n"
                                                           : " FAIL\r\n");
 }
+#endif /* KVC_M1_CLOCK_DIAG */
 
+#if (KVC_M1_CLOCK_DIAG == 1)
 /* phase 0: trước khi init cảm biến — UART1/2/3 chưa nhận dữ liệu nên được phép
  *          xả text đồng bộ (blocking) để log chắc chắn ra hết.
  * phase 1: sau khi init cảm biến — UART1/2/3 đang nhận dữ liệu nhưng chưa được
@@ -743,6 +1011,8 @@ static void kvc_m1_diag(uint8_t phase) {
 
 #endif /* KVC_M1_CLOCK_DIAG */
 
+#endif /* (KVC_M1_CLOCK_DIAG == 1) || (KVC_M2_RX_STATS_DIAG == 1) */
+
 /* ============================================================================
  * ĐIỀU KHIỂN CHÂN SPI VÀ GPIO CHO MODULE LORA RA-02 (SX1278)
  * ============================================================================ */
@@ -815,8 +1085,11 @@ static uint8_t sx1278_init_tx(void) {
     SN_GPIO2->BSET = (1U << KVC_PIN_LORA_RST_PIN);
     delay_ms(50);
 
-    /* 3. Kiểm tra thanh ghi nhận diện chip RegVersion (0x42) phải là 0x12 */
+    /* 3. Kiểm tra thanh ghi nhận diện chip RegVersion (0x42) phải là 0x12.
+     * Ghi lại giá trị vừa đọc để khối chẩn đoán M3 in ra khi init thất bại —
+     * xem giải thích ở s_lora_last_version. */
     uint8_t ver = sx1278_read_reg(0x42);
+    s_lora_last_version = ver;
     if (ver != 0x12) {
         return 0; /* Lỗi nối dây SPI hoặc tiếp xúc lỏng */
     }
@@ -912,6 +1185,11 @@ int main(void) {
      * sx1278_init_tx() bên dưới, vì vòng đó có thể chặn boot khi thiếu module LoRa.
      * Chỉ đọc thanh ghi và in log; không đổi SYSCLK/PLL/HCLK/UART1/2/3. */
     kvc_m1_diag(0);
+#elif (KVC_M2_RX_STATS_DIAG == 1) || (KVC_M3_VALUE_DIAG == 1)
+    /* M1 tắt nhưng M2/M3 bật: vẫn phải mở UART5 để công bố thống kê ring và
+     * giá trị cảm biến, nếu không tick nào cũng thấy s_m1_tx_ready == 0 và im
+     * lặng. Chỉ cấu hình TX UART5/P0.15, không đọc thanh ghi clock. */
+    kvc_m1_uart5_diag_init();
 #endif
 
     /* 1. Cấp xung nhịp APB1 cho GPIO Port 0 (IMU), Port 1 (LED) và Port 2 (LoRa Ra-02) */
@@ -1005,8 +1283,24 @@ int main(void) {
     /* 5. Khởi tạo cảm biến siêu âm chống nước AJ-SR04M qua UART2 (9600 bps: P2.14 UTXD2, P2.15 URXD2) */
     kvc_usound_init();
 
-    /* 5b. Khởi tạo module định vị vệ tinh u-blox NEO-M10 qua UART3 (38400/9600 bps: P2.0 UTXD3, P2.1 URXD3) */
+    /* 5b. Khởi tạo module định vị vệ tinh u-blox NEO-M10 qua UART3
+     * (9600 bps mặc định theo KVC_GNSS_BAUD_RATE: P2.0 UTXD3, P2.1 URXD3)
+     *
+     * LƯU Ý THỜI GIAN: kvc_gnss_init() có thể chạy tới 11–15 s vì nó dò tốc độ
+     * module (5 ứng viên × 1500 ms). Trong suốt thời gian đó UART2 đã bật ngắt từ
+     * bước 5 nhưng KHÔNG ai tiêu thụ ring, nên ring 1024 byte tràn và FSM giải mã
+     * siêu âm bị lệch trạng thái. Vì vậy ngay sau đây phải xả ring (xem bước 5d). */
     kvc_gnss_init();
+
+    /* 5d. Xả dữ liệu siêu âm ứ đọng trong lúc autobaud GNSS chạy.
+     *
+     * Nếu bỏ bước này, khung 4 byte bị cắt giữa chừng khi ring tràn sẽ khiến FSM
+     * hiểu sai vị trí byte (ví dụ đang chờ checksum lại nhận được 0xFF header) và
+     * cảm biến trả lỗi liên tục dù phần cứng vẫn tốt. Đã gặp trên kit.
+     *
+     * Đặt SAU kvc_gnss_init() và TRƯỚC kvc_fpga_bbox_init() để thời gian chết
+     * không tăng thêm (bbox init ngắn). */
+    kvc_usound_discard_stale_rx();
 
     /* 5c. Khởi tạo driver tiếp nhận BBox FPGA qua UART1 (115200 bps: P2.3 URXD1, P2.2 UTXD1) */
     kvc_fpga_bbox_init();
@@ -1048,17 +1342,32 @@ int main(void) {
 
     uint8_t seq = 1;
 
-    /* 7. Vòng lặp phát sóng định kỳ mỗi 1.0 giây */
+    /* 7. Vòng lặp phát sóng định kỳ.
+     *
+     * KVC-PERIOD: chu kỳ được điều khiển bằng MỐC THỜI GIAN TUYỆT ĐỐI, không
+     * đếm số bước. Trước đây vòng trong đếm đúng 1000 nhịp `delay_ms(1)`, nên
+     * chu kỳ thật = 1000 ms + thời gian chặn của cảm biến/TX. Kết quả: telemetry
+     * ~1,1-1,4 s chứ không phải 1,0 s, đúng bằng ngưỡng 3 s mà gateway coi là
+     * mất sóng và ngưỡng 2 s BBox hết hạn -> dữ liệu AI tới trạm đất đã cũ.
+     *
+     * Nay mỗi vòng ghi `cycle_start` rồi chờ ĐẾN mốc `cycle_start + period`
+     * trong lúc vẫn poll cảm biến. Nếu khối xử lý vượt quá period thì vòng chờ
+     * bằng 0 (không bù dồn, không tăng tốc bất thường) và `s_cycle_overrun`
+     * tăng để biết có xảy ra và xảy ra bao nhiêu lần. */
+    uint32_t cycle_start_ms = kvc_millis();
+    uint32_t cycle_overrun_count = 0U;
+
     while (1) {
         /* KVC-F10: kick watchdog ở ĐÚNG MỘT chỗ, đầu mỗi vòng. Không kick trong
          * ISR để watchdog còn phát hiện được main bị treo. */
         kvc_wdt_feed();
 
+        cycle_start_ms = kvc_millis();
+
         pkt.seq_num = seq++;
-        /* FIX (Codex F6): dùng time base monotonic thật thay cho `+= 1000`.
-         * Trước đây timestamp chỉ đếm số vòng nên bỏ qua toàn bộ thời gian
-         * xử lý/chặn trong vòng, làm lệch ngưỡng expiry và cửa sổ TDM. */
-        pkt.timestamp_ms = kvc_millis();
+        /* FIX (Codex F6 / KVC-F6b): timestamp_ms được lấy NGAY TRƯỚC khi đóng gói
+         * ở cuối vòng (xem khối kvc_finalize_telemetry_packet). Không lấy ở đây
+         * vì các bước sau (IMU bit-bang, chờ siêu âm ~100 ms) đã làm mốc này cũ. */
 
         /* Nếu IMU chưa nhận diện được, tự động dò tìm lại mỗi chu kỳ để người dùng cắm lại dây là nhận ngay */
         if (!imu_ready) {
@@ -1075,17 +1384,23 @@ int main(void) {
             KVC_BOARD_LED2_ON();
         }
 
-        /* Đọc dữ liệu góc nghiêng từ cảm biến IMU GY-87 nếu có cắm */
+        /* Đọc dữ liệu góc nghiêng từ cảm biến IMU GY-87 nếu có cắm.
+         * KVC-M3-20261026-001: roll/pitch được khai báo NGOÀI khối if để khối
+         * chẩn đoán M3 đọc được giá trị của vòng hiện tại. Việc ghi vào
+         * pkt.reserved[] và cờ IMU_VALID giữ nguyên hoàn toàn như trước. */
+        int16_t m3_roll_deg10 = 0;
+        int16_t m3_pitch_deg10 = 0;
+        uint8_t m3_imu_ok = 0U;
+
         if (imu_ready) {
-            int16_t roll_deg10 = 0;
-            int16_t pitch_deg10 = 0;
-            if (mpu6050_read_angles(imu_addr, &roll_deg10, &pitch_deg10)) {
+            if (mpu6050_read_angles(imu_addr, &m3_roll_deg10, &m3_pitch_deg10)) {
+                m3_imu_ok = 1U;
                 pkt.sensor_flags |= KVC_FLAG_IMU_VALID;
                 /* Ghi Roll và Pitch (đơn vị 0.1 độ, ví dụ 152 = 15.2°) vào 4 byte reserved */
-                pkt.reserved[0] = (uint8_t)(roll_deg10 & 0xFF);
-                pkt.reserved[1] = (uint8_t)((roll_deg10 >> 8) & 0xFF);
-                pkt.reserved[2] = (uint8_t)(pitch_deg10 & 0xFF);
-                pkt.reserved[3] = (uint8_t)((pitch_deg10 >> 8) & 0xFF);
+                pkt.reserved[0] = (uint8_t)(m3_roll_deg10 & 0xFF);
+                pkt.reserved[1] = (uint8_t)((m3_roll_deg10 >> 8) & 0xFF);
+                pkt.reserved[2] = (uint8_t)(m3_pitch_deg10 & 0xFF);
+                pkt.reserved[3] = (uint8_t)((m3_pitch_deg10 >> 8) & 0xFF);
             } else {
                 /* Đọc thất bại (mất kết nối hoặc chập I2C): Đánh dấu mất IMU để tự dò tìm lại */
                 imu_ready = 0;
@@ -1095,6 +1410,8 @@ int main(void) {
                 pkt.reserved[1] = 0;
                 pkt.reserved[2] = 0;
                 pkt.reserved[3] = 0;
+                m3_roll_deg10 = 0;
+                m3_pitch_deg10 = 0;
             }
         } else {
             /* Chưa có IMU: Đảm bảo xóa cờ IMU */
@@ -1117,10 +1434,14 @@ int main(void) {
         }
 
         /* Cập nhật trạng thái định vị vệ tinh từ module GNSS NEO-M10 (Polling không chặn) */
-        kvc_gnss_poll(pkt.timestamp_ms);
+        kvc_gnss_poll(kvc_millis());
         int32_t uav_lat = 0;
         int32_t uav_lon = 0;
-        if (kvc_gnss_is_valid()) {
+        /* IF-02 byte 24 bit 0 nghĩa là "GNSS 3D Fix hợp lệ", nên chỉ bật cờ khi
+         * driver xác nhận 3D fix (mode == 3, sats >= 5, 0 < HDOP <= 2.50).
+         * Trước đây dùng kvc_gnss_is_valid() (chấp nhận cả 2D) nên toạ độ có
+         * thể được công bố dù chưa đủ điều kiện 3D. */
+        if (kvc_gnss_is_3d_fix()) {
             /* Cảm biến GPS đã thu nhận được tín hiệu vệ tinh thực tế */
             const KvcGnssState *gnss_st = kvc_gnss_get_state();
             uav_lat = gnss_st->lat_deg7;
@@ -1141,21 +1462,26 @@ int main(void) {
         }
 
         /* Cập nhật và giải mã khung BBox từ FPGA (UART1 P2.3) */
-        kvc_fpga_bbox_poll(pkt.timestamp_ms);
+        kvc_fpga_bbox_poll(kvc_millis());
         if (kvc_fpga_bbox_is_valid()) {
             const KvcFpgaFrameState *fpga_state = kvc_fpga_bbox_get_state();
             const KvcFpgaBBoxItem *target = NULL;
             uint8_t target_idx = 0;
 
             if (fpga_state != NULL && fpga_state->candidate_count > 0) {
-                /* Luân phiên báo cáo các mục tiêu (TDM Round-Robin) nếu có nhiều người/phao gặp nạn (xoay vòng mỗi 1.5s) */
+                /* Luân phiên báo cáo các mục tiêu (TDM Round-Robin).
+                 *
+                 * KVC-PERIOD: đếm theo SỐ GÓI, không theo thời gian. Trước đây
+                 * dùng cửa sổ 1500 ms trong khi chu kỳ phát ~1,1-1,4 s, nên
+                 * thực tế mục tiêu chỉ nhảy mỗi 2 gói và mốc 1,5 s không bao
+                 * giờ đúng. Đếm theo gói là tất định: mỗi gói một mục tiêu.
+                 * Chỉ số được mod theo candidate_count nên luôn nằm trong mảng
+                 * kể cả khi số mục tiêu giảm giữa hai gói. */
                 static uint8_t s_target_cycle_idx = 0;
-                static uint32_t s_last_cycle_time = 0;
-                if ((pkt.timestamp_ms - s_last_cycle_time) >= 1500UL) {
-                    s_last_cycle_time = pkt.timestamp_ms;
-                    s_target_cycle_idx++;
-                }
-                target_idx = s_target_cycle_idx % fpga_state->candidate_count;
+                target_idx = (uint8_t)(s_target_cycle_idx % fpga_state->candidate_count);
+#if (KVC_TDM_ROTATE_EVERY_PACKET == 1)
+                s_target_cycle_idx++;
+#endif
                 target = &fpga_state->targets[target_idx];
             } else {
                 target = kvc_fpga_bbox_get_primary_target();
@@ -1241,6 +1567,13 @@ int main(void) {
             pkt.target_y_local = 0;
         }
 
+        /* Làm mới mốc thời gian NGAY TRƯỚC khi đóng gói: từ KVC-F6b, time base đã
+         * tính cả thời gian chặn (đọc siêu âm ~100 ms, bit-bang I2C, TX LoRa
+         * ~300 ms của vòng trước), nên `pkt.timestamp_ms` lấy ở đầu vòng đã cũ
+         * vài trăm ms. Đóng gói bằng giá trị cũ sẽ làm GCS hiển thị mốc lệch và
+         * làm sai ngưỡng expiry/TDM ở phía nhận. */
+        pkt.timestamp_ms = kvc_millis();
+
         /* Tự động điền Sync Header 0xAA 0x55 và tính mã CRC-16 chuẩn xác */
         kvc_finalize_telemetry_packet(&pkt);
 
@@ -1258,25 +1591,76 @@ int main(void) {
         /* Tắt đèn LED1 sau khi bắn xong */
         KVC_BOARD_LED1_OFF();
 
-        /* Chu kỳ phát 1 giây / gói: polling GNSS, FPGA BBox và Siêu âm liên tục theo từng nhịp 1 ms không chặn */
-        for (uint32_t step = 0; step < 1000; step++) {
-            kvc_gnss_poll(pkt.timestamp_ms + step);
-            kvc_fpga_bbox_poll(pkt.timestamp_ms + step);
+#if (KVC_M3_VALUE_DIAG == 1)
+        /* KVC-M3-20261026-001: chốt ảnh chụp giá trị của VÒNG HIỆN TẠI để in
+         * trong lúc chờ. Snapshot lấy đúng các biến đã dùng cho telemetry phía
+         * trên nên log M3 và gói RF luôn nhất quán. */
+        KvcM3Snapshot m3_snap;
+        m3_snap.usound_cm          = usound_cm;
+        m3_snap.usound_ok          = (usound_res == KVC_USOUND_OK) ? 1U : 0U;
+        m3_snap.roll_deg10         = m3_roll_deg10;
+        m3_snap.pitch_deg10        = m3_pitch_deg10;
+        m3_snap.imu_ok             = m3_imu_ok;
+        m3_snap.cycle_overrun_count = cycle_overrun_count;
+#else
+        /* M3 tắt: roll/pitch vẫn được đọc để ghi pkt.reserved[] nên không có
+         * cảnh báo unused; chỉ m3_imu_ok là set-but-not-used nên đọc bỏ. */
+        (void)m3_imu_ok;
+#endif
+
+#if (KVC_M1_CLOCK_DIAG == 1) || (KVC_M2_RX_STATS_DIAG == 1) || (KVC_M3_VALUE_DIAG == 1)
+        /* KVC-M3-20261026-001: định dạng + xả text MỘT lần mỗi vòng main, TRƯỚC
+         * vòng chờ. Lý do: nếu khối xử lý vượt hạn 1 s (siêu âm 340 ms + TX LoRa
+         * 300 ms + ...) thì vòng chờ bên dưới không chạy lượt nào; nếu chỉ tick
+         * trong vòng chờ thì UART5 im lặng đúng lúc cần chẩn đoán overrun nhất.
+         * Cả hai tick đều tự chặn theo thời gian nên gọi thêm trong vòng chờ
+         * không sinh dòng trùng. */
+#if (KVC_M2_RX_STATS_DIAG == 1)
+        kvc_m2_stats_tick();
+#endif
+#if (KVC_M3_VALUE_DIAG == 1)
+        kvc_m3_value_tick(&m3_snap);
+#endif
+        kvc_m1_diag_pump();
+#endif
+
+        /* CHỜ ĐẾN MỐC TUYỆT ĐỐI `cycle_start_ms + KVC_TELEMETRY_PERIOD_MS`.
+         *
+         * Vẫn poll cảm biến trong lúc chờ để không mất byte UART nào. Vòng lặp
+         * kết thúc khi đã tới hạn, nên chu kỳ phát là 1000 ms bất kể thời gian
+         * xử lý ở trên là bao nhiêu (miễn là < 1000 ms).
+         *
+         * Nếu khối xử lý đã vượt hạn, `elapsed >= period` ngay từ đầu nên vòng
+         * chờ không chạy lần nào; ta đếm vào `cycle_overrun_count` để biết chuyện
+         * đó có xảy ra thật hay không, thay vì im lặng coi như đúng 1 Hz. */
+        while ((uint32_t)(kvc_millis() - cycle_start_ms) < KVC_TELEMETRY_PERIOD_MS) {
+            kvc_gnss_poll(kvc_millis());
+            kvc_fpga_bbox_poll(kvc_millis());
             kvc_usound_poll();
-#if (KVC_M1_CLOCK_DIAG == 1)
-            /* Xả text chẩn đoán post-init dần theo THRE. Không delay, nên không
-             * chặn polling UART1/2/3 và không gây tràn FIFO cảm biến. */
+#if (KVC_M1_CLOCK_DIAG == 1) || (KVC_M2_RX_STATS_DIAG == 1) || (KVC_M3_VALUE_DIAG == 1)
+            /* Xả text chẩn đoán dần theo THRE. Không delay, nên không chặn
+             * polling UART1/2/3 và không gây tràn FIFO cảm biến.
+             * KVC-M3-20261026-001: pump phục vụ M1/M2/M3 nên điều kiện mở rộng;
+             * trước đây chỉ M1 nên cấu hình mặc định (M1=0, M2=1) không xả gì. */
             kvc_m1_diag_pump();
-            /* KVC-M2: công bố thống kê RX ring mỗi ~5 s để theo dõi gate
+#endif
+#if (KVC_M2_RX_STATS_DIAG == 1)
+            /* Công bố thống kê RX ring mỗi ~5 s để theo dõi gate
              * oe/fe/drop = 0 trong suốt buổi chạy, không cần nạp lại. */
             kvc_m2_stats_tick();
 #endif
-            /* KVC-F10: kick giữa vòng để không phụ thuộc hoàn toàn vào ước lượng
-             * thời gian một vòng. Vẫn là "một chỗ" theo nghĩa chỉ trong main. */
-            if (step == 500U) {
-                kvc_wdt_feed();
-            }
+#if (KVC_M3_VALUE_DIAG == 1)
+            /* In giá trị cảm biến ~1 Hz để nghiệm thu từng cảm biến trên bo. */
+            kvc_m3_value_tick(&m3_snap);
+#endif
             delay_ms(1);
+        }
+
+        /* Đo chu kỳ thực đã trôi (ms). > period nghĩa là khối xử lý vượt hạn;
+         * đếm lại để có số liệu thay vì giả định 1 Hz. Không log mỗi vòng để
+         * không chiếm UART5; log qua thống kê dưới đây khi có overrun. */
+        if ((uint32_t)(kvc_millis() - cycle_start_ms) > KVC_TELEMETRY_PERIOD_MS) {
+            cycle_overrun_count++;
         }
     }
 }

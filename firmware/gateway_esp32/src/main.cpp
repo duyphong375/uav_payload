@@ -35,6 +35,7 @@
 // Thư viện điều khiển phần cứng Wi-Fi của ESP32: quản lý kết nối vào mạng Wi-Fi
 // (Station Mode)
 #include <WiFi.h>
+#include <ESPmDNS.h>
 
 // Thư viện máy chủ WebSocket: quản lý các kết nối TCP 2 chiều (Full-Duplex) với
 // Laptop thời gian thực
@@ -51,6 +52,17 @@
 // stddef.h cho offsetof() dùng trong static_assert khoá layout IF-02 bên dưới
 #include <cstddef>
 #include <cstring>
+
+// KVC-F1: lớp giải mã RF (struct IF-02, CRC-16, hex) đã tách sang module thuần
+// C++ để biên dịch và kiểm thử được trên host (firmware/gateway_esp32/host_tests).
+// Không khai báo lại struct/CRC trong file này.
+#include "net_policy.h"
+#include "rf_decode.h"
+
+using kvc::RfTelemetryPacket32;
+using kvc::bytesToHexString;
+using kvc::calculateCrc16;
+using kvc::validatePacketCrc;
 
 
 // ======================================================================================
@@ -84,23 +96,24 @@ static const long LORA_BAND_HZ = 433E6;
 // ======================================================================================
 
 /**
- * Cấu hình mạng Wi-Fi cục bộ để ESP32 và Laptop cùng bắt chung.
- * Lưu ý: ESP32-C3 chỉ hỗ trợ băng tần 2.4GHz.
+ * Cấu hình mạng Wi-Fi của gateway theo THỨ TỰ ƯU TIÊN:
  *
- * FIX (Codex F11): trước đây SSID/mật khẩu Wi-Fi được hardcode trong source đã
- * commit, tức là credential bị lộ cho bất kỳ ai đọc repo. Nay giá trị được lấy
- * từ build flag (platformio.ini / biến môi trường), KHÔNG còn literal trong
- * source. Nếu không truyền flag, firmware vẫn build được nhưng sẽ không kết nối
- * Wi-Fi và in cảnh báo ra Serial.
+ *   Ưu tiên 1 — STA: kết nối Wi-Fi 2.4 GHz đã thiết lập sẵn.
+ *               "4G" trong dự án này là do ĐIỆN THOẠI phát hotspot Wi-Fi 2.4 GHz;
+ *               gateway không có module 4G/LTE riêng và không cần có. Điện thoại
+ *               lo phần sóng di động, ESP32 chỉ việc bắt Wi-Fi của nó.
+ *   Ưu tiên 2 — SoftAP: nếu không kết nối được STA trong thời gian cho phép
+ *               thì tự phát Wi-Fi để laptop bắt vào.
  *
- * Truyền khi build (không commit giá trị thật):
+ * Có thể nạp TỐI ĐA 4 mạng, thử lần lượt theo thứ tự khai báo. Nhờ vậy không
+ * phải build lại khi chuyển giữa hotspot điện thoại và Wi-Fi phòng Lab:
  *   pio run -e esp32-c3-devkitm-1 \
- *     -D KVC_WIFI_SSID=\"ten-mang\" -D KVC_WIFI_PASS=\"mat-khau\"
- * Hoặc đặt trong platformio.ini cục bộ (file này nên nằm trong .gitignore):
- *   build_flags = -D KVC_WIFI_SSID=\"...\" -D KVC_WIFI_PASS=\"...\"
+ *     -D KVC_WIFI_SSID=\"hotspot-dien-thoai\"   -D KVC_WIFI_PASS=\"mat-khau-1\" \
+ *     -D KVC_WIFI_SSID2=\"wifi-phong-lab\"      -D KVC_WIFI_PASS2=\"mat-khau-2\"
+ * Không truyền flag nào -> bỏ qua STA và chạy SoftAP ngay.
  *
- * LƯU Ý BẢO MẬT: credential đã từng nằm trong history Git. Cần rotate mật khẩu
- * Wi-Fi đó; việc xoá khỏi source hiện tại KHÔNG làm sạch history.
+ * Credential SoftAP là hằng số của dự án (do người dùng chốt), ghi một lần ở đây
+ * và vẫn override được bằng build flag khi cần demo mạng khác.
  */
 #ifndef KVC_WIFI_SSID
 #define KVC_WIFI_SSID ""
@@ -108,9 +121,79 @@ static const long LORA_BAND_HZ = 433E6;
 #ifndef KVC_WIFI_PASS
 #define KVC_WIFI_PASS ""
 #endif
+#ifndef KVC_WIFI_SSID2
+#define KVC_WIFI_SSID2 ""
+#endif
+#ifndef KVC_WIFI_PASS2
+#define KVC_WIFI_PASS2 ""
+#endif
+#ifndef KVC_WIFI_SSID3
+#define KVC_WIFI_SSID3 ""
+#endif
+#ifndef KVC_WIFI_PASS3
+#define KVC_WIFI_PASS3 ""
+#endif
+#ifndef KVC_WIFI_SSID4
+#define KVC_WIFI_SSID4 ""
+#endif
+#ifndef KVC_WIFI_PASS4
+#define KVC_WIFI_PASS4 ""
+#endif
 
-const char *WIFI_SSID = KVC_WIFI_SSID;
-const char *WIFI_PASS = KVC_WIFI_PASS;
+/* SoftAP mặc định của dự án. SSID/mật khẩu này là thông số vận hành công khai
+ * trong nội bộ nhóm, không phải secret; mọi tài liệu phải dùng đúng hai giá trị
+ * này (trước đây tài liệu ghi KVC_GCS_AP / kvc12345678 và đã lệch code). */
+#ifndef KVC_AP_SSID
+#define KVC_AP_SSID "KVC_GROUND_STATION"
+#endif
+#ifndef KVC_AP_PASS
+#define KVC_AP_PASS "kvc123456"
+#endif
+
+/* Thời gian chờ mỗi mạng ở ưu tiên 1 trong lúc khởi động. */
+static const uint32_t KVC_STA_PER_NET_TIMEOUT_MS = 8000UL;
+/* Tổng ngân sách thời gian cho ưu tiên 1 lúc khởi động. Hết ngân sách thì mở
+ * SoftAP ngay để laptop không phải chờ; các mạng còn lại vẫn được thử lại khi
+ * chạy. Đặt nhỏ hơn thời gian một buổi demo cần để chờ là có chủ đích. */
+static const uint32_t KVC_STA_BOOT_BUDGET_MS = 15000UL;
+/* Chu kỳ thử lại ưu tiên 1 khi đang chạy (kể cả khi đang phát SoftAP). */
+static const uint32_t KVC_STA_RETRY_INTERVAL_MS = 30000UL;
+
+/** Một bộ credential Wi-Fi 2.4 GHz (ưu tiên 1). */
+struct WifiCredential {
+  const char *ssid;
+  const char *pass;
+};
+
+/* Danh sách ưu tiên 1, theo đúng thứ tự khai báo build flag. Mạng không có SSID
+ * (chuỗi rỗng) bị bỏ qua khi duyệt. */
+static const WifiCredential WIFI_NETWORKS[] = {
+    {KVC_WIFI_SSID, KVC_WIFI_PASS},   {KVC_WIFI_SSID2, KVC_WIFI_PASS2},
+    {KVC_WIFI_SSID3, KVC_WIFI_PASS3}, {KVC_WIFI_SSID4, KVC_WIFI_PASS4},
+};
+static const size_t WIFI_NETWORK_COUNT =
+    sizeof(WIFI_NETWORKS) / sizeof(WIFI_NETWORKS[0]);
+
+const char *AP_SSID = KVC_AP_SSID;
+const char *AP_PASS = KVC_AP_PASS;
+
+/* Trạng thái mạng do wifiBegin()/wifiSupervise() quản lý. */
+static bool s_staConfigured = false;   // Có ít nhất 1 mạng ở ưu tiên 1
+static size_t s_netIndex = 0;          // Mạng đang/đã thử gần nhất
+static bool s_apStarted = false;
+static uint32_t s_lastStaAttemptMs = 0;
+
+/**
+ * @brief Tìm mạng kế tiếp có SSID, bắt đầu từ afterIndex.
+ * @return Chỉ số mạng, hoặc WIFI_NETWORK_COUNT nếu không còn mạng nào.
+ */
+static size_t nextConfiguredNetwork(size_t afterIndex) {
+  const char *ssids[WIFI_NETWORK_COUNT];
+  for (size_t i = 0; i < WIFI_NETWORK_COUNT; i++) {
+    ssids[i] = WIFI_NETWORKS[i].ssid;
+  }
+  return kvc::netNextConfiguredIndex(ssids, WIFI_NETWORK_COUNT, afterIndex);
+}
 
 // ======================================================================================
 // 3. CẤU HÌNH DỊCH VỤ WEBSOCKET SERVER
@@ -124,109 +207,15 @@ const uint16_t WS_PORT = 8080;
 WebSocketsServer webSocket = WebSocketsServer(WS_PORT);
 
 // ======================================================================================
-// 4. ĐỊNH NGHĨA CẤU TRÚC GÓI ĐO XA TELEMETRY 32-BYTE (CHUẨN IF_MCU_LORA_RF.MD)
+// 4. GÓI TELEMETRY 32-BYTE (IF-02) — ĐỊNH NGHĨA NẰM TRONG rf_decode.h
 // ======================================================================================
-
-/**
- * @brief Cấu trúc gói tin 32 bytes Little-Endian truyền từ máy bay UAV về mặt
- * đất.
- *
- * ⚠️ QUY TẮC CỐT LÕI:
- * Phải sử dụng __attribute__((packed)) để vô hiệu hóa tính năng căn chỉnh tự
- * động của compiler, đảm bảo kích thước struct chính xác tròn trĩnh 32 bytes
- * không có byte rác (padding), tương thích 100% với
- * struct.unpack("<2sBBIIIhhHBBBB4sH") trên Backend Python.
- */
-struct __attribute__((packed)) RfTelemetryPacket32 {
-  // Byte 0..1: Tiêu đề đồng bộ nhận diện gói tin UAV (Cố định: 0xAA 0x55)
-  uint8_t sync[2];
-
-  // Byte 2: Mã định danh loại gói tin (0x01 = Telemetry cứu nạn, 0x02 =
-  // Heartbeat)
-  uint8_t msg_id;
-
-  // Byte 3: Số thứ tự gói tin (0 - 255, xoay vòng) giúp phát hiện rớt gói vô
-  // tuyến
-  uint8_t seq_num;
-
-  // Byte 4..7: Mốc thời gian bay của UAV tính bằng mili-giây kể từ lúc cất cánh
-  uint32_t timestamp_ms;
-
-  // Byte 8..11: Vĩ độ WGS-84 mục tiêu nhân 10^7 (Ví dụ: 107723450
-  // = 10.772345°N)
-  int32_t target_lat;
-
-  // Byte 12..15: Kinh độ WGS-84 mục tiêu nhân 10^7 (Ví dụ: 1066578900 =
-  // 106.657890°E)
-  int32_t target_lon;
-
-  // Byte 16..17: Tọa độ X tương đối so với mốc sa bàn/bể bơi thực nghiệm (cm)
-  int16_t target_x_local;
-
-  // Byte 18..19: Tọa độ Y tương đối so với mốc sa bàn/bể bơi thực nghiệm (cm)
-  int16_t target_y_local;
-
-  // Byte 20..21: Khoảng cách cảm biến đo mặt nước từ AJ-SR04M siêu âm (cm)
-  // [tiền thân LiDAR TF-Luna]
-  union {
-    uint16_t alt_dist_cm;
-    uint16_t lidar_dist_cm; // Bí danh tương thích mã nguồn hiện hành
-  };
-
-  // Byte 22: Phân loại mục tiêu do AI nhận diện (1 = Người/person, 2 = Phao/tàu
-  // thuyền)
-  uint8_t class_id;
-
-  // Byte 23: Độ tin cậy nhận diện của AI (0 đến 100%)
-  uint8_t confidence;
-
-  // Byte 24: Cờ trạng thái cảm biến (Bit 0: GPS, Bit 1: Siêu âm ALT, Bit 2:
-  // IMU, Bit 3: Khóa AI)
-  uint8_t sensor_flags;
-
-  // Byte 25: Điện áp Pin UAV (Đơn vị: 0.1V/bit, ví dụ 126 tương đương 12.6V)
-  uint8_t battery_raw;
-
-  // Byte 26..29: 4 byte dự phòng mở rộng (áp suất khí quyển, nhiệt độ môi
-  // trường, ...)
-  uint8_t reserved[4];
-
-  // Byte 30..31: Mã kiểm tra an toàn CRC-16/CCITT-FALSE (tính trên 30 byte đầu
-  // từ byte 0..29)
-  uint16_t crc16;
-};
-
-// Khoa ABI IF-02 tai thoi diem bien dich: neu layout lech khoi bang offset
-// trong docs/interfaces/IF_MCU_LORA_RF.md thi build FAIL ngay, khong doi den
-// luc chay tren bo moi phat hien.
-static_assert(sizeof(RfTelemetryPacket32) == 32,
-              "IF-02: RfTelemetryPacket32 phai dung 32 byte");
-static_assert(offsetof(RfTelemetryPacket32, sync) == 0, "IF-02: sync @0");
-static_assert(offsetof(RfTelemetryPacket32, msg_id) == 2, "IF-02: msg_id @2");
-static_assert(offsetof(RfTelemetryPacket32, seq_num) == 3, "IF-02: seq_num @3");
-static_assert(offsetof(RfTelemetryPacket32, timestamp_ms) == 4,
-              "IF-02: timestamp_ms @4");
-static_assert(offsetof(RfTelemetryPacket32, target_lat) == 8,
-              "IF-02: target_lat @8");
-static_assert(offsetof(RfTelemetryPacket32, target_lon) == 12,
-              "IF-02: target_lon @12");
-static_assert(offsetof(RfTelemetryPacket32, target_x_local) == 16,
-              "IF-02: target_x_local @16");
-static_assert(offsetof(RfTelemetryPacket32, target_y_local) == 18,
-              "IF-02: target_y_local @18");
-static_assert(offsetof(RfTelemetryPacket32, alt_dist_cm) == 20,
-              "IF-02: alt_dist_cm @20");
-static_assert(offsetof(RfTelemetryPacket32, class_id) == 22,
-              "IF-02: class_id @22");
-static_assert(offsetof(RfTelemetryPacket32, confidence) == 23,
-              "IF-02: confidence @23");
-static_assert(offsetof(RfTelemetryPacket32, sensor_flags) == 24,
-              "IF-02: sensor_flags @24");
-static_assert(offsetof(RfTelemetryPacket32, battery_raw) == 25,
-              "IF-02: battery_raw @25");
-static_assert(offsetof(RfTelemetryPacket32, reserved) == 26,
-              "IF-02: reserved @26");
-static_assert(offsetof(RfTelemetryPacket32, crc16) == 30, "IF-02: crc16 @30");
+// Struct RfTelemetryPacket32, các static_assert khoá layout, CRC-16/CCITT-FALSE,
+// validatePacketCrc() và bytesToHexString() đã chuyển sang
+// firmware/gateway_esp32/src/rf_decode.{h,cpp} — thuần C++, có host test tại
+// firmware/gateway_esp32/test/. Lý do: lớp quyết định đúng/sai của chuỗi REAL
+// phải kiểm thử được mà không cần board.
+//
+// Xem: docs/interfaces/IF_MCU_LORA_RF.md (đặc tả IF-02).
 
 // ======================================================================================
 // 5. CÁC BIẾN QUẢN LÝ THỜI GIAN, PHIÊN LÀM VIỆC, SELF-MOCK & THỐNG KÊ HỆ THỐNG
@@ -277,107 +266,10 @@ static bool loraHardwareReady = false;
 static uint32_t lastRxPacketMs = 0;
 
 // ======================================================================================
-// 6. CÁC HÀM XỬ LÝ DỮ LIỆU: THUẬT TOÁN CRC-16, CHUYỂN ĐỔI HEX & ĐÓNG GÓI JSON
+// 6. ĐÓNG GÓI JSON TRANSPORT ENVELOPE V1 (IF-03)
 // ======================================================================================
-
-/**
- * @brief Tính toán mã kiểm tra toàn vẹn CRC-16/CCITT-FALSE trên mảng dữ liệu
- * byte.
- *
- * Đặc tả kỹ thuật thuật toán:
- * - Đa thức sinh (Polynomial): 0x1021 (x^16 + x^12 + x^5 + 1)
- * - Giá trị khởi tạo (Initial Value): 0xFFFF
- * - Chiều xử lý: MSB first (Không đảo bit vào RefIn=false, không đảo bit ra
- * RefOut=false)
- * - Giá trị XOR đầu ra (XorOut): 0x0000
- *
- * @param data Con trỏ trỏ tới vùng đệm byte cần tính CRC.
- * @param length Số lượng byte cần tính (Với gói RF, length = 30 byte đầu tiên).
- * @return uint16_t Giá trị mã băm 16-bit tính được.
- */
-uint16_t calculateCrc16(const uint8_t *data, size_t length) {
-  uint16_t crc = 0xFFFF; // Khởi tạo thanh ghi với giá trị 0xFFFF
-  for (size_t i = 0; i < length; i++) {
-    crc ^= ((uint16_t)data[i]
-            << 8); // Đưa byte dữ liệu vào 8-bit cao của thanh ghi CRC
-    for (uint8_t bit = 0; bit < 8; bit++) {
-      if (crc & 0x8000) { // Nếu bit cao nhất là 1
-        crc = (crc << 1) ^
-              0x1021; // Dịch trái 1 bit và thực hiện phép chia đa thức (XOR)
-      } else {
-        crc = (crc << 1); // Dịch trái 1 bit bình thường
-      }
-    }
-  }
-  return crc;
-}
-
-/**
- * @brief Thẩm định tính hợp lệ của gói tin đo xa 32 bytes nhận được.
- *
- * Kiểm tra 2 điều kiện an toàn:
- * 1. Tiêu đề đồng bộ (Sync Header) phải đúng cặp byte 0xAA 0x55.
- * 2. Mã CRC-16 tính trên 30 byte đầu phải trùng khớp hoàn toàn với 2 byte cuối
- * (byte 30..31).
- *
- * @param packetBuffer Con trỏ trỏ tới mảng 32 bytes nhị phân.
- * @param length Kích thước gói (bắt buộc đúng 32 bytes).
- * @return true Gói tin nguyên vẹn, hợp lệ 100%.
- * @return false Gói tin bị lỗi, méo bit hoặc không rõ nguồn gốc.
- */
-bool validatePacketCrc(const uint8_t *packetBuffer, size_t length) {
-  // Điều kiện 1: Độ dài gói phải đúng chuẩn 32 bytes
-  if (length != sizeof(RfTelemetryPacket32)) {
-    return false;
-  }
-
-  // Điều kiện 2: Kiểm tra Sync Header (0xAA 0x55)
-  if (packetBuffer[0] != 0xAA || packetBuffer[1] != 0x55) {
-    return false;
-  }
-
-  // Ép kiểu mảng byte về struct để trích xuất trường crc16 ở cuối
-  const RfTelemetryPacket32 *pkt = (const RfTelemetryPacket32 *)packetBuffer;
-
-  // Tính mã CRC-16 trên 30 byte đầu tiên (từ byte 0 đến byte 29)
-  uint16_t computedCrc = calculateCrc16(packetBuffer, 30);
-
-  // So khớp mã vừa tính với mã do máy bay ghi ở cuối gói tin
-  return (computedCrc == pkt->crc16);
-}
-
-/**
- * @brief Chuyển đổi mảng byte nhị phân thành chuỗi Hex chữ thường (Zero-padded
- * lowercase Hex).
- *
- * @param data Con trỏ trỏ tới mảng dữ liệu nhị phân.
- * @param length Số byte cần chuyển đổi (32 bytes sẽ tạo thành chuỗi 64 ký tự).
- * @param output Vùng đệm nhận chuỗi Hex; cần tối thiểu length * 2 + 1 byte.
- * @param outputSize Kích thước vùng đệm output.
- * @return true nếu chuyển đổi thành công; false nếu tham số hoặc vùng đệm không
- * hợp lệ.
- */
-bool bytesToHexString(const uint8_t *data, size_t length, char *output,
-                      size_t outputSize) {
-  if (data == nullptr || output == nullptr || outputSize == 0) {
-    return false;
-  }
-
-  // Kiểm tra theo phép chia để tránh tràn khi tính length * 2 + 1.
-  if (length > (outputSize - 1) / 2) {
-    output[0] = '\0';
-    return false;
-  }
-
-  const char hexChars[] = "0123456789abcdef";
-  size_t outputIndex = 0;
-  for (size_t i = 0; i < length; i++) {
-    output[outputIndex++] = hexChars[(data[i] >> 4) & 0x0F]; // 4 bit cao
-    output[outputIndex++] = hexChars[data[i] & 0x0F];        // 4 bit thấp
-  }
-  output[outputIndex] = '\0';
-  return true;
-}
+// CRC-16 và kiểm tra gói nằm trong rf_decode.cpp (host-testable). Phần dưới chỉ
+// còn trách nhiệm của gateway: dựng envelope và gắn metadata sóng vô tuyến.
 
 /**
  * @brief Đóng gói chuỗi Hex và các metadata sóng vô tuyến vào JSON Transport
@@ -475,23 +367,25 @@ void runPhase2SelfTest() {
   // TEST 2B: DOI CHIEU GOLDEN VECTOR GV-01 (IF-02 muc 3) — dung chung C/Python
   // Vector nay duoc sinh tu kvc_telemetry.h (MCU) va parse lai bang
   // struct.unpack("<2sBBIIIhhHBBBB4sH") trong gcs/backend/esp32_ingress.py.
+  // Logic so khop nam trong rf_decode.cpp (kvc::matchesGoldenGv01) de host test
+  // và firmware dùng đúng một nguồn.
   {
-    static const uint16_t kGoldenGv01Crc = 0x304E;
     static const char kGoldenGv01Hex[] =
         "aa55012ae8030000baba6b06d4b3923f96004001f000015c0f7e000000004e30";
     char gvHex[sizeof(samplePkt) * 2 + 1] = {0};
     bool gvHexOk = bytesToHexString((const uint8_t *)&samplePkt,
                                     sizeof(samplePkt), gvHex, sizeof(gvHex));
-    bool gvCrcOk = (expectedCrc == kGoldenGv01Crc);
+    bool gvStructOk = kvc::matchesGoldenGv01(&samplePkt);
     bool gvHexMatch = gvHexOk && (strcmp(gvHex, kGoldenGv01Hex) == 0);
     Serial.printf("[TEST 2B - GOLDEN GV-01] CRC 0x%04X (expect 0x%04X) %s | "
                   "Hex %s\n",
-                  expectedCrc, kGoldenGv01Crc, gvCrcOk ? "MATCH" : "MISMATCH",
+                  expectedCrc, kvc::kGoldenGv01Crc16,
+                  gvStructOk ? "MATCH" : "MISMATCH",
                   gvHexMatch ? "MATCH" : "MISMATCH");
     if (!gvHexMatch && gvHexOk) {
       Serial.printf("                       actual: %s\n", gvHex);
     }
-    if (gvCrcOk && gvHexMatch) {
+    if (gvStructOk && gvHexMatch) {
       Serial.println("                       -> GOLDEN VECTOR KHOP C/PYTHON! "
                      "[PASS]");
     } else {
@@ -699,9 +593,14 @@ void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t *payload,
     Serial.printf("             Tong so thiet bi dang ket noi: %u\n",
                   connectedClientCount);
 
-    // Gửi bản tin chào mừng (Handshake Frame) dạng JSON sang Laptop
-    String welcomeMsg = "{\"status\":\"CONNECTED\",\"gateway\":\"KVC_ESP32_"
-                        "GATEWAY\",\"mode\":\"WIFI_STA_LOCAL\"}";
+    // Gửi bản tin chào mừng (Handshake Frame) dạng JSON sang Laptop.
+    // "mode" phản ánh đúng chế độ mạng đang chạy sau thứ tự ưu tiên, không cứng
+    // một giá trị: STA_LOCAL khi đã nối Wi-Fi 2.4 GHz, SOFTAP khi đang dự phòng.
+    const char *netMode =
+        (WiFi.status() == WL_CONNECTED) ? "WIFI_STA_LOCAL" : "WIFI_SOFTAP";
+    String welcomeMsg = String("{\"status\":\"CONNECTED\",\"gateway\":\"KVC_ESP32_"
+                               "GATEWAY\",\"mode\":\"") +
+                        netMode + "\"}";
     webSocket.sendTXT(num, welcomeMsg);
     break;
   }
@@ -786,6 +685,213 @@ static bool initLoRaHardware() {
 }
 
 // ======================================================================================
+// 9.5. QUẢN LÝ MẠNG: ƯU TIÊN STA (Wi-Fi 2.4 GHz có sẵn), DỰ PHÒNG SOFTAP
+// ======================================================================================
+
+/**
+ * @brief Bật SoftAP (dự phòng) và ghi log.
+ *
+ * Idempotent: gọi nhiều lần không mở lại AP đã chạy.
+ */
+static void startSoftAp() {
+  if (s_apStarted) {
+    return;
+  }
+
+  // AP_STA thay vì AP: vẫn giữ được STA để tự nối lại khi router xuất hiện lại.
+  WiFi.mode(WIFI_AP_STA);
+  s_apStarted = WiFi.softAP(AP_SSID, AP_PASS);
+
+  if (s_apStarted) {
+    Serial.println("[WIFI-AP]  Phat SoftAP du phong THANH CONG!");
+    Serial.printf("[WIFI-AP]  SSID: %s | Password: %s\n", AP_SSID, AP_PASS);
+    Serial.printf("[WIFI-AP]  IP Gateway: %s\n",
+                  WiFi.softAPIP().toString().c_str());
+  } else {
+    Serial.println("[WIFI-AP-ERR] Khong mo duoc SoftAP! Kiem tra lai cau hinh.");
+  }
+}
+
+/**
+ * @brief Thử một mạng ở ưu tiên 1 trong tối đa timeoutMs.
+ * @return true nếu nối được.
+ */
+static bool tryConnectSta(size_t netIndex, uint32_t timeoutMs) {
+  Serial.printf("[WIFI-STA] Uu tien 1: thu mang \"%s\"...\n",
+                WIFI_NETWORKS[netIndex].ssid);
+  WiFi.begin(WIFI_NETWORKS[netIndex].ssid, WIFI_NETWORKS[netIndex].pass);
+
+  const uint32_t startMs = millis();
+  while (WiFi.status() != WL_CONNECTED && (millis() - startMs) < timeoutMs) {
+    delay(250);
+    Serial.print(".");
+  }
+  Serial.println();
+
+  return WiFi.status() == WL_CONNECTED;
+}
+
+/**
+ * @brief Ghi log sau khi ưu tiên 1 thành công.
+ */
+static void logStaConnected(size_t netIndex) {
+  Serial.printf("[WIFI-STA] Ket noi STA THANH CONG (uu tien 1, mang \"%s\").\n",
+                WIFI_NETWORKS[netIndex].ssid);
+  Serial.printf("[WIFI-STA] IP do mang cap: %s | RSSI: %d dBm\n",
+                WiFi.localIP().toString().c_str(), WiFi.RSSI());
+}
+
+/**
+ * @brief Thiết lập mạng theo thứ tự ưu tiên 1 -> 2.
+ *
+ * Ưu tiên 1: lần lượt thử các mạng 2.4 GHz đã khai báo (tối đa 4), mỗi mạng có
+ *   KVC_STA_PER_NET_TIMEOUT_MS và tổng không quá KVC_STA_BOOT_BUDGET_MS.
+ *   - Thành công: chỉ chạy STA, KHÔNG phát SoftAP (đúng thứ tự ưu tiên).
+ * Ưu tiên 2: không có credential, hoặc hết ngân sách mà chưa nối được -> mở
+ *   SoftAP để laptop vẫn vào được. Khi đó mode là AP_STA nên wifiSupervise()
+ *   vẫn tiếp tục thử ưu tiên 1; nếu nối được thì AP tự đóng.
+ *
+ * Ghi chú: "4G" ở đây là hotspot Wi-Fi 2.4 GHz do ĐIỆN THOẠI phát. Gateway không
+ * có module 4G/LTE và không cần: điện thoại lo phần sóng di động, ESP32-C3 chỉ
+ * bắt Wi-Fi của điện thoại. Vì vậy không có nhánh PPP/modem nào trong firmware.
+ */
+static void wifiBegin() {
+  WiFi.persistent(false); // Không ghi credential vào NVS, tránh trạng thái cũ
+  WiFi.setAutoReconnect(true);
+
+  s_apStarted = false;
+  s_netIndex = 0;
+  s_lastStaAttemptMs = millis();
+
+  const size_t first = nextConfiguredNetwork(0);
+  s_staConfigured = (first != WIFI_NETWORK_COUNT);
+
+  if (!s_staConfigured) {
+    Serial.println("[WIFI-STA] Khong co KVC_WIFI_SSID... khi build.");
+    Serial.println("[WIFI-STA] Chuyen sang uu tien 2: phat SoftAP.");
+    startSoftAp();
+    return;
+  }
+
+  WiFi.mode(WIFI_STA);
+
+  const uint32_t bootStartMs = millis();
+  size_t idx = first;
+  while (idx != WIFI_NETWORK_COUNT) {
+    const uint32_t elapsed = millis() - bootStartMs;
+    if (elapsed >= KVC_STA_BOOT_BUDGET_MS) {
+      Serial.printf("[WIFI-STA] Het ngan sach %lu ms cho uu tien 1.\n",
+                    (unsigned long)KVC_STA_BOOT_BUDGET_MS);
+      break;
+    }
+
+    uint32_t allowance = KVC_STA_BOOT_BUDGET_MS - elapsed;
+    if (allowance > KVC_STA_PER_NET_TIMEOUT_MS) {
+      allowance = KVC_STA_PER_NET_TIMEOUT_MS;
+    }
+
+    /* Ghi nhận mạng vừa thử TRƯỚC khi kết nối: nếu thất bại, vòng retry sau sẽ
+     * bắt đầu từ mạng kế tiếp chứ không thử lại đúng mạng vừa hỏng ngay lập tức. */
+    s_netIndex = idx;
+
+    if (tryConnectSta(idx, allowance)) {
+      logStaConnected(idx);
+      Serial.println("[WIFI-AP]  Khong phat SoftAP vi da co Wi-Fi 2.4 GHz.");
+      return;
+    }
+
+    idx = nextConfiguredNetwork(idx + 1);
+  }
+
+  Serial.println("[WIFI-STA] That bai tat ca mang o uu tien 1. Chuyen sang uu tien 2.");
+  startSoftAp();
+}
+
+/**
+ * @brief Giữ mạng ổn định trong loop().
+ *
+ * - Đang chạy STA mà mất kết nối: thử lại định kỳ, luân phiên qua các mạng đã
+ *   khai báo (điện thoại tắt hotspot thì tự chuyển sang Wi-Fi khác).
+ * - Đang chạy SoftAP vì ưu tiên 1 thất bại: vẫn thử lại định kỳ, và đóng SoftAP
+ *   ngay khi ưu tiên 1 nối được để không phát sóng thừa.
+ */
+static void wifiSupervise(uint32_t now) {
+  if (!s_staConfigured) {
+    return; // Không có credential thì SoftAP là phương án duy nhất
+  }
+
+  kvc::NetPolicyState state;
+  state.staConfigured = s_staConfigured;
+  state.staConnected = (WiFi.status() == WL_CONNECTED);
+  state.apStarted = s_apStarted;
+  state.lastStaAttemptMs = s_lastStaAttemptMs;
+
+  switch (kvc::netPolicyEvaluate(state, now, KVC_STA_RETRY_INTERVAL_MS)) {
+  case kvc::NetAction::CloseSoftAp:
+    WiFi.softAPdisconnect(true);
+    s_apStarted = false;
+    WiFi.mode(WIFI_STA);
+    Serial.println("[WIFI-AP]  Da dong SoftAP: uu tien 1 hoat dong lai.");
+    Serial.printf("[WIFI-STA] IP: %s\n", WiFi.localIP().toString().c_str());
+    break;
+
+  case kvc::NetAction::RetrySta: {
+    s_lastStaAttemptMs = now;
+
+    const size_t idx = nextConfiguredNetwork(s_netIndex + 1);
+    if (idx == WIFI_NETWORK_COUNT) {
+      break;
+    }
+    s_netIndex = idx;
+
+    Serial.printf("[WIFI-STA] Thu ket noi lai \"%s\"...\n",
+                  WIFI_NETWORKS[idx].ssid);
+    /* Không chặn loop(): WiFi.begin() trả về ngay, kết quả được kiểm ở vòng sau
+     * qua state.staConnected. */
+    WiFi.begin(WIFI_NETWORKS[idx].ssid, WIFI_NETWORKS[idx].pass);
+    break;
+  }
+
+  case kvc::NetAction::None:
+  default:
+    break;
+  }
+}
+
+/**
+ * @brief In các endpoint WebSocket đang dùng được.
+ */
+static void reportNetworkEndpoints() {
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.printf("[WS] Endpoint STA   : ws://%s:%u/telemetry\n",
+                  WiFi.localIP().toString().c_str(), WS_PORT);
+  }
+  if (s_apStarted) {
+    Serial.printf("[WS] Endpoint SoftAP: ws://%s:%u/telemetry\n",
+                  WiFi.softAPIP().toString().c_str(), WS_PORT);
+  }
+  if (WiFi.status() != WL_CONNECTED && !s_apStarted) {
+    Serial.println("[WS] Chua co endpoint mang nao san sang.");
+  }
+}
+
+/**
+ * @brief Bật mDNS để laptop tìm gateway bằng tên, không cần biết IP.
+ *
+ * Ở chế độ STA, IP do router cấp và có thể đổi mỗi lần boot; tài liệu vận hành
+ * đã hướng dẫn dùng `kvc-gateway.local`. Phải bật mDNS thật thì tên đó mới phân
+ * giải được — trước đây tài liệu hướng dẫn nhưng firmware chưa hề khởi tạo.
+ */
+static void startMdns() {
+  if (MDNS.begin("kvc-gateway")) {
+    MDNS.addService("http", "tcp", WS_PORT);
+    Serial.println("[MDNS] Da bat: http://kvc-gateway.local");
+  } else {
+    Serial.println("[MDNS-WARN] Khong bat duoc mDNS; dung IP truc tiep.");
+  }
+}
+
+// ======================================================================================
 // 10. HÀM KHỞI TẠO HỆ THỐNG SETUP() - CHỈ CHẠY 1 LẦN DUY NHẤT KHI BẬT NGUỒN
 // ======================================================================================
 void setup() {
@@ -807,55 +913,9 @@ void setup() {
   // BƯỚC 1: CHẠY BÀI SÁT HẠCH TỰ ĐỘNG GIAI ĐOẠN 2 (SELF-TEST UNIT)
   runPhase2SelfTest();
 
-  // BƯỚC 2: CẤU HÌNH ESP32 CHẾ ĐỘ DUAL WIFI (SOFTAP + STA)
-  // Luôn phát mạng Wi-Fi KVC_GROUND_STATION (IP cố định 192.168.4.1) ngay lập tức
-  WiFi.mode(WIFI_AP_STA);
-  WiFi.softAP("KVC_GROUND_STATION", "kvc123456");
-  delay(100);
-  Serial.println("[WIFI-AP]  Phat SoftAP KVC_GROUND_STATION THANH CONG!");
-  Serial.print("[WIFI-AP]  Ten mang (SSID): KVC_GROUND_STATION | Mat khau: kvc123456\n");
-  Serial.print("[WIFI-AP]  Dia chi IP Gateway: ");
-  Serial.println(WiFi.softAPIP());
-
-  // Đồng thời thử kết nối mạng Wi-Fi ngoài nếu có.
-  // F11: nếu không được cấu hình credential qua build flag thì bỏ qua STA,
-  // chỉ chạy SoftAP. Không gọi WiFi.begin("") vì sẽ treo chờ vô ích.
-  WiFi.setAutoReconnect(true);
-  WiFi.persistent(true);
-
-  const bool staConfigured = (WIFI_SSID[0] != '\0');
-  if (staConfigured) {
-    Serial.print("[WIFI-STA] Dang thu ket noi mang Wi-Fi ngoai: ");
-    Serial.println(WIFI_SSID);
-    WiFi.begin(WIFI_SSID, WIFI_PASS);
-
-    // Chờ tối đa 10 giây để không làm gián đoạn hệ thống nếu ngoài tầm phủ sóng
-    uint32_t startAttemptTime = millis();
-    while (WiFi.status() != WL_CONNECTED && (millis() - startAttemptTime < 10000)) {
-      delay(500);
-      Serial.print(".");
-    }
-  } else {
-    Serial.println("[WIFI-STA] BO QUA: chua cau hinh KVC_WIFI_SSID/KVC_WIFI_PASS khi build. Chi chay SoftAP.");
-  }
-
-  // Kiểm tra kết quả kết nối Wi-Fi (Nếu thất bại, tự động chuyển sang SoftAP KVC_GROUND_STATION)
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("\n[WIFI-STA] Ket noi Wi-Fi STA THANH CONG!");
-    Serial.print("[WIFI-STA] Dia chi IP do Router cap cho ESP32: ");
-    Serial.println(WiFi.localIP());
-    Serial.printf("[WIFI-STA] Cuong do song RSSI: %d dBm\n", WiFi.RSSI());
-  } else {
-    Serial.println("\n[WIFI-STA] Khong the ket noi Wi-Fi STA sau 10 giay.");
-    Serial.println("[WIFI-AP]  Kich hoat che do tu phat Wi-Fi SoftAP du phong...");
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP("KVC_GROUND_STATION", "kvc123456");
-    delay(500);
-    Serial.println("[WIFI-AP]  Phat SoftAP THANH CONG!");
-    Serial.print("[WIFI-AP]  Ten mang (SSID): KVC_GROUND_STATION | Mat khau: kvc123456\n");
-    Serial.print("[WIFI-AP]  Dia chi IP Gateway: ");
-    Serial.println(WiFi.softAPIP());
-  }
+  // BƯỚC 2: THIẾT LẬP MẠNG THEO THỨ TỰ ƯU TIÊN (STA trước, SoftAP dự phòng)
+  wifiBegin();
+  startMdns();
 
   // BƯỚC 3: KHỞI ĐỘNG DỊCH VỤ MÁY CHỦ WEBSOCKET SERVER
   webSocket.begin();
@@ -864,12 +924,7 @@ void setup() {
 
   Serial.println("\n=======================================================");
   Serial.printf("[WS] WebSocket Server da mo tai cong: %u\n", WS_PORT);
-  Serial.printf("[WS] Endpoint SoftAP: ws://%s:%u/telemetry\n",
-                WiFi.softAPIP().toString().c_str(), WS_PORT);
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.printf("[WS] Endpoint STA   : ws://%s:%u/telemetry\n",
-                  WiFi.localIP().toString().c_str(), WS_PORT);
-  }
+  reportNetworkEndpoints();
   Serial.println("=======================================================\n");
 
   // BƯỚC 4: KHỞI TẠO MODULE PHẦN CỨNG LORA RA-02 (SX1278) THEO MASTER PINOUT
@@ -904,17 +959,9 @@ void loop() {
   uint32_t now = millis();
 
   // ----------------------------------------------------------------------------------
-  // TỰ ĐỘNG KẾT NỐI LẠI WI-FI NẾU BỊ MẤT SÓNG TRONG CHẾ ĐỘ STA
+  // GIỮ MẠNG ỔN ĐỊNH: ưu tiên STA, tự đóng SoftAP khi STA nối lại được
   // ----------------------------------------------------------------------------------
-  if (WiFi.getMode() == WIFI_STA && WiFi.status() != WL_CONNECTED) {
-    static uint32_t lastReconnectAttempt = 0;
-    if (now - lastReconnectAttempt >= 5000) {
-      lastReconnectAttempt = now;
-      Serial.println(
-          "[WIFI-STA-WARN] Mat ket noi Wi-Fi STA! Dang tu dong ket noi lai...");
-      WiFi.reconnect();
-    }
-  }
+  wifiSupervise(now);
 
   // ----------------------------------------------------------------------------------
   // GIAI ĐOẠN 3: BỘ PHÁT DỮ LIỆU TELEMETRY DỰ PHÒNG (SELF-MOCK FALLBACK) MỖI 1.0 GIÂY
@@ -1095,9 +1142,9 @@ void loop() {
     uint32_t seconds = (now % 60000) / 1000;
 
     String ipStr = "CHUA_KET_NOI";
-    if (WiFi.getMode() == WIFI_STA && WiFi.status() == WL_CONNECTED) {
+    if (WiFi.status() == WL_CONNECTED) {
       ipStr = WiFi.localIP().toString();
-    } else if (WiFi.getMode() == WIFI_AP) {
+    } else if (s_apStarted) {
       ipStr = WiFi.softAPIP().toString();
     }
 

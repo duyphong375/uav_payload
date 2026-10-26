@@ -29,6 +29,9 @@ extern "C" {
  * ============================================================================ */
 #define MPU6050_ADDR_DEFAULT        0x68U  /* Khi chân AD0 kéo xuống GND (Mặc định trên GY-87) */
 #define MPU6050_ADDR_ALT            0x69U  /* Khi chân AD0 kéo lên 3.3V */
+/* Register 117 (WHO_AM_I) trả về giá trị CỐ ĐỊNH 0x68 trên MPU-60X0.
+ * Nguồn: RM-MPU-6000A-00 §4.34 ("Register 117: 0x68"), xem docs/hardware/sensors/. */
+#define MPU6050_WHO_AM_I_VALUE      0x68U
 
 #define MPU6050_REG_SMPLRT_DIV      0x19U
 #define MPU6050_REG_CONFIG          0x1AU
@@ -44,14 +47,30 @@ extern "C" {
 #define MPU6050_ERR_OK              0U  /* Nhận diện và đánh thức MPU-6050 thành công */
 #define MPU6050_ERR_BUS_STUCK       1U  /* Chân SDA hoặc SCL bị chập mass (mức 0V liên tục) */
 #define MPU6050_ERR_NO_ACK          2U  /* Cả địa chỉ 0x68 và 0x69 đều không phản hồi ACK */
-#define MPU6050_ERR_WHO_AM_I        3U  /* Có ACK nhưng đọc WHO_AM_I ra 0x00 hoặc 0xFF */
+#define MPU6050_ERR_WHO_AM_I        3U  /* Có ACK nhưng WHO_AM_I != 0x68 (không phải MPU-60X0) */
 #define MPU6050_ERR_WAKEUP_FAIL     4U  /* Ghi lệnh đánh thức PWR_MGMT_1 thất bại */
 
 /* ============================================================================
  * ĐIỀU KHIỂN CHÂN I2C0: SCL PUSH-PULL, SDA OPEN-DRAIN CÓ PULL-UP NỘI
  * ============================================================================ */
 static inline void kvc_imu_i2c_delay(void) {
-    /* 80 NOP ở 48 MHz tạo chu kỳ I2C ~100 kHz chuẩn công nghiệp, rất ổn định */
+    /* Độ trễ nửa chu kỳ I2C bằng vòng lặp NOP.
+     *
+     * TÍNH TOÁN (suy ra từ tần số và số chu kỳ, KHÔNG phải phép đo trên kit):
+     * - HCLK thực tế là 12 MHz (uvprojx CLOCK(12000000), SystemInit không bật
+     *   PLL -> SYSCLK = IHRC 12 MHz). Bản trước ghi "48 MHz" là SAI.
+     * - Vòng `for (volatile int d...)` với biến volatile tốn ~3-4 chu kỳ mỗi
+     *   lần lặp trên Cortex-M4 (load/so sánh/nhảy + store do volatile).
+     * - 80 x 3 chu kỳ / 12 MHz = 20 us cho mỗi lần gọi.
+     *
+     * Mỗi bit I2C cần 2 lần gọi (mức thấp rồi mức cao) -> ~40 us/bit ->
+     * SCL ~25 kHz. Con số 25 kHz là ƯỚC LƯỢNG, chưa đo bằng oscilloscope.
+     *
+     * Vì sao vẫn giữ 80: MPU-6050 chấp nhận 100-400 kHz và KHÔNG có mức tối
+     * thiểu, nên 25 kHz hoạt động đúng, chỉ chậm hơn cần thiết. Đọc 14 byte
+     * mất ~5 ms mỗi chu kỳ 1 s (<0,5 % CPU). Muốn 100 kHz phải xác định chính
+     * xác số chu kỳ mỗi vòng lặp trên kit (đo), rồi giảm hằng số 80 xuống ~20;
+     * không nên chỉnh mù vì I2C quá nhanh sẽ hỏng bus nếu trở kéo yếu. */
     for (volatile int d = 0; d < 80; d++) {
         __NOP();
     }
@@ -234,20 +253,37 @@ static uint8_t mpu6050_init(uint8_t *active_addr) {
         }
     }
 
-    /* 6. Thử nhận dạng WHO_AM_I ở địa chỉ mặc định 0x68 và phụ 0x69 */
+    /* 6. Nhận dạng chip qua WHO_AM_I (reg 117/0x75, giá trị cố định 0x68).
+     *
+     * So sánh ĐÚNG BẰNG 0x68 chứ không chỉ loại 0x00/0xFF: nhiều module GY-87
+     * "clone" có thêm DS1307 (RTC, 0x68) hoặc AT24C32 (EEPROM, 0x57) trên cùng
+     * bus. Nếu chỉ loại 0x00/0xFF, một chip khác cùng địa chỉ 0x68 sẽ được chấp
+     * nhận nhầm và mọi lần đọc sau đó trả về rác mà không báo lỗi. */
     uint8_t who = 0;
     uint8_t addr = MPU6050_ADDR_DEFAULT;
+    bool acked = false;
+    bool found = false;
 
-    if (!mpu6050_read_reg(addr, MPU6050_REG_WHO_AM_I, &who)) {
-        addr = MPU6050_ADDR_ALT;
-        if (!mpu6050_read_reg(addr, MPU6050_REG_WHO_AM_I, &who)) {
-            return MPU6050_ERR_NO_ACK; /* Cả địa chỉ 0x68 và 0x69 đều không phản hồi ACK */
+    if (mpu6050_read_reg(MPU6050_ADDR_DEFAULT, MPU6050_REG_WHO_AM_I, &who)) {
+        acked = true;
+        if (who == MPU6050_WHO_AM_I_VALUE) {
+            addr = MPU6050_ADDR_DEFAULT;
+            found = true;
         }
     }
 
-    /* Kiểm tra ID phản hồi: Không được là 0x00 (đường bus chập) hoặc 0xFF (không có dữ liệu) */
-    if (who == 0x00U || who == 0xFFU) {
-        return MPU6050_ERR_WHO_AM_I;
+    if (!found && mpu6050_read_reg(MPU6050_ADDR_ALT, MPU6050_REG_WHO_AM_I, &who)) {
+        acked = true;
+        if (who == MPU6050_WHO_AM_I_VALUE) {
+            addr = MPU6050_ADDR_ALT;
+            found = true;
+        }
+    }
+
+    if (!found) {
+        /* Có ACK nhưng ID sai -> chip khác cùng địa chỉ.
+         * Không ACK ở cả 0x68 lẫn 0x69 -> MPU không phản hồi (mất nguồn/hỏng dây). */
+        return acked ? MPU6050_ERR_WHO_AM_I : MPU6050_ERR_NO_ACK;
     }
 
     if (active_addr != 0) {

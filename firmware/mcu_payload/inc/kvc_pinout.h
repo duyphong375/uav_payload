@@ -54,7 +54,17 @@ extern "C" {
 #define KVC_PIN_USOUND_ECHO_PIN     15      /* P2.15 - Pin 31 LQFP64 | JP3 Pin 31 hoặc 32 (BẮT BUỘC QUA CẦU PHÂN ÁP 1k/2k) */
 
 /* ============================================================================
- * 3. CỤM CẢM BIẾN TƯ THẾ IMU 10-DOF GY-87 (I2C0: MPU6050 + HMC5883L + BMP180)
+ * 3. CỤM CẢM BIẾN TƯ THẾ GY-87 (I2C0, module 10-DOF)
+ *
+ * Firmware CHỈ dùng MPU-6050 (accel + gyro) trên bus này.
+ *   - HMC5883L (0x1E/0x0D): HOÃN — cần hiệu chuẩn hard/soft iron bằng cách xoay
+ *     UAV 360° trên kit thật. Dự kiến thay bằng Yaw từ GNSS track_made_good.
+ *   - BMP180 (0x77): ĐÃ LOẠI khỏi thiết kế — AJ-SR04M đã đo cao độ trực tiếp và
+ *     BMP180 có sai số ±1 m do biến động khí áp, không đủ cho georef.
+ * Chi tiết: docs/interfaces/IF_MCU_SENSORS.md §3.2 B–C.
+ *
+ * Chân I2C0 giữ nguyên cho cả 3 chip vì chúng nằm sẵn trên module; bật lại sau
+ * này không cần thay đổi phần cứng.
  * ============================================================================ */
 #define KVC_PIN_IMU_SCL_PORT        SN_GPIO0
 #define KVC_PIN_IMU_SCL_PIN         10      /* P0.10 - Pin 38 LQFP64 | JP1 Pin 7 hoặc 8 (I2C0 SCL 400kHz) */

@@ -74,7 +74,7 @@ Phân hệ GNSS thu thập tọa độ định vị vị trí UAV phục vụ đ
   - C Source: [`firmware/mcu_payload/src/sensors/kvc_gnss_neo_m10.c`](file:///d:/Project_UAV_KVC/firmware/mcu_payload/src/sensors/kvc_gnss_neo_m10.c)
   - Host Unit Test: [`firmware/mcu_payload/tests/test_kvc_gnss_neo_m10.c`](file:///d:/Project_UAV_KVC/firmware/mcu_payload/tests/test_kvc_gnss_neo_m10.c)
 - **Cấu hình phần cứng UART3 Sonix SN34F788:**
-  - Tốc độ: **9.600 bps** (chuẩn phần cứng xuất xưởng NEO-M10N, sai số chỉ **+0,16 %** với UCLK 12 MHz: `DLL = 0x4E`, `DLM = 0`, `PRE = 1`). Trong mã nguồn thử nghiệm hiện tại (`KVC_GNSS_BAUD_RATE`), tốc độ được gán 38.400 bps (`DLL = 0x14`, lệch **−2,34 %** trên UCLK 12 MHz; nếu cộng dung sai IHRC ±2 % có thể chạm ngưỡng 4,3 %). Để an toàn tuyệt đối khi chưa kích hoạt PLL, 9.600 bps là cấu hình khuyến nghị đã đồng bộ trong [IF_MCU_SENSORS.md](file:///d:/Project_UAV_KVC/docs/interfaces/IF_MCU_SENSORS.md).
+  - Tốc độ: **9.600 bps** (chuẩn phần cứng xuất xưởng NEO-M10N, sai số chỉ **+0,16 %** với UCLK 12 MHz: `DLL = 0x4E`, `DLM = 0`, `PRE = 1`). Firmware hiện đặt `KVC_GNSS_BAUD_RATE = 9600` đúng theo khuyến nghị này. Lý do không dùng 38.400: tại UCLK 12 MHz, divisor 20 cho tốc độ thực 37.500 bps (lệch **−2,34 %**); cộng dung sai IHRC ±2 % thành ~4,3 %, vượt ngưỡng chịu đựng của UART không đồng bộ nên gây lỗi khung ngẫu nhiên. Muốn tốc độ cao hơn phải nâng UCLK bằng PLL. Khớp với [IF_MCU_SENSORS.md](file:///d:/Project_UAV_KVC/docs/interfaces/IF_MCU_SENSORS.md).
   - Pin mux (`SN_ALWAYSON->P2_AFIO0`):
     - `P2.1` (`URXD3`, Pin 15 LQFP64 | JP3 Pin 3/4): Nhận NMEA từ chân TX của module.
     - `P2.0` (`UTXD3`, Pin 14 LQFP64 | JP3 Pin 1/2): Nối RX của module (không phát lệnh đổi cấu hình).

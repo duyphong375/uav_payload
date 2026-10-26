@@ -18,7 +18,7 @@
 |    - WebSocket Server (:8080/telemetry) |
 +-----------------+------------------+
                   │
-                  │  Sóng Wi-Fi 802.11 b/g/n (SSID: KVC_GCS_AP hoặc Wi-Fi STA)
+                  │  Sóng Wi-Fi 802.11 b/g/n (SSID: KVC_GROUND_STATION hoặc Wi-Fi STA)
                   │  Giao thức: WebSocket (:8080/telemetry)
                   ▼
 +------------------------------------+
@@ -48,17 +48,27 @@
 
 ## 2. Cấu hình mạng Wi-Fi và Endpoint của ESP32
 
-Gateway ESP32 hỗ trợ hai chế độ mạng linh hoạt:
+Gateway ESP32 tự chọn chế độ mạng theo **thứ tự ưu tiên cố định** (firmware quyết định, người vận hành không phải chọn tay):
 
-1. **Chế độ Dã ngoại Thực địa (SoftAP Mode - Mặc định khi không có router ngoài):**
-   - **SSID:** `KVC_GCS_AP` (hoặc `KVC_GROUND_STATION`)
-   - **Mật khẩu (Password):** Cấu hình bảo mật nội bộ
-   - **Địa chỉ IP ESP32:** `192.168.4.1`
-   - **WebSocket Endpoint:** `ws://192.168.4.1:8080/telemetry`
+### Ưu tiên 1 — Station Mode (STA), Wi-Fi 2.4 GHz có sẵn
 
-2. **Chế độ Phòng Lab / Thử nghiệm (Station Mode - STA):**
-   - ESP32 kết nối trực tiếp vào mạng Wi-Fi của phòng Lab hoặc điểm phát sóng Hotspot điện thoại.
-   - Backend Python tích hợp cơ chế Auto-Discovery (`discover_esp32_gateway`) tự động dò quét địa chỉ IP của ESP32 trên mạng cục bộ để kết nối ngay lập tức mà không cần cấu hình IP thủ công.
+- ESP32 kết nối vào mạng Wi-Fi 2.4 GHz của phòng Lab, router, hoặc hotspot điện thoại. Credential truyền lúc build qua `KVC_WIFI_SSID` / `KVC_WIFI_PASS` (không hardcode trong source).
+- **ESP32-C3 chỉ hỗ trợ 2.4 GHz**, không hỗ trợ 5 GHz.
+- Khi STA thành công, firmware **không phát SoftAP**.
+- Backend Python tích hợp cơ chế Auto-Discovery (`discover_esp32_gateway`) tự dò địa chỉ IP của ESP32 trên mạng cục bộ, không cần cấu hình IP thủ công.
+- IP do router cấp, in ra Serial: `[WIFI-STA] IP do Router cap: <ip>`.
+
+### Ưu tiên 2 — SoftAP dự phòng (tự động)
+
+- Kích hoạt khi **không có credential** hoặc **hết 10 giây** chưa nối được STA.
+- **SSID:** `KVC_GROUND_STATION`
+- **Mật khẩu (Password):** `kvc123456` (WPA2-PSK, thông số vận hành nội bộ)
+- **Địa chỉ IP ESP32:** `192.168.4.1`
+- **WebSocket Endpoint:** `ws://192.168.4.1:8080/telemetry`
+- Firmware vẫn thử lại STA mỗi 30 giây; nếu STA nối được thì **tự đóng SoftAP** và chuyển về ưu tiên 1.
+
+> [!NOTE]
+> **"4G" trong dự án là do điện thoại phát hotspot Wi-Fi 2.4 GHz**, không phải module 4G/LTE gắn vào ESP32. Điện thoại lo phần sóng di động; gateway chỉ cần bắt Wi-Fi của điện thoại nên **không cần thêm phần cứng nào**. Firmware hỗ trợ khai báo tối đa 4 mạng ở ưu tiên 1 và thử lần lượt; nếu không mạng nào kết nối được thì mới phát SoftAP.
 
 ---
 

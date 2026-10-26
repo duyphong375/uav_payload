@@ -14,6 +14,8 @@
  */
 
 #include "kvc_gnss_neo_m10.h"
+#include "kvc_ubx_cfg.h"
+#include "kvc_timebase.h"  /* kvc_gnss_autobaud dùng kvc_timebase_ms() để đo cửa sổ */
 #include <string.h>
 #include <stdlib.h>
 #include <ctype.h>
@@ -44,6 +46,9 @@ static volatile uint32_t s_rx_overrun_count = 0U;  /* LS.OE */
 static volatile uint32_t s_rx_framing_count = 0U;  /* LS.FE */
 static volatile uint32_t s_rx_parity_count  = 0U;  /* LS.PE */
 static volatile uint32_t s_rx_isr_count     = 0U;
+/* Số byte THẬT SỰ lấy ra khỏi RB. Cần để phân biệt "ISR bắn vì có byte" với
+ * "ISR bắn vì nhiễu" — xem chẩn đoán UART5. */
+static volatile uint32_t s_rx_byte_count    = 0U;
 #endif
 
 /* ============================================================================
@@ -64,6 +69,11 @@ static char           s_rx_buf[KVC_GNSS_MAX_SENTENCE_LEN + 1];
 static uint8_t        s_rx_len = 0;
 static uint8_t        s_calc_cs = 0;
 static uint8_t        s_recv_cs = 0;
+
+/* Đếm số câu NMEA đã qua checksum. Dùng cho bộ dò baud lúc khởi động
+ * (kvc_gnss_autobaud): ở sai tốc độ, byte nhận là rác nên số này gần như
+ * không tăng. Định nghĩa ở đây (trước hàm parse) vì hàm parse tăng nó. */
+static volatile uint32_t s_rx_good_sentence_count = 0U;
 
 /* ============================================================================
  * CÁC HÀM TIỆN ÍCH GIẢI MÃ NỘI BỘ
@@ -108,13 +118,13 @@ static void kvc_gnss_eval_validity(uint32_t now_ms) {
     /* Chất lượng Fix: GGA Quality >= 1 hoặc RMC Status Active */
     bool quality_ok = (s_state.fix_quality >= KVC_GNSS_MIN_FIX_QUALITY);
 
-    /* Nếu có câu GSA, kiểm tra không bị rơi vào Mode 1 (No Fix) */
+    /* GSA: nếu đã nhận câu GSA thì fix_mode phải đạt ngưỡng (3 = 3D fix). */
     bool gsa_ok = !fresh_gsa || (s_state.fix_mode >= KVC_GNSS_REQ_FIX_MODE);
 
-    /* Số lượng vệ tinh: Nếu có GGA, yêu cầu >= MIN_SATS (4); nếu chỉ có RMC thì cho qua */
+    /* Số lượng vệ tinh: Nếu có GGA, yêu cầu >= MIN_SATS; nếu chỉ có RMC thì cho qua */
     bool sats_ok = (!fresh_gga) || (s_state.satellites_tracked >= KVC_GNSS_MIN_SATS);
 
-    /* Sai số hình học HDOP: Nếu có thông số, yêu cầu <= MAX_HDOP_CENTI (5.00) */
+    /* Sai số hình học HDOP: Nếu có thông số, yêu cầu <= MAX_HDOP_CENTI (2.50) */
     bool hdop_ok = (s_state.hdop_centi == 0xFFFFU) || (s_state.hdop_centi <= KVC_GNSS_MAX_HDOP_CENTI);
 
     if (has_fresh_pos && coord_ok && quality_ok && gsa_ok && sats_ok && hdop_ok) {
@@ -273,6 +283,11 @@ static uint8_t split_fields(char *buf, char *fields[], uint8_t max_fields) {
  * @brief Phân giải và cập nhật câu NMEA hoàn chỉnh đã qua kiểm tra Checksum.
  */
 static void kvc_gnss_parse_sentence_internal(uint32_t now_ms) {
+    /* Đếm câu đã qua checksum: dùng cho bộ dò baud lúc khởi động
+     * (kvc_gnss_autobaud). Tăng ở đây — sau khi checksum đã khớp — nên số đếm
+     * chỉ tăng khi tốc độ UART3 thực sự đúng với module. */
+    s_rx_good_sentence_count++;
+
     char *fields[24];
     uint8_t num_fields = split_fields(s_rx_buf, fields, 24);
     if (num_fields < 2) return;
@@ -390,6 +405,363 @@ static void kvc_gnss_parse_sentence_internal(uint32_t now_ms) {
  * GIAO DIỆN HÀM API NGOÀI
  * ============================================================================ */
 
+/* ============================================================================
+ * PHÁT LỆNH UBX XUỐNG MODULE (chỉ dùng cho cấu hình lúc khởi động)
+ * ============================================================================ */
+
+#if KVC_GNSS_HAS_SONIX_HW
+/* Khai báo trước: kvc_gnss_send_gnss_config() gọi hàm này nhưng nó được định
+ * nghĩa sau (gần kvc_gnss_try_baud) để nhóm với phần autobaud. */
+static void kvc_gnss_spin_ms(uint32_t ms);
+
+/**
+ * @brief Ghi divisor cho UART3 theo UCLK 12 MHz. Yêu cầu DLAB đã = 1.
+ *
+ * DL = round(UCLK / (16 × baud)). Giá trị thực tế:
+ *   9600  -> 78 (0x4E), thực 9615 bps, +0,16 %
+ *   38400 -> 20 (0x14), thực 37500 bps, −2,34 %
+ *   57600 -> 13 (0x0D), thực 57692 bps, +0,16 %
+ *
+ * Bảng này chỉ có ba giá trị dùng thật; giá trị khác được tính tại chỗ để
+ * không phải bảo trì bảng.
+ */
+static void kvc_gnss_set_uart3_divisor(uint32_t baud) {
+    uint32_t dl;
+
+    if (baud == 0U) {
+        return;
+    }
+
+    dl = (12000000UL + (8UL * baud)) / (16UL * baud); /* làm tròn */
+    if (dl < 1U) {
+        dl = 1U;
+    }
+    if (dl > 0xFFFFUL) {
+        dl = 0xFFFFUL;
+    }
+
+    SN_UART3->DLL = (uint8_t)(dl & 0xFFU);
+    SN_UART3->DLM = (uint8_t)((dl >> 8) & 0xFFU);
+}
+
+/**
+ * @brief Gửi 1 byte qua UART3, chờ THRE với giới hạn lặp an toàn.
+ *
+ * Chỉ dùng lúc khởi tạo (chưa có ngắt RX chạy hoặc ngay sau khi cấu hình xong),
+ * không gọi trong vòng lặp chính. Có timeout nên không treo được nếu module
+ * không phản hồi.
+ */
+static void kvc_gnss_uart3_tx_byte(uint8_t b) {
+    uint32_t timeout = 50000U;
+    while (((SN_UART3->LS & (1U << 5)) == 0U) && (--timeout > 0U)) {
+        __NOP();
+    }
+    SN_UART3->TH = b;
+}
+
+/**
+ * @brief Gửi khung UBX CFG-PRT đặt baud cho module.
+ *
+ * Module NEO-M10-0-10 xuất xưởng ở 38400, nhưng ở UCLK 12 MHz MCU chỉ chia được
+ * 38400 thành 37500 (−2,34 %); cộng IHRC ±2 % thành ~4,34 %, vượt giới hạn
+ * 3,125 % của chính MCU. Vì vậy firmware chạy 9600 và gửi lệnh này để đưa module
+ * về 9600 MỘT LẦN. Xem kvc_gnss_autobaud() để biết cách xác định baud hiện tại.
+ */
+static void kvc_gnss_send_baud_change(void) {
+    uint8_t frame[KVC_UBX_CFG_PRT_LEN];
+
+    if (!kvc_ubx_build_cfg_prt_baud(KVC_GNSS_BAUD_RATE, frame)) {
+        return; /* Không dựng được khung: giữ nguyên tốc độ hiện tại */
+    }
+
+    /* Xả FIFO phát trước khi gửi để không lẫn byte cũ. */
+    SN_UART3->FIFOCTRL = 0x04; /* TXFIFORST */
+
+    for (uint32_t i = 0U; i < KVC_UBX_CFG_PRT_LEN; i++) {
+        kvc_gnss_uart3_tx_byte(frame[i]);
+    }
+
+    /* Chờ byte cuối ra hết dây (TRE = bit 6 của LS) trước khi đổi tốc độ,
+     * nếu không byte cuối sẽ bị truyền sai tốc độ. */
+    uint32_t guard = 200000U;
+    while (((SN_UART3->LS & (1U << 6)) == 0U) && (--guard > 0U)) {
+        __NOP();
+    }
+}
+
+/**
+ * @brief Gửi khung UBX CFG-GNSS bật 4 chòm sao, rồi lưu vào flash của module.
+ *
+ * MỤC ĐÍCH: tăng số vệ tinh khả dụng khi bị chắn một phần bầu trời (trong nhà,
+ * sát tường, ban công) để cải thiện HDOP. Đo thực tế trên kit: 9 vệ tinh nhưng
+ * HDOP 5.60 → sai số ngang ~28 m, không đủ cho georef cứu hộ.
+ *
+ * Đây là cấu hình **một lần**: `CFG-CFG` lưu vào flash của module, nên các lần
+ * khởi động sau không cần gửi lại. Gửi lại cũng vô hại (module ghi đè cùng giá
+ * trị) nhưng làm chậm boot ~60 ms.
+ *
+ * GIỚI HẠN ĐÃ BIẾT:
+ *   - Khung được ghép theo chuẩn u-blox, không phải khung mẫu nguyên văn trong
+ *     datasheet module (datasheet chỉ có GLONASS/BDS/GPS+BDS/GLO+BDS). Xem
+ *     kvc_ubx_cfg.h để biết cách ghép.
+ *   - Không kiểm ACK. Nếu module từ chối, triệu chứng là số vệ tinh không tăng
+ *     sau khi nạp lại — khi đó thử khung mẫu `GPS+BeiDou` trong datasheet.
+ *   - Không xác minh được nếu không có kit; đã kiểm bằng host test (66 assert).
+ */
+static void kvc_gnss_send_gnss_config(void) {
+    uint8_t frame[KVC_UBX_CFG_GNSS_LEN];
+
+    if (!kvc_ubx_get_cfg_gnss_4const(frame)) {
+        return;
+    }
+
+    /* Xả FIFO phát trước khi gửi để không lẫn byte cũ. */
+    SN_UART3->FIFOCTRL = 0x04; /* TXFIFORST */
+
+    for (uint32_t i = 0U; i < KVC_UBX_CFG_GNSS_LEN; i++) {
+        kvc_gnss_uart3_tx_byte(frame[i]);
+    }
+
+    /* Chờ phát xong trước khi gửi lệnh lưu (CFG-CFG), nếu không lệnh lưu có
+     * thể chen vào giữa khung cấu hình và module hiểu sai. */
+    uint32_t guard = 200000U;
+    while (((SN_UART3->LS & (1U << 6)) == 0U) && (--guard > 0U)) {
+        __NOP();
+    }
+    kvc_gnss_spin_ms(20U);
+}
+
+/**
+ * @brief Lưu cấu hình hiện tại vào flash của module (UBX CFG-CFG, 4 nhóm).
+ *
+ * Khung lấy từ datasheet module §10.6 ("保存设置"):
+ *   B5 62 06 09 0D 00 00 00 00 00 FF FF 00 00 00 00 00 00 17 31 BF
+ *
+ * Cần gọi SAU khi đã gửi CFG-GNSS, nếu không cấu hình chỉ nằm trong RAM và mất
+ * khi mất nguồn.
+ */
+static void kvc_gnss_save_config(void) {
+    /* Nguyên văn từ datasheet §10.6 — checksum đã có sẵn. */
+    static const uint8_t kSaveCfg[21] = {
+        0xB5, 0x62, 0x06, 0x09, 0x0D, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x17, 0x31, 0xBF,
+    };
+
+    SN_UART3->FIFOCTRL = 0x04; /* TXFIFORST */
+    for (uint32_t i = 0U; i < sizeof(kSaveCfg); i++) {
+        kvc_gnss_uart3_tx_byte(kSaveCfg[i]);
+    }
+
+    uint32_t guard = 200000U;
+    while (((SN_UART3->LS & (1U << 6)) == 0U) && (--guard > 0U)) {
+        __NOP();
+    }
+}
+
+/**
+ * @brief Chờ thật `ms` mili-giây và cập nhật time base.
+ *
+ * VÌ SAO KHÔNG DÙNG kvc_timebase_ms() TRẦN: `kvc_timebase` chỉ tiến khi có ai gọi
+ * `kvc_timebase_add_ms()` / `add_us()` — tức chỉ khi `delay_ms()` của main hoặc
+ * `kvc_usound_delay_us()` chạy. Trong vòng dò baud, nếu chỉ đọc
+ * `kvc_timebase_ms()` mà không chờ thật thì giá trị đó ĐỨNG YÊN, điều kiện
+ * `(now - start) < window_ms` luôn đúng và vòng lặp treo vô hạn — đúng sự cố
+ * "nạp xong không in gì, LED tắt" đã gặp trên kit.
+ *
+ * Hàm này vừa tiêu thời gian thật (vòng NOP) vừa báo vào time base, nên đồng hồ
+ * dùng chung vẫn nhất quán sau khi thoát.
+ *
+ * Chỉ dùng lúc khởi tạo (chưa bật ngắt cảm biến). Không gọi trong main loop.
+ *
+ * GIỚI HẠN: số vòng 3000 là ước lượng cho ~1 ms ở 12 MHz (~4 chu kỳ/vòng NOP).
+ * Không phải phép đo; nếu HCLK khác thì cửa sổ dò dài/ngắn theo cùng tỉ lệ, và
+ * vẫn bị chặn bởi `max_iter` nên không thể treo.
+ */
+static void kvc_gnss_spin_ms(uint32_t ms) {
+    while (ms-- > 0U) {
+        for (volatile uint32_t d = 0U; d < 3000U; d++) {
+            __NOP();
+        }
+        kvc_timebase_add_ms(1U);
+    }
+}
+
+/**
+ * @brief Thử nhận NMEA ở một tốc độ trong khoảng thời gian cho trước.
+ *
+ * TIÊU CHÍ CHẤP NHẬN (sửa sau khi đo trên kit ngày 26/10/2026):
+ *   1. Có ít nhất `min_good` câu NMEA qua checksum, VÀ
+ *   2. **Không có byte nào lỗi khung** trong cửa sổ thử.
+ *
+ * VÌ SAO PHẢI THÊM ĐIỀU KIỆN 2: bản đầu chỉ yêu cầu 2 câu hợp lệ. Trên kit thật,
+ * khi module ở 38400 mà MCU chia ra 37500 (sai số −2,34 %, cộng IHRC ±2 % thành
+ * −4,3 %), vẫn lọt được 2 câu "may mắn" trong 1200 ms nên autobaud DỪNG LẠI ở
+ * 38400 — sai. Log thực tế cho thấy 67 % byte bị lỗi khung và không có fix nào,
+ * tức đã chọn nhầm tốc độ. Ở tốc độ đúng, lỗi khung phải bằng 0 tuyệt đối.
+ *
+ * VÒNG LẶP CÓ HAI CHỐT CHẶN TREO: mỗi vòng chờ thật 1 ms (đồng hồ tiến), và tổng
+ * số vòng bị chặn bởi `max_iter` phòng khi đồng hồ có vấn đề.
+ *
+ * @param baud Tốc độ cần thử.
+ * @param window_ms Thời gian chờ tối đa.
+ * @param min_good Số câu hợp lệ tối thiểu để coi là đúng baud.
+ * @param out_fe Con trỏ nhận số lỗi khung đếm được (có thể NULL).
+ * @return true nếu nhận đủ số câu hợp lệ VÀ không có lỗi khung.
+ */
+static bool kvc_gnss_try_baud(uint32_t baud, uint32_t window_ms,
+                              uint32_t min_good, uint32_t *out_fe) {
+    if (baud == 0U) {
+        return false;
+    }
+
+    /* Mở UART3 ở tốc độ cần thử. */
+    SN_UART3->LC |= (1U << 7); /* DLAB = 1 */
+    kvc_gnss_set_uart3_divisor(baud);
+    SN_UART3->LC = 0x03;       /* 8N1, DLAB = 0 */
+
+    /* Xả sạch dữ liệu còn sót của lần thử trước (FIFO phần cứng + ring phần mềm)
+     * để không tính nhầm câu của tốc độ khác vào lần thử này. */
+    SN_UART3->FIFOCTRL = 0x07;  /* FIFOEN, RXFIFORST, TXFIFORST */
+    kvc_ring_reset(&s_rx_ring);
+    s_rx_state = STATE_WAIT_START;
+    s_rx_len = 0U;
+    s_calc_cs = 0U;
+    s_recv_cs = 0U;
+    s_rx_good_sentence_count = 0U;
+
+    uint32_t fe_count = 0U;
+    const uint32_t start = kvc_timebase_ms();
+    /* Chốt chặn cứng: window_ms (giả định 1 ms/vòng) cộng biên 50 %. */
+    const uint32_t max_iter = (window_ms + (window_ms / 2U)) + 1U;
+
+    for (uint32_t iter = 0U; iter < max_iter; iter++) {
+        /* Rút FIFO phần cứng trực tiếp: lúc này chưa bật ngắt nên không có ISR
+         * đẩy byte vào ring. Đọc LS trước RB để cờ lỗi khớp byte vừa lấy. */
+        uint32_t guard = 0U;
+        while (guard++ < 64U) {
+            uint32_t ls = SN_UART3->LS;
+            if ((ls & 0x01U) == 0U) {
+                break;
+            }
+            if ((ls & 0x08U) != 0U) {
+                fe_count++;   /* framing error: dấu hiệu chắc chắn sai tốc độ */
+            }
+            kvc_gnss_feed_byte((uint8_t)(SN_UART3->RB & 0xFFU),
+                               kvc_timebase_ms());
+        }
+
+        if (s_rx_good_sentence_count >= min_good) {
+            break;
+        }
+        if ((uint32_t)(kvc_timebase_ms() - start) >= window_ms) {
+            break;
+        }
+
+        /* Chờ thật 1 ms: vừa cho byte mới kịp tới, vừa làm đồng hồ tiến. */
+        kvc_gnss_spin_ms(1U);
+    }
+
+    if (out_fe != NULL) {
+        *out_fe = fe_count;
+    }
+
+    /* Chỉ chấp nhận khi đủ câu hợp lệ VÀ không có lỗi khung nào. */
+    return (s_rx_good_sentence_count >= min_good) && (fe_count == 0U);
+}
+
+/**
+ * @brief Dò tốc độ module đang dùng, rồi đưa module về KVC_GNSS_BAUD_RATE.
+ *
+ * THỨ TỰ THỬ: ưu tiên tốc độ xuất xưởng (38400) và tốc độ firmware dùng (9600)
+ * trước, sau đó tới các tốc độ phổ biến khác mà module hỗ trợ. Danh sách dừng ở
+ * tốc độ MCU chia được với sai số chấp nhận (<3,125 %): 4800, 9600, 19200,
+ * 38400, 57600. KHÔNG thử 115200 vì tại 12 MHz divisor 7 cho 107143 bps
+ * (−6,99 %), vượt giới hạn — dù có tìm ra cũng không giao tiếp ổn định được.
+ *
+ * Nếu tìm ra tốc độ khác KVC_GNSS_BAUD_RATE, gửi UBX CFG-PRT đổi module về
+ * KVC_GNSS_BAUD_RATE và mở lại UART3 ở tốc độ đó. Nếu không tìm ra tốc độ nào,
+ * **vẫn mở UART3 ở KVC_GNSS_BAUD_RATE** để firmware chạy như trước (không sập),
+ * và để `[RING] GNSS isr=0` báo hiệu cần kiểm tra dây/anten.
+ *
+ * @return Tốc độ thực sự đang dùng, hoặc 0 nếu không nhận được NMEA ở tốc độ nào.
+ */
+static uint32_t kvc_gnss_autobaud(void) {
+    /* Thứ tự thử: 9600 TRƯỚC vì đó là tốc độ firmware muốn dùng — nếu module đã
+     * được đổi từ lần chạy trước thì dừng ngay tại đây, không mất thời gian.
+     * Sau đó mới tới các tốc độ khác, ưu tiên 38400 (mặc định xuất xưởng).
+     *
+     * KHÔNG thử 115200: tại 12 MHz divisor 7 cho 107143 bps (−6,99 %), vượt giới
+     * hạn 3,125 % nên dù nhận ra cũng không giao tiếp ổn định được. */
+    static const uint32_t kCandidate[] = {9600UL, 38400UL, 19200UL,
+                                          57600UL, 4800UL};
+    const uint32_t kCandidateCount =
+        (uint32_t)(sizeof(kCandidate) / sizeof(kCandidate[0]));
+
+    /* Mỗi tốc độ chờ tối đa 1500 ms (module phát 1 Hz nên đủ thấy 1–2 câu).
+     * Xấu nhất 5 × 1500 = 7,5 s — an toàn vì watchdog chưa bật lúc này. */
+    const uint32_t kWindowMs = 1500UL;
+    const uint32_t kMinGood = 2UL;
+
+    /* LƯỢT 1: tìm tốc độ nhận SẠCH (fe == 0). Đây là tốc độ MCU chia đúng, dùng
+     * luôn nếu nó là 9600. */
+    for (uint32_t i = 0U; i < kCandidateCount; i++) {
+        uint32_t fe = 0U;
+        if (!kvc_gnss_try_baud(kCandidate[i], kWindowMs, kMinGood, &fe)) {
+            continue;
+        }
+        if (kCandidate[i] == KVC_GNSS_BAUD_RATE) {
+            return KVC_GNSS_BAUD_RATE;
+        }
+
+        /* Nhận sạch ở tốc độ khác: đổi module về đích rồi chuyển UART3. */
+        kvc_gnss_send_baud_change();
+        SN_UART3->LC |= (1U << 7);
+        kvc_gnss_set_uart3_divisor(KVC_GNSS_BAUD_RATE);
+        SN_UART3->LC = 0x03;
+        SN_UART3->FIFOCTRL = 0x07;
+        return KVC_GNSS_BAUD_RATE;
+    }
+
+    /* LƯỢT 2: không tốc độ nào nhận sạch. Trường hợp thực tế đã gặp trên kit:
+     * module xuất xưởng 38400, nhưng tại UCLK 12 MHz MCU chỉ chia được 37500
+     * (−2,34 % + IHRC ±2 % ≈ −4,3 %) nên ~67 % byte lỗi khung — KHÔNG BAO GIỜ
+     * đạt fe == 0, dù module đúng là đang ở 38400.
+     *
+     * Nếu bỏ qua bước này, firmware sẽ không bao giờ gửi được lệnh đổi baud và
+     * kẹt ở 38400 vĩnh viễn. Vì vậy: chấp nhận "có tín hiệu NMEA" (đủ câu qua
+     * checksum) làm bằng chứng module đang ở tốc độ đó, rồi gửi lệnh đổi.
+     *
+     * Rủi ro: lệnh UBX gửi đi ở 37500 trong khi module đo 38400 — lệch −2,34 %,
+     * nằm trong ngưỡng chịu đựng của module nên phần lớn trường hợp vẫn tới.
+     * Nếu lần này không ăn, lần khởi động sau module vẫn 38400 và thử lại. */
+    for (uint32_t i = 0U; i < kCandidateCount; i++) {
+        uint32_t fe = 0U;
+        if (!kvc_gnss_try_baud(kCandidate[i], kWindowMs, kMinGood, &fe)) {
+            continue;
+        }
+        if (kCandidate[i] == KVC_GNSS_BAUD_RATE) {
+            return KVC_GNSS_BAUD_RATE;   /* đã ở đích, chỉ là còn FE */
+        }
+
+        kvc_gnss_send_baud_change();
+        SN_UART3->LC |= (1U << 7);
+        kvc_gnss_set_uart3_divisor(KVC_GNSS_BAUD_RATE);
+        SN_UART3->LC = 0x03;
+        SN_UART3->FIFOCTRL = 0x07;
+        return KVC_GNSS_BAUD_RATE;
+    }
+
+    /* Không nhận được câu NMEA nào ở mọi tốc độ: vẫn mở ở tốc độ đích để hệ
+     * thống chạy tiếp; chẩn đoán dựa vào isr/fe trên UART5. */
+    SN_UART3->LC |= (1U << 7);
+    kvc_gnss_set_uart3_divisor(KVC_GNSS_BAUD_RATE);
+    SN_UART3->LC = 0x03;
+    SN_UART3->FIFOCTRL = 0x07;
+    return 0U;
+}
+#endif /* KVC_GNSS_HAS_SONIX_HW */
+
 void kvc_gnss_init(void) {
     kvc_gnss_reset();
 
@@ -406,24 +778,34 @@ void kvc_gnss_init(void) {
                           | (1U << 0)   /* IO0 = 1: UTXD3 */
                           | (1U << 5);  /* IO1 = 1: URXD3 */
 
-    /* 3. Cài đặt Baudrate (mặc định 38400 bps) trên SN_UART3 (Xung nhịp UCLK = 12 MHz):
-     *    Với 38400 bps: Divisor = 12000000 / (16 * 38400) = 19.53 ≈ 20 = 0x0014
-     *    Tốc độ thực tế: 37500 bps (sai số -2.34%, nằm hoàn toàn trong dải an toàn ±3% của UART)
+    /* 3-5. Cấu hình 8N1 + FIFO, rồi DÒ TỐC ĐỘ MODULE ĐANG DÙNG.
+     *
+     * Module NEO-M10-0-10 xuất xưởng 38400, nhưng có thể đã được đổi bằng
+     * u-center hoặc bởi lần chạy firmware trước. Vì vậy không giả định tốc độ:
+     * kvc_gnss_autobaud() thử lần lượt {38400, 9600, 19200, 57600, 4800}, chọn
+     * tốc độ đầu tiên nhận được câu NMEA có checksum đúng, rồi đưa module về
+     * KVC_GNSS_BAUD_RATE (9600) để MCU chạy với sai số +0,16 % thay vì −2,34 %.
+     *
+     * Đây là lời giải cho trường hợp "module ở tốc độ lạ": không cần u-center,
+     * không cần biết trước module đang ở đâu (miễn là trong danh sách trên và
+     * MCU chia được với sai số <3,125 %).
      */
     SN_UART3->LC |= (1U << 7);    /* DLAB = 1: Cho phép ghi DLL/DLM */
-#if (KVC_GNSS_BAUD_RATE == 38400UL)
-    SN_UART3->DLL = 0x14;         /* DLL = 20 (0x14) cho 38400 bps */
-    SN_UART3->DLM = 0x00;         /* DLM = 0 */
-#else
-    SN_UART3->DLL = 0x4E;         /* DLL = 78 (0x4E) cho 9600 bps */
-    SN_UART3->DLM = 0x00;         /* DLM = 0 */
-#endif
+    kvc_gnss_set_uart3_divisor(KVC_GNSS_BAUD_RATE);
+    SN_UART3->LC = 0x03;          /* WLS=3 (8-bit), 1 stop, no parity, DLAB=0 */
+    SN_UART3->FIFOCTRL = 0x07;    /* FIFOEN, RXFIFORST, TXFIFORST */
 
-    /* 4. Cấu hình khung 8N1 (8 bit dữ liệu, 1 stop bit, không parity) và trả DLAB = 0 */
-    SN_UART3->LC = 0x03;          /* WLS = 3 (8-bit), SBS = 0 (1 stop bit), PE = 0 (no parity), DLAB = 0 */
+    (void)kvc_gnss_autobaud();
 
-    /* 5. Kích hoạt và thiết lập lại bộ đệm FIFO 16-byte phần cứng */
-    SN_UART3->FIFOCTRL = 0x07;    /* FIFOEN = 1, RXFIFORST = 1, TXFIFORST = 1 */
+    /* 5e. Bật đủ 4 chòm sao (GPS + Galileo + BeiDou + GLONASS) rồi lưu vào flash
+     * module. Mục đích: cải thiện HDOP khi bị chắn một phần bầu trời — đo trên
+     * kit cho thấy 9 vệ tinh nhưng HDOP 5.60 (~28 m sai số), không đủ cho georef.
+     *
+     * Chạy SAU autobaud vì phải giao tiếp được với module trước đã. Chỉ tốn
+     * ~80 ms mỗi lần boot. Không kiểm ACK — nếu module từ chối thì triệu chứng
+     * là số vệ tinh không tăng; xem kvc_gnss_send_gnss_config(). */
+    kvc_gnss_send_gnss_config();
+    kvc_gnss_save_config();
 
     /* 6. Khởi tạo ring RX TRƯỚC khi bật ngắt */
     (void)kvc_ring_init(&s_rx_ring, s_rx_ring_buf, (uint16_t)KVC_GNSS_RX_RING_SIZE);
@@ -431,6 +813,7 @@ void kvc_gnss_init(void) {
     s_rx_framing_count = 0U;
     s_rx_parity_count  = 0U;
     s_rx_isr_count     = 0U;
+    s_rx_byte_count    = 0U;
 
     /* 7. Bật ngắt RX (RDAIE) + ngắt lỗi đường truyền (RLSIE) */
     SN_UART3->IE = (1U << 0) | (1U << 2);
@@ -454,6 +837,9 @@ void UART3_IRQHandler(void) {
 
     s_rx_isr_count++;
 
+    /* Đọc LS đúng MỘT lần cho mỗi byte. Cờ FE/PE/BI/OE là sticky gắn với byte ở
+     * đỉnh RX FIFO (§15.11.13); đọc LS lặp lại cho cùng byte sẽ đếm lỗi trùng,
+     * làm `fe` tiến gần bằng `isr` dù dữ liệu đúng. Đã gặp trên kit. */
     for (uint32_t guard = 0U; guard < 64U; guard++) {
         ls = SN_UART3->LS;
         if ((ls & 0x01U) == 0U) {
@@ -469,6 +855,7 @@ void UART3_IRQHandler(void) {
             s_rx_parity_count++;
         }
         (void)kvc_ring_push_from_isr(&s_rx_ring, (uint8_t)(SN_UART3->RB & 0xFFU));
+        s_rx_byte_count++;
     }
 
     (void)SN_UART3->LS;
@@ -500,6 +887,7 @@ void kvc_gnss_get_rx_stats(KvcGnssRxStats *out) {
     out->framing_count = s_rx_framing_count;
     out->parity_count  = s_rx_parity_count;
     out->isr_count     = s_rx_isr_count;
+    out->byte_count    = s_rx_byte_count;
 }
 #endif
 
@@ -597,9 +985,9 @@ bool kvc_gnss_is_valid(void) {
 
 bool kvc_gnss_is_3d_fix(void) {
     return s_state.valid &&
-           (s_state.fix_mode == 3U) &&
-           (s_state.satellites_tracked >= 5U) &&
-           (s_state.hdop_centi > 0U && s_state.hdop_centi <= 250U);
+           (s_state.fix_mode == KVC_GNSS_REQ_FIX_MODE_3D) &&
+           (s_state.satellites_tracked >= KVC_GNSS_MIN_SATS) &&
+           (s_state.hdop_centi > 0U && s_state.hdop_centi <= KVC_GNSS_MAX_HDOP_CENTI);
 }
 
 const KvcGnssState* kvc_gnss_get_state(void) {

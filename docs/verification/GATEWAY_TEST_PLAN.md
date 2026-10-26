@@ -28,7 +28,7 @@ flowchart TD
         VALIDATOR["Bộ thẩm định tính toàn vẹn:<br/>1. Kiểm tra Sync Header: 0xAA 0x55<br/>2. Kiểm tra CRC-16/CCITT-FALSE (30 bytes đầu)"]
         PARSER["Giải mã Telemetry cứu nạn:<br/>• Tọa độ WGS-84 (Lat, Lon) hoặc Sa bàn Local (X, Y cm)<br/>• Cự ly siêu âm mặt nước, Phân loại Người/Phao cứu sinh (Person/Lifebuoy), Pin"]
         JSON_PACK["Đóng gói JSON Envelope v1 (IF-03):<br/>• Chuỗi Hex 64 ký tự (rf_payload_hex)<br/>• Metadata sóng vô tuyến & Drop Count"]
-        WS_SRV["WebSocket Server (:8080/telemetry)<br/>Wi-Fi SoftAP: KVC_GCS_AP (192.168.4.1)"]
+        WS_SRV["WebSocket Server (:8080/telemetry)<br/>Mạng: STA 2.4 GHz (ưu tiên 1) hoặc SoftAP KVC_GROUND_STATION (192.168.4.1, dự phòng)"]
     end
 
     subgraph GCS_LAPTOP ["TẦNG 4: HỆ THỐNG GCS TRÊN LAPTOP CỦA THỊNH"]
@@ -54,31 +54,45 @@ flowchart TD
 
 ---
 
-### GIAI ĐOẠN 1: KHỞI TẠO WI-FI SOFTAP & MỞ WEBSOCKET SERVER TRÊN ESP32
-*Mục tiêu: ESP32 phát Wi-Fi độc lập và mở cổng WebSocket sẵn sàng nhận kết nối từ Laptop.*
+### GIAI ĐOẠN 1: THIẾT LẬP MẠNG (ƯU TIÊN STA 2.4 GHz, DỰ PHÒNG SOFTAP) & MỞ WEBSOCKET SERVER TRÊN ESP32
+*Mục tiêu: ESP32 tự chọn mạng đúng thứ tự ưu tiên và mở cổng WebSocket sẵn sàng nhận kết nối từ Laptop.*
 
 #### A. Các bước thực hiện & Lệnh kiểm tra:
-1. Nạp code Wi-Fi SoftAP và WebSocket Server lên bo ESP32 qua cáp Type-C/MicroUSB.
+0. **Kiểm tra thứ tự ưu tiên (bắt buộc):** nạp firmware **không** truyền `KVC_WIFI_SSID` → ESP32 phải in `[WIFI-STA] Khong co KVC_WIFI_SSID...` rồi mới phát SoftAP. Sau đó nạp lại **có** truyền SSID/mật khẩu hotspot điện thoại (2.4 GHz) → ESP32 phải in `[WIFI-STA] Ket noi STA THANH CONG` và **không** phát SoftAP. Đây là tiêu chí PASS của thứ tự ưu tiên.
+0b. **Kiểm tra hotspot điện thoại (4G):** bật hotspot 2.4 GHz trên điện thoại, nạp firmware kèm SSID/mật khẩu hotspot → gateway phải bắt được và in IP do điện thoại cấp. Nếu điện thoại chỉ phát 5 GHz, ESP32-C3 **không** thấy mạng — đổi sang 2.4 GHz rồi thử lại.
+0c. **Kiểm tra nhiều mạng:** nạp 2 mạng (hotspot điện thoại + Wi-Fi lab), tắt hotspot → gateway phải chuyển sang mạng thứ hai; bật lại hotspot và chờ hơn 30 s → gateway phải quay lại mạng khai báo trước.
+1. Nạp code gateway lên bo ESP32 qua cáp Type-C/MicroUSB.
 2. Mở Serial Monitor với tốc độ baud `115200`.
-3. Trên Laptop của Thịnh, bật Wi-Fi và quét danh sách mạng -> Kết nối vào mạng **`KVC_GCS_AP`** (Mật khẩu mặc định: `kvc@2026sar` hoặc mật khẩu truyền qua build flag `-D KVC_WIFI_PASS`).
-4. Mở PowerShell trên Laptop kiểm tra độ trễ kết nối:
+3. Nếu đang ở chế độ dự phòng (ưu tiên 2): trên Laptop bật Wi-Fi và quét danh sách mạng → Kết nối vào mạng **`KVC_GROUND_STATION`** (Mật khẩu mặc định: `kvc123456`). Nếu đang ở ưu tiên 1: laptop kết nối cùng Wi-Fi 2.4 GHz với ESP32 và dùng IP in ở dòng `[WIFI-STA] IP do Router cap`.
+4. Mở PowerShell trên Laptop kiểm tra độ trễ kết nối (chỉ khi dùng SoftAP):
    ```powershell
    ping 192.168.4.1
    ```
-5. Dùng công cụ test WebSocket (Python hoặc Chrome extension) kết nối tới: `ws://192.168.4.1:8080/telemetry`.
+5. Dùng công cụ test WebSocket (Python hoặc Chrome extension) kết nối tới endpoint tương ứng: `ws://192.168.4.1:8080/telemetry` (SoftAP) hoặc `ws://<IP_STA>:8080/telemetry` (STA).
 
 #### B. Thể hiện trực quan kết quả đạt chuẩn:
 
-* **Trực quan trên Serial Monitor (ESP32):**
+* **Trực quan trên Serial Monitor (ESP32), trường hợp dự phòng SoftAP:**
   ```text
   =======================================================
      KVC GATEWAY ESP32 - PHÂN HỆ TRẠM THU MẶT ĐẤT       
   =======================================================
-  [WIFI] Khoi tao SoftAP thanh cong!
-  [WIFI] SSID: KVC_GCS_AP | Password: kvc@2026sar
-  [WIFI] IP Gateway ESP32: 192.168.4.1 | Subnet: 255.255.255.0
-  [WS] WebSocket Server dang lang nghe tai port 8080 (/telemetry)
+  [WIFI-STA] Uu tien 1: ket noi Wi-Fi 2.4 GHz "..."
+  [WIFI-STA] That bai sau 10000 ms. Chuyen sang uu tien 2.
+  [WIFI-AP]  Phat SoftAP du phong THANH CONG!
+  [WIFI-AP]  SSID: KVC_GROUND_STATION | Password: kvc123456
+  [WIFI-AP]  IP Gateway: 192.168.4.1
+  [WS] Endpoint SoftAP: ws://192.168.4.1:8080/telemetry
   [WS] Laptop GCS da ket noi thanh cong tu: 192.168.4.2 (Client ID: 0)
+  ```
+
+* **Trực quan trên Serial Monitor (ESP32), trường hợp ưu tiên 1 (STA):**
+  ```text
+  [WIFI-STA] Uu tien 1: ket noi Wi-Fi 2.4 GHz "..."
+  [WIFI-STA] Ket noi STA THANH CONG (uu tien 1).
+  [WIFI-STA] IP do Router cap: 192.168.1.182 | RSSI: -61 dBm
+  [WIFI-AP]  Khong phat SoftAP vi da co Wi-Fi 2.4 GHz.
+  [WS] Endpoint STA   : ws://192.168.1.182:8080/telemetry
   ```
 
 * **Trực quan trên Terminal PowerShell (Laptop):**
@@ -303,7 +317,7 @@ Mỗi lần Thịnh bắt đầu bật hệ thống lên để kiểm thử ho�
 
 ### Bước 1: Cấp nguồn cho ESP32 Gateway (Phần cứng)
 1. Cắm cáp USB kết nối bo mạch ESP32 vào cổng USB Laptop (hoặc pin sạc dự phòng).
-2. ESP32 tự động bật nguồn, tự động kết nối vào Wi-Fi `"HA"` (hoặc phát SoftAP `KVC_GCS_AP`), mở sẵn dịch vụ WebSocket ở cổng **`8080`** (`ws://<IP_ESP32>:8080/telemetry`).
+2. ESP32 tự động bật nguồn, thực hiện **ưu tiên 1**: kết nối Wi-Fi 2.4 GHz đã nạp qua build flag; nếu thất bại sau 10 s thì **ưu tiên 2**: phát SoftAP `KVC_GROUND_STATION` (mật khẩu `kvc123456`). Sau đó mở dịch vụ WebSocket ở cổng **`8080`** (`ws://<IP_ESP32>:8080/telemetry`).
 *(Nếu cần xem IP do Router cấp, mở Serial Monitor ở tốc độ baud 115200)*.
 
 ### Bước 2: Khởi động Backend Python ở Chế độ REAL (Mở Cửa sổ Terminal 1)

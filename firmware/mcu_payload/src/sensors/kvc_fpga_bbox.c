@@ -46,6 +46,9 @@ static volatile uint32_t s_rx_overrun_count   = 0U;  /* LS.OE  - FIFO phần c�
 static volatile uint32_t s_rx_framing_count   = 0U;  /* LS.FE  - sai stop bit */
 static volatile uint32_t s_rx_parity_count    = 0U;  /* LS.PE  - sai parity */
 static volatile uint32_t s_rx_isr_count       = 0U;  /* số lần vào ISR */
+/* Số byte THẬT SỰ lấy ra khỏi RB. Cần để phân biệt "ISR bắn vì có byte" với
+ * "ISR bắn vì nhiễu/đường RX float" — xem chẩn đoán UART5. */
+static volatile uint32_t s_rx_byte_count      = 0U;
 #endif
 
 /* ============================================================================
@@ -134,6 +137,7 @@ void kvc_fpga_bbox_init(void) {
     s_rx_framing_count = 0U;
     s_rx_parity_count  = 0U;
     s_rx_isr_count     = 0U;
+    s_rx_byte_count    = 0U;
 
     /* 7. Bật ngắt RX (RDAIE) + ngắt lỗi đường truyền (RLSIE).
      *    Không bật THREIE: driver không dùng ngắt TX. */
@@ -161,8 +165,12 @@ void UART1_IRQHandler(void) {
 
     s_rx_isr_count++;
 
-    /* Rút cạn FIFO. Điều kiện dừng là RDR = 0 (bit 0) hoặc TXFIFOFULL không
-     * liên quan. Vòng lặp có trần để một sự cố clock/AFIO không treo ISR. */
+    /* Rút cạn FIFO. Điều kiện dừng là RDR = 0 (bit 0).
+     *
+     * Đọc LS đúng MỘT lần cho mỗi byte: cờ FE/PE ở LS là sticky gắn với byte ở
+     * đỉnh RX FIFO (§15.11.13), nên đọc lặp cho cùng byte sẽ đếm lỗi trùng và
+     * làm `fe` tiến gần bằng `isr`. Vòng lặp có trần để sự cố clock/AFIO không
+     * treo ISR. */
     for (uint32_t guard = 0U; guard < 64U; guard++) {
         ls = SN_UART1->LS;
         if ((ls & 0x01U) == 0U) {          /* RDR = 0: không còn byte */
@@ -178,6 +186,7 @@ void UART1_IRQHandler(void) {
             s_rx_parity_count++;
         }
         (void)kvc_ring_push_from_isr(&s_rx_ring, (uint8_t)(SN_UART1->RB & 0xFFU));
+        s_rx_byte_count++;
     }
 
     /* Xoá cờ ngắt đang treo (RLS/RDA) bằng cách đọc LS thêm lần nữa. */
@@ -322,6 +331,7 @@ void kvc_fpga_bbox_get_rx_stats(KvcBBoxRxStats *out) {
     out->framing_count   = s_rx_framing_count;
     out->parity_count    = s_rx_parity_count;
     out->isr_count       = s_rx_isr_count;
+    out->byte_count      = s_rx_byte_count;
 }
 #endif
 

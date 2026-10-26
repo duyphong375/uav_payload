@@ -66,9 +66,9 @@ docs/hardware/sonix_sn34f788/**/*.pack
 docs/hardware/onekiwi20k/**/*.pdf
 docs/hardware/onekiwi20k/**/*.png
 
-# Datasheet cảm biến: cùng lý do (chưa xác minh quyền phân phối lại).
-# Danh mục phiên bản + SHA-256 ở docs/hardware/sensors/SENSOR_PACKAGES.md.
-docs/hardware/sensors/**/*.pdf
+# Datasheet cảm biến: owner đã chấp nhận rủi ro phân phối lại, nên các PDF được
+# version hóa để clone mới có đủ tài liệu đối chiếu driver. Danh mục phiên bản +
+# nguồn + SHA-256 ở docs/hardware/sensors/SENSOR_PACKAGES.md.
 
 # Local media and review evidence
 media/

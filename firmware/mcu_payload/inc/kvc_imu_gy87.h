@@ -339,8 +339,28 @@ static uint8_t mpu6050_read_accel_raw(uint8_t dev_addr, int16_t *ax, int16_t *ay
 
 /**
  * @brief Tính toán góc nghiêng Roll và Pitch (Đơn vị: 0.1 độ, ví dụ 152 là 15.2 độ)
+ *
+ * KVC-MCU-IMU-20261026-001: LỌC THÔNG THẤP TRƯỚC KHI XUẤT.
+ *
+ * VẤN ĐỀ ĐO ĐƯỢC TRÊN KIT: log M3 cho thấy góc nhảy giữa hai mẫu liên tiếp
+ * (1 giây) tới 3,9° roll và 7,1° pitch dù board đặt yên. Nguyên nhân: mỗi chu kỳ
+ * chỉ lấy MỘT mẫu gia tốc thô rồi đưa thẳng qua atan2. MPU-6050 có nhiễu nền
+ * ±2..4 LSB và rung cơ học từ quạt/khung, nên một mẫu đơn lẻ rất dễ lệch.
+ *
+ * Cách sửa: lọc EMA (exponential moving average) bậc 1 trên chính góc, hệ số
+ * 1/4. Đáp ứng ~4 mẫu (4 giây ở 1 Hz) — đủ mượt cho hiển thị và georef, vẫn
+ * theo kịp thay đổi tư thế thật của UAV.
+ *
+ * GIỚI HẠN: bộ lọc KHÔNG sửa được trục bị hoán đổi hay gắn sai hướng. Nếu
+ * board nằm phẳng mà roll/pitch khác 0 nhiều (ví dụ ±130°), đó là lỗi ánh xạ
+ * trục phần cứng — phải đối chiếu `docs/hardware/wiring/KVC_MASTER_PINOUT_WIRING.md`
+ * mục 3.3 và hướng gắn module, không phải lỗi lọc.
  */
 static uint8_t mpu6050_read_angles(uint8_t dev_addr, int16_t *roll_deg10, int16_t *pitch_deg10) {
+    static int16_t s_roll_filt  = 0;
+    static int16_t s_pitch_filt = 0;
+    static uint8_t s_filt_init  = 0U;
+
     int16_t ax = 0, ay = 0, az = 0;
     if (!mpu6050_read_accel_raw(dev_addr, &ax, &ay, &az)) {
         return 0;
@@ -364,8 +384,24 @@ static uint8_t mpu6050_read_angles(uint8_t dev_addr, int16_t *roll_deg10, int16_
     /* Pitch = atan2(-X, sqrt(Y^2 + Z^2)) */
     float pitch = atan2f(-fax, sqrtf(fay * fay + faz * faz)) * 57.2957795f;
 
-    if (roll_deg10)  *roll_deg10  = (int16_t)(roll * 10.0f);
-    if (pitch_deg10) *pitch_deg10 = (int16_t)(pitch * 10.0f);
+    int16_t roll_raw  = (int16_t)(roll * 10.0f);
+    int16_t pitch_raw = (int16_t)(pitch * 10.0f);
+
+    if (s_filt_init == 0U) {
+        /* Mẫu đầu tiên: khởi tạo bộ lọc bằng chính giá trị đo, tránh
+         * hiện tượng góc bò dần từ 0 lên giá trị thật trong vài giây đầu. */
+        s_roll_filt  = roll_raw;
+        s_pitch_filt = pitch_raw;
+        s_filt_init  = 1U;
+    } else {
+        /* EMA bậc 1, hệ số 1/4: filt += (raw - filt) / 4.
+         * Dùng phép chia có dấu của C (làm tròn về 0) nên không cần thư viện. */
+        s_roll_filt  = (int16_t)(s_roll_filt  + (roll_raw  - s_roll_filt)  / 4);
+        s_pitch_filt = (int16_t)(s_pitch_filt + (pitch_raw - s_pitch_filt) / 4);
+    }
+
+    if (roll_deg10)  *roll_deg10  = s_roll_filt;
+    if (pitch_deg10) *pitch_deg10 = s_pitch_filt;
     return 1;
 }
 

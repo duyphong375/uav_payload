@@ -15,6 +15,7 @@ Các bước (mỗi bước in PASS/FAIL kèm exit code):
      - test_kvc_fpga_bbox     : driver UART1 + file nguồn sensors/kvc_fpga_bbox.c
      - test_kvc_gnss_neo_m10  : driver NMEA + file nguồn sensors/kvc_gnss_neo_m10.c
      - test_kvc_usound_decode : giải mã khung 4 byte AJ-SR04M + sensors/kvc_usound_decode.c
+     - test_kvc_geo_math      : lượng giác số nguyên cho georef + src/kvc_geo_math.c
   2. Gateway host test (g++): test_rf_decode.cpp + src/rf_decode.cpp
   3. Gateway build (PlatformIO) — bỏ qua bằng -SkipBuild
   4. Python tests (pytest) — bỏ qua bằng -SkipPython
@@ -151,6 +152,13 @@ if ($null -eq $gcc) {
             (Join-Path $mcuSensors 'kvc_usound_decode.c'),
             '-o', (Join-Path $outDir 'test_kvc_usound_decode.exe'))) `
         -OutputExe (Join-Path $outDir 'test_kvc_usound_decode.exe')
+
+    Invoke-TestBinary -Name 'MCU test_kvc_geo_math' -Compiler $gcc.Source `
+        -Arguments ($common + @(
+            (Join-Path $mcuTests 'test_kvc_geo_math.c'),
+            (Join-Path $mcuSrc 'kvc_geo_math.c'),
+            '-o', (Join-Path $outDir 'test_kvc_geo_math.exe'))) `
+        -OutputExe (Join-Path $outDir 'test_kvc_geo_math.exe')
 }
 
 # --- 2. Gateway host test ---

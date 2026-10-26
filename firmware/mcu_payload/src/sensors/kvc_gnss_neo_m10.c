@@ -262,6 +262,51 @@ static bool parse_hdop(const char *s, uint16_t *out_centi, uint16_t *out_x10) {
 }
 
 /**
+ * @brief Phân giải chuỗi số thực không dấu thành giá trị ×100, cắt phần lẻ thứ 2.
+ * @param s Chuỗi đầu vào ("0.004", "77.52", "").
+ * @param out Nhận giá trị ×100.
+ * @return true nếu chuỗi hợp lệ và nằm trong dải uint16.
+ */
+static bool parse_centi_unsigned(const char *s, uint16_t *out) {
+    if (s == NULL || out == NULL) {
+        return false;
+    }
+    while (*s == ' ') s++;
+    if (*s == '\0' || *s == ',') {
+        return false;   /* trường rỗng = module không cung cấp */
+    }
+
+    uint32_t int_part = 0U;
+    uint32_t digits = 0U;
+    while (*s != '\0' && *s != '.') {
+        if (!isdigit((unsigned char)*s)) return false;
+        int_part = int_part * 10U + (uint32_t)(*s - '0');
+        digits++;
+        if (digits > 4U) return false;   /* quá lớn, không thể là tốc độ/hướng */
+        s++;
+    }
+
+    uint32_t frac = 0U;
+    if (*s == '.') {
+        s++;
+        if (isdigit((unsigned char)*s)) {
+            frac = (uint32_t)(*s - '0') * 10U;
+            s++;
+            if (isdigit((unsigned char)*s)) {
+                frac += (uint32_t)(*s - '0');
+            }
+        }
+    }
+
+    uint32_t centi = int_part * 100U + frac;
+    if (centi > 65535U) {
+        return false;
+    }
+    *out = (uint16_t)centi;
+    return true;
+}
+
+/**
  * @brief Phân tách chuỗi bản tin NMEA bằng dấu phẩy ',' thành mảng con trỏ trường (an toàn cho trường rỗng).
  */
 static uint8_t split_fields(char *buf, char *fields[], uint8_t max_fields) {
@@ -366,7 +411,7 @@ static void kvc_gnss_parse_sentence_internal(uint32_t now_ms) {
 
     /* Nhận dạng câu RMC: kết thúc bằng "RMC", ví dụ $GNRMC, $GPRMC */
     if (tag_len >= 5 && memcmp(&fields[0][tag_len - 3], "RMC", 3) == 0) {
-        /* Định dạng chuẩn:
+        /* Định dạng chuẩn (NMEA 0183 §RMC):
          * 0: Tag (GNRMC)
          * 1: UTC Time
          * 2: Status ('A' = Data valid, 'V' = Navigation receiver warning / invalid)
@@ -374,6 +419,9 @@ static void kvc_gnss_parse_sentence_internal(uint32_t now_ms) {
          * 4: N/S indicator ('N' hoặc 'S')
          * 5: Longitude (dddmm.mmmmm)
          * 6: E/W indicator ('E' hoặc 'W')
+         * 7: Speed over ground (knots)
+         * 8: Course over ground / track made good (độ, 0..359.99)
+         * 9: Date (ddmmyy)
          */
         if (num_fields >= 7) {
             char status = fields[2][0];
@@ -392,8 +440,37 @@ static void kvc_gnss_parse_sentence_internal(uint32_t now_ms) {
                 } else {
                     s_state.last_rmc_ms = 0U;
                 }
+
+                /* KVC-MCU-1.5: Yaw cho georef từ trường 8 (`track_made_good`),
+                 * kèm tốc độ trường 7 để georef biết hướng này có đáng tin.
+                 *
+                 * CHỈ nhận course khi status = 'A'. Trường rỗng (module không
+                 * tính được hướng) làm course không đổi và `last_course_ms`
+                 * không được cập nhật — nhờ vậy `kvc_gnss_get_course_deg10()`
+                 * sẽ từ chối sau KVC_GNSS_COURSE_STALE_MS thay vì dùng giá trị
+                 * cũ của một lần bay trước. */
+                uint16_t speed_centi = 0U;
+                if (parse_centi_unsigned(fields[7], &speed_centi)) {
+                    s_state.speed_centi_knots = speed_centi;
+                } else {
+                    s_state.speed_centi_knots = 0U;
+                }
+
+                uint16_t course_centi = 0U;
+                if ((num_fields > 8) && parse_centi_unsigned(fields[8], &course_centi)
+                        && (course_centi < 36000U)) {
+                    /* 0,01° -> 0,1° làm tròn; 359,95° trở lên quy về 0. */
+                    uint32_t deg10 = ((uint32_t)course_centi + 5U) / 10U;
+                    if (deg10 >= 3600U) {
+                        deg10 -= 3600U;
+                    }
+                    s_state.course_deg10 = (uint16_t)deg10;
+                    s_state.last_course_ms = now_ms;
+                }
             } else {
                 s_state.last_rmc_ms = 0U;
+                s_state.last_course_ms = 0U;
+                s_state.speed_centi_knots = 0U;
             }
         }
         kvc_gnss_eval_validity(now_ms);
@@ -1004,10 +1081,44 @@ void kvc_gnss_check_expiry(uint32_t now_ms) {
     kvc_gnss_eval_validity(now_ms);
 }
 
+bool kvc_gnss_get_course_deg10(uint32_t now_ms, uint16_t *out_deg10) {
+    /* Chưa từng có course, hoặc RMC gần nhất báo 'V' (đã xoá last_course_ms). */
+    if (s_state.last_course_ms == 0U) {
+        return false;
+    }
+
+    /* Course cũ quá hạn: UAV có thể đã đổi hướng. Dùng giá trị cũ sẽ làm
+     * georef xoay sai và cho ra toạ độ mục tiêu lệch hẳn. */
+    if ((now_ms < s_state.last_course_ms) ||
+        ((now_ms - s_state.last_course_ms) > KVC_GNSS_COURSE_STALE_MS)) {
+        return false;
+    }
+
+    /* Tốc độ quá thấp: hướng do module tính là nhiễu, sai tới hàng chục độ.
+     * Trả false để georef từ chối thay vì dùng một góc vô nghĩa. */
+    if (s_state.speed_centi_knots < KVC_GNSS_COURSE_MIN_SPEED_CENTI_KNOTS) {
+        return false;
+    }
+
+    if (s_state.course_deg10 >= 3600U) {
+        return false;
+    }
+
+    if (out_deg10 != NULL) {
+        *out_deg10 = s_state.course_deg10;
+    }
+    return true;
+}
+
+uint16_t kvc_gnss_get_speed_centi_knots(void) {
+    return s_state.speed_centi_knots;
+}
+
 void kvc_gnss_reset(void) {
     memset(&s_state, 0, sizeof(KvcGnssState));
     s_state.hdop_centi = 0xFFFFU;
     s_state.hdop_x10 = 0xFFFFU;
+    s_state.course_deg10 = KVC_GNSS_COURSE_INVALID;
     s_rx_state = STATE_WAIT_START;
     s_rx_len = 0;
     s_calc_cs = 0;

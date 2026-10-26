@@ -98,10 +98,27 @@ extern "C" {
 #define KVC_GNSS_REQ_FIX_MODE_3D        3U      /* GSA fix mode bắt buộc cho 3D fix (IF-02 bit 0) */
 #define KVC_GNSS_MAX_SENTENCE_LEN       120U    /* Độ dài tối đa câu NMEA đệm (tránh tràn RAM) */
 
+/* KVC-MCU-1.5 — Yaw cho georef từ `track_made_good` của câu RMC.
+ *
+ * GIỚI HẠN CỦA PHƯƠNG PHÁP (phải đọc trước khi dùng):
+ * `track_made_good` là hướng CHUYỂN ĐỘNG thực tế, không phải hướng mũi UAV và
+ * không phải hướng camera. Nó chỉ có nghĩa khi UAV đang bay ngang đủ nhanh để
+ * module tính ra vector chuyển động; khi đứng yên hoặc bay thẳng đứng, giá trị
+ * hoặc là rỗng (trường 8 trống) hoặc là giá trị cũ. Vì vậy:
+ *   1. Chỉ nhận course khi trường có dữ liệu và status = 'A'.
+ *   2. Từ chối nếu `last_course_ms` cũ hơn KVC_GNSS_COURSE_STALE_MS.
+ *   3. Từ chối nếu tốc độ mặt đất dưới KVC_GNSS_COURSE_MIN_SPEED_CENTI_KNOTS
+ *      (dưới ngưỡng này hướng đo được là nhiễu, sai tới hàng chục độ).
+ * Không có Yaw hợp lệ thì georef PHẢI từ chối, không được giả định hướng Bắc. */
+#define KVC_GNSS_COURSE_INVALID         0xFFFFU /* Giá trị "không có Yaw" */
+#define KVC_GNSS_COURSE_STALE_MS        3000UL  /* Course cũ hơn 3 s thì không dùng */
+/* 0,5 knot ≈ 0,93 km/h. Dưới ngưỡng này NEO-M10 không cho hướng đáng tin. */
+#define KVC_GNSS_COURSE_MIN_SPEED_CENTI_KNOTS  50U
+
 /* KVC-M2-20261025-001: RX qua ngắt + ring buffer.
- * Định cỡ theo cửa sổ KHÔNG-CONSUMER dài nhất ~740 ms:
- *   kvc_usound_read_robust 340 ms + TxDone LoRa 300 ms + init lại LoRa 100 ms.
- * Ở 9600 8N1 (960 byte/s): ~710 byte -> ring 4096 byte (biên ~5,7x).
+ * Định cỡ theo cửa sổ KHÔNG-CONSUMER dài nhất ~650 ms:
+ *   kvc_usound_read_robust 250 ms + TxDone LoRa 300 ms + init lại LoRa 100 ms.
+ * Ở 9600 8N1 (960 byte/s): ~624 byte -> ring 4096 byte (biên ~6,5x).
  * NMEA 1 Hz thực tế chỉ ~500 byte/s nên đây là biên rất rộng.
  * Ở 38400 (nếu bật lại) biên vẫn đủ 1,44x; giữ nguyên 4096 cho cả hai tốc độ. */
 #define KVC_GNSS_RX_RING_SIZE           4096U
@@ -129,6 +146,22 @@ typedef struct {
     uint8_t  fix_mode;           /* GSA Fix mode: 1=No fix, 2=2D fix, 3=3D fix */
     uint8_t  satellites_tracked; /* Số lượng vệ tinh đang tham gia giải nghiệm (0..99) */
     bool     valid;              /* true khi có vị trí hợp lệ (kiểu TinyGPSPlus) và dữ liệu còn mới trong 3 giây */
+
+    /* KVC-MCU-1.5: Yaw cho georef, lấy từ `track_made_good` (trường 8 câu RMC).
+     *
+     * QUY ƯỚC: 0..3599 = 0,0..359,9° theo chiều kim đồng hồ từ Bắc.
+     * `KVC_GNSS_COURSE_INVALID` (0xFFFF) = chưa có hoặc không dùng được.
+     *
+     * GIỚI HẠN PHẢI BIẾT: track_made_good là hướng CHUYỂN ĐỘNG, không phải
+     * hướng camera. Khi UAV đứng yên hoặc bay thẳng đứng, module không cập nhật
+     * trường này (thường giữ giá trị cũ hoặc để rỗng) nên georef PHẢI từ chối
+     * thay vì dùng giá trị cũ — xem KVC_GNSS_COURSE_STALE_MS.
+     *
+     * Thứ tự trường: 2 x uint16 đứng trước `last_course_ms` (uint32) để struct
+     * không sinh padding — dự án build với -Wpadded. */
+    uint16_t course_deg10;
+    uint16_t speed_centi_knots;  /* Tốc độ mặt đất ×100 hải lý/giờ (trường 7 RMC). 0 = đứng yên */
+    uint32_t last_course_ms;     /* Thời điểm (timestamp ms) cập nhật course gần nhất */
 } KvcGnssState;
 
 /* ============================================================================
@@ -188,6 +221,26 @@ const KvcGnssState* kvc_gnss_get_state(void);
  * @param out_state Con trỏ vùng nhớ nhận dữ liệu sao chép.
  */
 void kvc_gnss_get_state_copy(KvcGnssState *out_state);
+
+/**
+ * @brief Lấy Yaw dùng được cho georef (KVC-MCU-1.5).
+ *
+ * @param now_ms  Timestamp hiện tại (ms).
+ * @param out_deg10 Nhận Yaw 0,1° (0..3599) khi hàm trả true. Có thể NULL.
+ * @return true nếu có Yaw đáng tin ở thời điểm `now_ms`; false nếu chưa có,
+ *         đã cũ quá KVC_GNSS_COURSE_STALE_MS, hoặc tốc độ mặt đất quá thấp.
+ *
+ * QUAN TRỌNG: giá trị trả về là hướng CHUYỂN ĐỘNG, không phải hướng camera.
+ * Georef dùng nó làm xấp xỉ Yaw camera chỉ khi UAV bay ngang ổn định. Khi hàm
+ * trả false, georef phải TỪ CHỐI tính toạ độ mục tiêu thay vì giả định Bắc.
+ */
+bool kvc_gnss_get_course_deg10(uint32_t now_ms, uint16_t *out_deg10);
+
+/**
+ * @brief Tốc độ mặt đất ×100 hải lý/giờ tại lần cập nhật RMC gần nhất.
+ * @return 0 nếu đứng yên hoặc chưa có dữ liệu.
+ */
+uint16_t kvc_gnss_get_speed_centi_knots(void);
 
 /**
  * @brief Kiểm tra hạn định thời dữ liệu và hạ cờ valid nếu quá 3 giây không có bản tin mới.

@@ -18,6 +18,7 @@
 #include "kvc_usound_ajsr04m.h"
 #include "kvc_gnss_neo_m10.h"
 #include "kvc_fpga_bbox.h"
+#include "kvc_geo_math.h"
 #include <string.h>
 #include <stdbool.h>
 
@@ -642,6 +643,22 @@ static void kvc_m3_value_tick(const KvcM3Snapshot *snap) {
     kvc_m3_buf_dec32s((gnss != NULL) ? gnss->lon_deg7 : 0);
     kvc_m1_buf_puts(" v");
     kvc_m1_buf_dec32(kvc_gnss_is_3d_fix() ? 1U : 0U);
+
+    /* Yaw cho georef (KVC-MCU-1.5): giá trị 0,1° và cờ dùng được.
+     * `yw=-` nghĩa là chưa có/đã cũ/tốc độ quá thấp -> georef từ chối.
+     * Kèm tốc độ (0,01 knot) vì hướng chỉ đáng tin khi UAV đang bay ngang. */
+    {
+        uint16_t yaw_deg10 = 0U;
+        bool yaw_ok = kvc_gnss_get_course_deg10(kvc_millis(), &yaw_deg10);
+        kvc_m1_buf_puts(" yw=");
+        if (yaw_ok) {
+            kvc_m1_buf_dec32((uint32_t)yaw_deg10);
+        } else {
+            kvc_m1_buf_puts("-");
+        }
+        kvc_m1_buf_puts(" sp=");
+        kvc_m1_buf_dec32((uint32_t)kvc_gnss_get_speed_centi_knots());
+    }
 
     /* FPGA BBox: số candidate, cờ valid, số frame lỗi CRC. */
     bbox = kvc_fpga_bbox_get_state();
@@ -1546,13 +1563,47 @@ int main(void) {
                  * Khung hình chuẩn 640x480, tâm quang học cx = 320, cy = 240.
                  * Góc nhìn HFOV ~ 60 độ => fx ≈ 554 pixel.
                  *
+                 * KVC-MCU-1.5: BỔ SUNG XOAY THEO YAW. Trước đây khối này giả
+                 * định camera LUÔN hướng Bắc, nên khi UAV xoay thì toạ độ mục
+                 * tiêu lệch đúng bằng góc xoay (sai hoàn toàn ở 90/180/270°).
+                 *
+                 * Yaw lấy từ `track_made_good` của câu RMC (xem
+                 * kvc_gnss_get_course_deg10). Đó là hướng CHUYỂN ĐỘNG, không
+                 * phải hướng camera, nên chỉ dùng khi UAV bay ngang đủ nhanh;
+                 * hàm getter đã từ chối khi đứng yên hoặc course quá 3 s.
+                 *
                  * GIỚI HẠN CÒN LẠI: fx = 554 và tâm 320x240 là hằng số danh
                  * định, chưa dùng intrinsics hiệu chuẩn, chưa undistort, chưa bù
-                 * góc nghiêng IMU và chưa có extrinsic camera->body. Đây vẫn là
-                 * georef xấp xỉ, chưa đủ để nghiệm thu (M3). */
+                 * góc nghiêng IMU và chưa có extrinsic camera->body. Yaw cũng
+                 * chỉ là xấp xỉ hướng chuyển động. Đây vẫn là georef xấp xỉ,
+                 * chưa đủ để nghiệm thu (M3). */
                 bool alt_ok = ((pkt.sensor_flags & KVC_FLAG_ALT_VALID) != 0U) &&
                               (pkt.alt_dist_cm >= 20U) && (pkt.alt_dist_cm <= 800U);
                 bool pose_ok = ((pkt.sensor_flags & KVC_FLAG_GNSS_VALID) != 0U);
+
+                uint16_t yaw_deg10 = 0U;
+                /* KVC-MCU-1.5: Yaw chỉ dùng khi ĐÁNG TIN (RMC status A, course
+                 * ≤ 3 s, tốc độ ≥ 0,5 knot). Khi không có Yaw, hành vi giữ
+                 * nguyên như trước đây: giả định camera hướng Bắc.
+                 *
+                 * VÌ SAO KHÔNG TỪ CHỐI TÍNH TOẠ ĐỘ KHI THIẾU YAW: IF-02 chỉ có
+                 * một cặp lat/lon và 4 bit cờ (bit 4..7 dự phòng). Nếu MCU giữ
+                 * lat/lon = toạ độ UAV mà vẫn bật ALT_VALID + GNSS_VALID, backend
+                 * (esp32_ingress.py:95 `has_wgs84_position`) sẽ coi đó là toạ độ
+                 * mục tiêu HỢP LỆ và báo mục tiêu nằm ngay dưới UAV — sai nguy
+                 * hiểm hơn nhiều so với việc dùng Yaw xấp xỉ. Muốn biểu diễn
+                 * "phát hiện nhưng chưa định vị" cần thêm 1 bit trong byte cờ
+                 * (đề xuất bit 4 = TARGET_POS_VALID); đó là thay đổi IF-02 nên
+                 * phải thống nhất với gateway/backend trước, không tự sửa.
+                 *
+                 * GIỚI HẠN CÒN LẠI (đã ghi trong KVC_PHAN_CONG_2_NGUOI.md §7):
+                 * khi UAV đứng yên hoặc bay chậm, Yaw không có -> georef vẫn
+                 * giả định hướng Bắc như trước, nên nếu camera đang xoay thì toạ
+                 * độ vẫn lệch. Log `[M3]` in `yw=-` để nhận biết trạng thái này. */
+                bool yaw_ok = kvc_gnss_get_course_deg10(kvc_millis(), &yaw_deg10);
+                if (!yaw_ok) {
+                    yaw_deg10 = 0U;   /* 0 = Bắc: hành vi cũ, đã ghi rõ giới hạn */
+                }
 
                 if (!alt_ok || !pose_ok) {
                     /* Không bịa vị trí target; giữ vị trí UAV nếu GNSS vẫn hợp lệ. */
@@ -1564,9 +1615,19 @@ int main(void) {
                     float h_m = (float)pkt.alt_dist_cm / 100.0f;
                     if (h_m < 0.2f) h_m = 0.2f;
 
-                    /* Độ lệch mét từ tâm camera đến đối tượng */
-                    float delta_x_m = ((float)target->x_center - 320.0f) * (h_m / 554.0f);
-                    float delta_y_m = (240.0f - (float)target->y_center) * (h_m / 554.0f);
+                    /* Độ lệch MÉT trong hệ trục ẢNH:
+                     *   right_m  : dương = sang phải ảnh
+                     *   fwd_m    : dương = lên trên ảnh (ra xa camera) */
+                    int32_t right_mm = (int32_t)(((float)target->x_center - 320.0f) * (h_m / 554.0f) * 1000.0f);
+                    int32_t fwd_mm   = (int32_t)((240.0f - (float)target->y_center) * (h_m / 554.0f) * 1000.0f);
+
+                    /* Xoay hệ trục ảnh sang hệ trục địa lý (Đông, Bắc). */
+                    int32_t east_mm  = 0;
+                    int32_t north_mm = 0;
+                    kvc_geo_rotate_to_ne(right_mm, fwd_mm, yaw_deg10, &east_mm, &north_mm);
+
+                    float delta_x_m = (float)east_mm / 1000.0f;    /* Đông */
+                    float delta_y_m = (float)north_mm / 1000.0f;   /* Bắc */
 
                     /* Đổi độ lệch mét sang tọa độ WGS-84 (nhân 10^7):
                      * 1m vĩ độ  ≈ 89.977 x 10^-7 độ (1 / 111139 m)

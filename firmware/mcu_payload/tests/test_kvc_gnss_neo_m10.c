@@ -429,6 +429,65 @@ static void test_rmc_sentence(void) {
 }
 
 /* ============================================================================
+ * TEST CASE 12: YAW CHO GEOREF TỪ track_made_good (KVC-MCU-1.5)
+ * ============================================================================ */
+static void test_course_from_rmc(void) {
+    printf("[TEST 12] Yaw tu track_made_good (KVC-MCU-1.5)...\n");
+    kvc_gnss_reset();
+
+    uint16_t deg10 = 0U;
+
+    /* Chưa có RMC: không được trả Yaw. */
+    TEST_ASSERT(!kvc_gnss_get_course_deg10(0, &deg10), "chua co RMC -> khong co Yaw");
+    TEST_ASSERT(kvc_gnss_get_speed_centi_knots() == 0U, "chua co RMC -> speed = 0");
+
+    /* RMC đang bay: speed 12.34 knot, course 77.52 deg.
+     * 12.34 knot -> 1234 centi-knot (>= nguong 50).
+     * 77.52 deg  -> 775.2 -> 775 deg10 (lam tron). */
+    send_nmea("GNRMC,083559.00,A,1604.43112,N,10808.99526,E,12.34,77.52,241026,,,A,V", 2000);
+    TEST_ASSERT(kvc_gnss_is_valid(), "RMC active phai valid");
+
+    TEST_ASSERT(kvc_gnss_get_speed_centi_knots() == 1234U, "speed phai la 1234 centi-knot");
+    TEST_ASSERT(kvc_gnss_get_course_deg10(2000, &deg10), "dang bay phai co Yaw");
+    TEST_ASSERT(deg10 == 775U, "77.52 do -> 775 deg10");
+
+    /* Course cũ quá 3 s: phải từ chối. */
+    TEST_ASSERT(kvc_gnss_get_course_deg10(2000 + KVC_GNSS_COURSE_STALE_MS + 1U, &deg10) == false,
+                "course cu qua 3 s phai bi tu choi");
+    TEST_ASSERT(kvc_gnss_get_course_deg10(2000 + KVC_GNSS_COURSE_STALE_MS, &deg10) == true,
+                "course dung 3 s van dung duoc");
+
+    /* Đứng yên (speed 0.004 knot = 0 centi-knot sau khi cat): phải từ chối. */
+    send_nmea("GNRMC,083600.00,A,1604.43110,N,10808.99520,E,0.004,77.52,241026,,,A,V", 2000 + KVC_GNSS_COURSE_STALE_MS);
+    TEST_ASSERT(kvc_gnss_get_speed_centi_knots() == 0U, "speed 0.004 knot -> 0 centi");
+    TEST_ASSERT(!kvc_gnss_get_course_deg10(2000 + KVC_GNSS_COURSE_STALE_MS, &deg10),
+                "dung yen phai tu choi Yaw");
+
+    /* Trường course rỗng: phải giữ course cũ nhưng KHÔNG được cập nhật mốc thời
+     * gian, nên sau 3 s sẽ hết hạn. Đây là điểm then chốt: nếu code cập nhật
+     * mốc sai thì georef sẽ dùng mãi một hướng cũ. */
+    send_nmea("GNRMC,083601.00,A,1604.43110,N,10808.99520,E,12.00,,241026,,,A,V", 3000);
+    TEST_ASSERT(!kvc_gnss_get_course_deg10(3000, &deg10),
+                "course rong khong cap nhat moc -> het han");
+
+    /* Course mới sau đó phải dùng được, kể cả giá trị quanh 0/360. */
+    send_nmea("GNRMC,083602.00,A,1604.43110,N,10808.99520,E,12.00,359.98,241026,,,A,V", 4000);
+    TEST_ASSERT(kvc_gnss_get_course_deg10(4000, &deg10), "course 359.98 phai dung duoc");
+    TEST_ASSERT(deg10 == 0U, "359.98 do lam tron thanh 0 deg10");
+
+    /* RMC void phải xoá course, không để lại hướng cũ. */
+    send_nmea("GNRMC,083603.00,V,1604.43110,N,10808.99520,E,12.00,90.00,241026,,,A,V", 5000);
+    TEST_ASSERT(!kvc_gnss_get_course_deg10(5000, &deg10), "RMC void phai xoa Yaw");
+    TEST_ASSERT(kvc_gnss_get_speed_centi_knots() == 0U, "RMC void phai xoa speed");
+
+    /* KVC_GNSS_COURSE_INVALID phải giữ nguyên sau reset. */
+    kvc_gnss_reset();
+    TEST_ASSERT(kvc_gnss_get_state()->course_deg10 == KVC_GNSS_COURSE_INVALID,
+                "reset phai dat course = 0xFFFF");
+    TEST_ASSERT(kvc_gnss_get_state()->last_course_ms == 0U, "reset phai xoa last_course_ms");
+}
+
+/* ============================================================================
  * MAIN ENTRY POINT CHO TEST RUNNER
  * ============================================================================ */
 int main(void) {
@@ -447,6 +506,7 @@ int main(void) {
     test_error_recovery();
     test_byte_by_byte_stream();
     test_rmc_sentence();
+    test_course_from_rmc();
 
     printf("================================================================\n");
     printf("  Results: %d/%d assertions PASSED\n", s_tests_passed, s_tests_run);

@@ -10,10 +10,11 @@ README bị sai trên Windows (gcc không expand `*.c`), nên kết quả không
 
 Các bước (mỗi bước in PASS/FAIL kèm exit code):
   1. MCU host tests (gcc, không cần board):
-     - test_kvc_uart_ring    : ring buffer SPSC
-     - test_kvc_timebase     : time base monotonic dùng chung
-     - test_kvc_fpga_bbox    : driver UART1 + file nguồn sensors/kvc_fpga_bbox.c
-     - test_kvc_gnss_neo_m10 : driver NMEA + file nguồn sensors/kvc_gnss_neo_m10.c
+     - test_kvc_uart_ring     : ring buffer SPSC
+     - test_kvc_timebase      : time base monotonic dùng chung
+     - test_kvc_fpga_bbox     : driver UART1 + file nguồn sensors/kvc_fpga_bbox.c
+     - test_kvc_gnss_neo_m10  : driver NMEA + file nguồn sensors/kvc_gnss_neo_m10.c
+     - test_kvc_usound_decode : giải mã khung 4 byte AJ-SR04M + sensors/kvc_usound_decode.c
   2. Gateway host test (g++): test_rf_decode.cpp + src/rf_decode.cpp
   3. Gateway build (PlatformIO) — bỏ qua bằng -SkipBuild
   4. Python tests (pytest) — bỏ qua bằng -SkipPython
@@ -143,6 +144,13 @@ if ($null -eq $gcc) {
             (Join-Path $mcuSensors 'kvc_gnss_neo_m10.c'),
             '-o', (Join-Path $outDir 'test_kvc_gnss_neo_m10.exe'))) `
         -OutputExe (Join-Path $outDir 'test_kvc_gnss_neo_m10.exe')
+
+    Invoke-TestBinary -Name 'MCU test_kvc_usound_decode' -Compiler $gcc.Source `
+        -Arguments ($common + @(
+            (Join-Path $mcuTests 'test_kvc_usound_decode.c'),
+            (Join-Path $mcuSensors 'kvc_usound_decode.c'),
+            '-o', (Join-Path $outDir 'test_kvc_usound_decode.exe'))) `
+        -OutputExe (Join-Path $outDir 'test_kvc_usound_decode.exe')
 }
 
 # --- 2. Gateway host test ---

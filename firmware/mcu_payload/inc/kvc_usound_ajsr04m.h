@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file kvc_usound_ajsr04m.h
  * @brief Driver UART 9600 8N1 cho cảm biến siêu âm chống nước **AJ-SR04M**
  *        (board xanh có pad chọn mode `R19`) trên MCU Sonix SN34F788.
@@ -43,6 +43,11 @@
 #include "kvc_pinout.h"
 #include "kvc_uart_ring.h"
 
+/* KVC-MCU-1.2: máy trạng thái 4 byte đã tách sang module thuần logic để chạy
+ * được host test bằng gcc. Driver này KHÔNG được định nghĩa lại logic giải mã;
+ * mọi thay đổi định dạng khung phải sửa trong kvc_usound_decode.c. */
+#include "kvc_usound_decode.h"
+
 /* KVC-F6b: driver này báo thời gian chờ vào time base dùng chung, nên mọi
  * target/host test có gọi kvc_usound_delay_us() phải link thêm
  * firmware/mcu_payload/src/kvc_timebase.c. */
@@ -54,17 +59,27 @@ extern "C" {
 
 /* ============================================================================
  * 1. CÁC HẰNG SỐ ĐẶC TẢ CẢM BIẾN VÀ MÃ TRẠNG THÁI
- * ============================================================================ */
-#define KVC_USOUND_MIN_RANGE_CM       20U     /* Vùng mù dưới 20 cm */
-#define KVC_USOUND_MAX_RANGE_CM       500U    /* Trần đo tin cậy phục vụ tải UAV cứu nạn */
-#define KVC_USOUND_TIMEOUT_MS         150U    /* Timeout tối đa 150 ms chờ phản hồi khung */
-
-/* Mã trạng thái đo đạc */
-#define KVC_USOUND_OK                 0U      /* Đo cự ly thành công, nằm trong dải tin cậy 20–500 cm */
-#define KVC_USOUND_ERR_TIMEOUT        1U      /* Quá timeout không nhận đủ 4 byte hợp lệ */
-#define KVC_USOUND_ERR_CHECKSUM       2U      /* Mã Checksum khung dữ liệu 4 byte không khớp */
-#define KVC_USOUND_ERR_OUT_OF_RANGE   3U      /* Cự ly vượt trần 500 cm hoặc cảm biến báo mã 6000 mm (No Echo) */
-#define KVC_USOUND_ERR_BLIND_ZONE     4U      /* Vật cản nằm trong vùng mù dưới 20 cm */
+ * ============================================================================
+ * Dải đo (KVC_USOUND_MIN_RANGE_CM, KVC_USOUND_MAX_RANGE_CM), mã trạng thái
+ * (KVC_USOUND_OK, KVC_USOUND_ERR_*) và hằng số khung (KVC_USOUND_NO_ECHO_MM)
+ * nay nằm trong kvc_usound_decode.h — một nguồn duy nhất, để driver và host
+ * test không bao giờ lệch định nghĩa. */
+/* Cửa sổ nghe RX sau khi gửi 0x01.
+ *
+ * Đo trên kit: khung đầu của một lần đo thành công về sau ~5 ms (26 cm) đến
+ * ~30 ms (5 m) tính từ lúc gửi 0x01, nên 120 ms là dư cho đường truyền.
+ *
+ * NHƯNG khi KHÔNG có phản xạ, module còn phải chạy hết thời gian chờ nội bộ
+ * của nó rồi mới phát 4 khung 6000 mm. Trên kit đo được cửa sổ 120 ms bỏ sót
+ * cả cụm khung này khoảng 1/65 lần, và lỗi bị báo nhầm thành `err/6`
+ * ("module không đáp 0x01") trong khi thực chất module có đáp nhưng muộn.
+ * Nới lên 250 ms loại bỏ nhầm lẫn đó.
+ *
+ * CHI PHÍ: chỉ tốn thêm thời gian ở những chu kỳ THẤT BẠI. Khi có phản xạ,
+ * `kvc_usound_measure()` thoát ngay ở khung đầu nên chu kỳ bình thường không
+ * đổi. Trường hợp xấu nhất 250 ms + TX LoRa 300 ms + I2C/GNSS ~100 ms = 650 ms
+ * vẫn dưới hạn 1000 ms của chu kỳ phát và dưới watchdog 6 s. */
+#define KVC_USOUND_TIMEOUT_MS         250U    /* Độ dài cửa sổ nghe RX (ms) */
 
 /* ============================================================================
  * 2. HÀM TRỄ VI GIÂY (MICROSECOND) BẰNG VÒNG LẶP LỆNH CHUẨN XÁC, AN TOÀN TUYỆT ĐỐI
@@ -102,16 +117,31 @@ static inline void kvc_usound_uart_tx_byte(uint8_t b) {
  * 4. HÀM KHỞI TẠO PHẦN CỨNG UART2 VÀ AFIO CHO SONIX SN34F788
  * ============================================================================ */
 
-/* KVC-M2-20261025-001: RX qua ngắt + ring buffer.
+/* KVC-MCU-1.1 (26/10/2026): RX qua ngắt + ring buffer, NHƯNG ngắt chỉ bật
+ * trong cửa sổ nghe ngắn quanh lệnh 0x01.
  *
- * TRƯỚC: IE = 0x00, poll đọc thẳng FIFO. Khi main chờ TxDone LoRa (tới 300 ms)
- * FIFO 16 byte tràn -> mất khung 4 byte của AJ-SR04M, mất mẫu đo.
- * SAU: ISR UART2 rút FIFO vào ring; kvc_usound_poll() tiêu thụ ring.
+ * VẤN ĐỀ ĐO ĐƯỢC TRÊN KIT: khi bật RDAIE thường trực, đường RX hứng nhiễu
+ * 50 Hz từ lưới điện (đo được 51–58 byte/giây, `fe == byt == isr`). Nhiễu này
+ * không làm hỏng byte mà phá khung ở tầng FSM: mỗi byte rác được nạp vào máy
+ * trạng thái, làm nó lệch khỏi ranh giới 4 byte của khung, nên khung THẬT bị
+ * cắt vụn và không bao giờ qua được checksum. Đo trên kit: 76 lần đo liên tiếp
+ * đều `US=0cm err` dù module vẫn đáp lệnh (đèn nháy 1 Hz).
  *
- * Định cỡ: cửa sổ KHÔNG-CONSUMER dài nhất ~740 ms (usound robust 340 ms + LoRa
- * 360 ms). Riêng UART2 không bị chặn bởi chính usound_measure vì hàm đó có đọc
- * ring; nhưng vẫn có thể bị chặn bởi LoRa. 9600 8N1 = 960 byte/s x 0,74 = 711
- * byte -> ring 1024 byte (biên 1,44x).
+ * CÁCH SỬA: tắt ngắt RX ngoài cửa sổ nghe. Ngoài cửa sổ module ngủ nên không
+ * có dữ liệu thật; byte thu được chỉ là nhiễu. Trong cửa sổ 250 ms, lượng nhiễu
+ * trung bình chỉ ~0,7 byte nên FSM gần như luôn bắt đúng khung.
+ *
+ * KẾT QUẢ ĐÃ ĐO với cách này: `byt` từ 57,6 B/s xuống còn 3,59 B/s (đúng 4
+ * byte/giây = 1 khung thật mỗi giây), `US=25–28cm ok` liên tục 20+ mẫu.
+ *
+ * LƯU Ý: đây KHÔNG phải nguyên nhân gốc. Gốc là chân TX của module ở mức LOW
+ * khi ngủ (cầu phân áp 1k/2k kéo P2.15 về 0 V), khiến UART thấy start bit giả.
+ * Muốn `fe = 0` tuyệt đối phải xử lý phần cứng (xem KVC_PHAN_CONG_2_NGUOI.md
+ * mục 1.1). Cửa sổ nghe chỉ là biện pháp phần mềm để dữ liệu vẫn dùng được.
+ *
+ * Định cỡ ring: cửa sổ KHÔNG-CONSUMER dài nhất ~800 ms (cửa sổ 250 ms + LoRa
+ * 300 ms + init lại LoRa 100 ms + I2C ~100 ms). 9600 8N1 = 960 B/s x 0,80 =
+ * 768 byte -> ring 1024 byte (biên 1,33x).
  */
 #define KVC_USOUND_RX_RING_SIZE    1024U   /* luỹ thừa của 2 */
 #define KVC_USOUND_RX_DRAIN_PER_POLL 128U
@@ -126,6 +156,36 @@ static volatile uint32_t s_usound_rx_isr_count     = 0U;
  * Cần để phân biệt "ISR bắn nhiều vì có byte" với "ISR bắn nhiều vì nhiễu trên
  * đường RX khi module nghỉ" — xem chẩn đoán UART5. */
 static volatile uint32_t s_usound_rx_byte_count    = 0U;
+
+/* Đếm khung theo KẾT QUẢ GIẢI MÃ, không theo cờ FE.
+ *
+ * `fe` phụ thuộc mức idle của chân TX (module ngủ kéo LOW) nên không phản ánh
+ * chất lượng dữ liệu. Ba bộ đếm dưới đây mới trả lời được "dữ liệu có đúng không":
+ *   - frame_valid : khung qua checksum và <= 6000 mm (trong + ngoài dải)
+ *   - frame_ok    : trong số đó, số khung nằm trong dải 20..500 cm
+ *   - frame_bad   : checksum sai (nhiễu làm hỏng bit)
+ * Quan hệ: frame_valid = frame_ok + (out-of-range) + (blind-zone) + (no-echo).
+ *
+ * `frame_valid` cần riêng vì `ok=0 bad=0` là trạng thái NHẬP NHẰNG: vừa có thể
+ * là "không nhận được khung nào", vừa có thể "mọi khung đều hợp lệ nhưng ngoài
+ * dải". `frame_valid > 0` chứng minh module có trả lời và khung sạch. */
+static volatile uint32_t s_usound_frame_valid_count = 0U;
+static volatile uint32_t s_usound_frame_ok_count    = 0U;
+static volatile uint32_t s_usound_frame_bad_count   = 0U;
+static volatile uint32_t s_usound_trigger_count     = 0U;
+
+/* Giá trị mm thô của khung hợp lệ gần nhất, kể cả ngoài dải. Chẩn đoán only. */
+static uint16_t s_usound_last_raw_mm     = 0U;
+static bool     s_usound_has_last_raw_mm = false;
+
+/* Giá trị cm ĐÃ LỌC tốt gần nhất, dùng cho chẩn đoán `last=` trên UART5.
+ * Tách khỏi `filtered_cm` để log thấy được cả khi chu kỳ hiện tại thất bại,
+ * mà KHÔNG bật cờ ALT_VALID và KHÔNG đưa vào georef. 0 = chưa từng có mẫu. */
+static uint16_t s_usound_last_good_out_cm = 0U;
+
+/* Trạng thái bộ giải mã 4 byte. Logic nằm trong kvc_usound_decode.c; khai báo
+ * ở đây (trước kvc_usound_init) vì init cần reset nó. */
+static KvcUsoundDecoder s_usound_decoder;
 
 static inline void kvc_usound_init(void) {
     /* 1. Cấp xung nhịp cho khối UART2 (APB0CLKG bit 5) và GPIO Port 2 (APB1CLKG bit 19) */
@@ -160,11 +220,26 @@ static inline void kvc_usound_init(void) {
     s_usound_rx_framing_count = 0U;
     s_usound_rx_isr_count     = 0U;
     s_usound_rx_byte_count    = 0U;
+    s_usound_frame_valid_count = 0U;
+    s_usound_frame_ok_count    = 0U;
+    s_usound_frame_bad_count   = 0U;
+    s_usound_trigger_count     = 0U;
+    s_usound_last_raw_mm       = 0U;
+    s_usound_has_last_raw_mm   = false;
+    s_usound_last_good_out_cm  = 0U;
+    kvc_usound_decode_reset(&s_usound_decoder);
 
-    /* 7. Bật ngắt RX (RDAIE) + ngắt lỗi đường truyền (RLSIE) */
-    SN_UART2->IE = (1U << 0) | (1U << 2);
+    /* 7. KVC-MCU-1.1: KHÔNG bật ngắt RX ở đây.
+     *
+     * Đo trên kit 26/10/2026: nếu bật RDAIE thường trực, đường RX (idle LOW vì
+     * cầu phân áp 1k/2k + module ngủ) hứng nhiễu 50 Hz ~57 byte/giây. Nhiễu này
+     * làm FSM lệch ranh giới khung, khiến MỌI khung thật bị cắt vụn: 76 lần đo
+     * liên tiếp đều `US=0cm err`. Ngắt chỉ được bật bên trong cửa sổ nghe của
+     * kvc_usound_measure() — xem ghi chú ở mục 4. */
 
-    /* 8. Bật ngắt UART2 trong NVIC (IRQ 39) */
+    /* 8. Bật ngắt UART2 trong NVIC (IRQ 39) nhưng để IE = 0.
+     * NVIC vẫn enable để kvc_usound_rx_window_open() chỉ cần ghi IE. */
+    SN_UART2->IE = 0U;
     NVIC_SetPriority(UART2_IRQn, 2U);
     NVIC_ClearPendingIRQ(UART2_IRQn);
     NVIC_EnableIRQ(UART2_IRQn);
@@ -215,17 +290,10 @@ static inline void kvc_usound_uart2_isr(void) {
 
 /* ============================================================================
  * 5. MÁY TRẠNG THÁI GIẢI MÃ LIÊN TỤC VÀ HÀM POLLING KHÔNG CHẶN (ZERO LATENCY)
- * ============================================================================ */
-typedef enum {
-    KVC_USOUND_STATE_HEADER = 0,
-    KVC_USOUND_STATE_DATA_H,
-    KVC_USOUND_STATE_DATA_L,
-    KVC_USOUND_STATE_CHECKSUM
-} KvcUsoundRxState;
-
-static KvcUsoundRxState s_usound_rx_state       = KVC_USOUND_STATE_HEADER;
-static uint8_t          s_usound_data_h          = 0;
-static uint8_t          s_usound_data_l          = 0;
+ * ============================================================================
+ * Logic 4 bước nằm trong kvc_usound_decode.c (KVC-MCU-1.2). Ở đây chỉ giữ các
+ * biến kết quả mà driver/telemetry cần; `s_usound_decoder` khai báo ở mục 1
+ * (trước kvc_usound_init) vì init phải reset nó. */
 static uint16_t         s_usound_latest_mm       = 0;
 static uint16_t         s_usound_latest_cm       = 0;
 static bool             s_usound_has_fresh_data  = false;
@@ -234,59 +302,93 @@ static uint32_t         s_usound_poll_count      = 0;
 static uint32_t         s_usound_last_rx_tick    = 0;
 
 /**
- * @brief Nạp và giải mã từng byte từ UART2 theo máy trạng thái.
+ * @brief Xả hết byte trong ring mà KHÔNG đụng counter `dropped`.
+ *
+ * Dùng thay `kvc_ring_reset()` khi mở/đóng cửa sổ: reset sẽ xoá luôn `dropped`,
+ * làm số liệu chẩn đoán `drop=0` trên UART5 trở nên vô nghĩa.
+ */
+static inline void kvc_usound_ring_drain(void) {
+    uint8_t b;
+    while (kvc_ring_pop(&s_usound_rx_ring, &b)) {
+        /* bỏ byte cũ */
+    }
+}
+
+/**
+ * @brief Mở cửa sổ nghe RX UART2. Chỉ gọi từ main context.
+ *
+ * Thứ tự có chủ đích: đóng ngắt và xoá pending trước, xả FIFO phần cứng, xoá
+ * cờ OE/FE sticky, xả ring + đưa FSM về HEADER, rồi mới bật RDAIE/RLSIE. Nhờ
+ * vậy byte rác đã chốt từ trước không lọt vào khung đầu tiên.
+ *
+ * Vì sao phải đọc LS sau RXFIFORST: khi IE tắt, bộ thu vẫn chạy và FIFO 16 byte
+ * vẫn đầy dần vì nhiễu, nên cờ OE/FE sticky đã bật. Không xoá thì `oe` tăng một
+ * lần mỗi lần đo dù ring không hề tràn.
+ */
+static inline void kvc_usound_rx_window_open(void) {
+    SN_UART2->IE = 0U;                      /* chắc chắn đang đóng trước khi xả FIFO */
+    NVIC_ClearPendingIRQ(UART2_IRQn);
+
+    SN_UART2->FIFOCTRL = 0x07;              /* FIFOEN + RXFIFORST + TXFIFORST */
+    (void)SN_UART2->LS;                     /* xoá cờ OE/FE sticky tích từ lúc IE tắt */
+
+    kvc_usound_ring_drain();
+    kvc_usound_decode_reset(&s_usound_decoder);
+
+    SN_UART2->IE = (1U << 0) | (1U << 2);   /* RDAIE + RLSIE: chỉ trong cửa sổ */
+}
+
+/**
+ * @brief Đóng cửa sổ nghe RX UART2. Phải gọi ở MỌI nhánh thoát của
+ *        kvc_usound_measure(), kể cả nhánh thành công.
+ */
+static inline void kvc_usound_rx_window_close(void) {
+    SN_UART2->IE = 0U;                      /* tắt ngắt RX: nhiễu ngoài cửa sổ bị bỏ qua */
+    NVIC_ClearPendingIRQ(UART2_IRQn);
+    kvc_usound_ring_drain();
+    kvc_usound_decode_reset(&s_usound_decoder);
+}
+
+/**
+ * @brief Nạp một byte vào bộ giải mã và cập nhật trạng thái đo của driver.
+ *
+ * Toàn bộ logic 4 byte nằm trong `kvc_usound_decode_byte()`. Hàm này chỉ làm
+ * phần "dịch kết quả sang trạng thái driver": lưu mm/cm, đặt cờ fresh, đếm
+ * khung và ghi mã lỗi.
  */
 static inline void kvc_usound_feed_byte(uint8_t b) {
-    switch (s_usound_rx_state) {
-        case KVC_USOUND_STATE_HEADER:
-            if (b == 0xFF) {
-                s_usound_rx_state = KVC_USOUND_STATE_DATA_H;
-            }
-            break;
+    uint16_t raw_mm = 0U;
+    KvcUsoundFrameResult r = kvc_usound_decode_byte(&s_usound_decoder, b, &raw_mm);
 
-        case KVC_USOUND_STATE_DATA_H:
-            s_usound_data_h = b;
-            s_usound_rx_state = KVC_USOUND_STATE_DATA_L;
-            break;
-
-        case KVC_USOUND_STATE_DATA_L:
-            s_usound_data_l = b;
-            s_usound_rx_state = KVC_USOUND_STATE_CHECKSUM;
-            break;
-
-        case KVC_USOUND_STATE_CHECKSUM: {
-            uint8_t checksum = b;
-            uint8_t expected_cs = (uint8_t)((0xFFU + (uint16_t)s_usound_data_h + (uint16_t)s_usound_data_l) & 0xFFU);
-            if (checksum == expected_cs) {
-                uint32_t calc_mm = ((uint32_t)s_usound_data_h << 8) | (uint32_t)s_usound_data_l;
-                uint32_t calc_cm = calc_mm / 10UL;
-
-                /* Xử lý mã hết tầm 6000 mm (No Echo) hoặc vượt ngưỡng tối đa 500 cm */
-                if (calc_cm >= 600U || calc_cm > KVC_USOUND_MAX_RANGE_CM) {
-                    s_usound_latest_mm = 0;
-                    s_usound_latest_cm = 0;
-                    s_usound_has_fresh_data = false;
-                    s_usound_last_err = KVC_USOUND_ERR_OUT_OF_RANGE;
-                } else if (calc_cm < KVC_USOUND_MIN_RANGE_CM) {
-                    s_usound_latest_mm = 0;
-                    s_usound_latest_cm = 0;
-                    s_usound_has_fresh_data = false;
-                    s_usound_last_err = KVC_USOUND_ERR_BLIND_ZONE;
-                } else {
-                    s_usound_latest_mm = (uint16_t)calc_mm;
-                    s_usound_latest_cm = (uint16_t)calc_cm;
-                    s_usound_has_fresh_data = true;
-                    s_usound_last_err = KVC_USOUND_OK;
-                    s_usound_last_rx_tick = s_usound_poll_count;
-                }
-            } else {
-                s_usound_last_err = KVC_USOUND_ERR_CHECKSUM;
-            }
-            /* Nếu byte hiện tại là 0xFF, khóa ngay làm Header của khung kế tiếp */
-            s_usound_rx_state = (b == 0xFF) ? KVC_USOUND_STATE_DATA_H : KVC_USOUND_STATE_HEADER;
-            break;
-        }
+    if (r == KVC_USOUND_FRAME_NONE) {
+        return;
     }
+
+    s_usound_last_err = kvc_usound_result_to_err(r);
+
+    if (r == KVC_USOUND_FRAME_BAD_CHECKSUM) {
+        s_usound_frame_bad_count++;
+        return;
+    }
+
+    /* Từ đây là khung qua checksum: lưu raw để chẩn đoán `raw=` trên UART5. */
+    s_usound_last_raw_mm     = raw_mm;
+    s_usound_has_last_raw_mm = true;
+    s_usound_frame_valid_count++;
+
+    if (r == KVC_USOUND_FRAME_OK) {
+        s_usound_latest_mm    = raw_mm;
+        s_usound_latest_cm    = (uint16_t)((uint32_t)raw_mm / 10UL);
+        s_usound_has_fresh_data = true;
+        s_usound_last_rx_tick = s_usound_poll_count;
+        s_usound_frame_ok_count++;
+        return;
+    }
+
+    /* No-Echo / ngoài dải / vùng mù: không có giá trị dùng được. */
+    s_usound_latest_mm      = 0U;
+    s_usound_latest_cm      = 0U;
+    s_usound_has_fresh_data = false;
 }
 
 /**
@@ -314,33 +416,40 @@ static inline void kvc_usound_poll(void) {    s_usound_poll_count++;
  * 6. HÀM ĐO CỰ LY THÔNG MINH, TỨC THÌ, KHÔNG DELAY (DRAIN TO LATEST FRAME)
  * ============================================================================ */
 static inline uint8_t kvc_usound_measure(uint16_t *dist_cm, uint16_t *dist_mm) {
-    /* 1. Xả sạch và giải mã toàn bộ các byte đang có trong FIFO để lấy gói tin MỚI NHẤT */
+    if (dist_mm != 0) *dist_mm = 0;
+    if (dist_cm != 0) *dist_cm = 0;
+
+    /* 1. Tiêu thụ byte còn sót. Ngoài cửa sổ nghe ring luôn rỗng (IE tắt), nên
+     *    bước này chủ yếu đảm bảo FSM sạch trước khi kích hoạt. */
     kvc_usound_poll();
 
-    /* 2. Nếu đã có dữ liệu hợp lệ (vừa giải mã hoặc đã được poll ngầm) */
-    if (s_usound_has_fresh_data) {
-        if (dist_mm != 0) *dist_mm = s_usound_latest_mm;
-        if (dist_cm != 0) *dist_cm = s_usound_latest_cm;
-        return KVC_USOUND_OK;
-    }
-
-    /* 3. Mode 4: chưa có khung trong ring (vừa boot hoặc đã bỏ lỡ khung trước).
-     *    Mode 4 CHỈ đo khi được kích hoạt, nên phải gửi byte 0x01 rồi chờ.
-     *    (Nếu board đang ở Mode 3 - không phải cấu hình đang dùng - module tự phát
-     *    100 ms/lần và byte 0x01 bị bỏ qua, không gây hại.)
+    /* 2. Mode 4 chỉ đo khi nhận lệnh, nên phải gửi 0x01 rồi mở cửa sổ nghe.
      *
-     *    Chờ tối đa 100 ms. GIỚI HẠN: datasheet Anji KHÔNG ghi thời gian đáp ứng
-     *    của Mode 4; con số 100 ms được chọn theo chu kỳ danh định của Mode 3.
-     *    Đo ở 5-6 m có thể cần lâu hơn — chưa xác minh được khi không có kit.
-     *    Nếu hay bị KVC_USOUND_ERR_TIMEOUT ở cự ly xa, tăng hằng số này. */
-    kvc_usound_uart_tx_byte(0x01);
+     *    Chỉ gửi ĐÚNG MỘT lệnh mỗi lần đo. Không thử lại: Mode 4 không có giao
+     *    thức xác nhận, gửi lệnh thứ hai khi module đang xử lý phép đo đầu có
+     *    thể huỷ phép đo đang chạy và cho ra giá trị sai nhưng vẫn qua checksum.
+     *
+     *    Cửa sổ 250 ms đủ cho cả 26 cm (~5 ms), 5 m (~30 ms), và cả trường hợp
+     *    module phải chạy hết thời gian chờ nội bộ rồi mới phát 6000 mm. Không
+     *    thoát sớm khi gặp khung ngoài dải, vì khung đó có thể là nhiễu khớp
+     *    checksum; nghe hết cửa sổ để khung thật đến sau vẫn được xử lý. */
+    s_usound_has_fresh_data = false;
+    s_usound_last_err = KVC_USOUND_ERR_NO_RESPONSE;
 
-    uint32_t wait_us = 100000U; /* 100 ms */
+    uint32_t const bytes_before = s_usound_rx_byte_count;
+
+    kvc_usound_rx_window_open();
+    kvc_usound_uart_tx_byte(0x01);
+    s_usound_trigger_count++;
+
+    uint32_t wait_us = (uint32_t)KVC_USOUND_TIMEOUT_MS * 1000UL;
     while (wait_us > 0U) {
         uint8_t b;
         while (kvc_ring_pop(&s_usound_rx_ring, &b)) {
             kvc_usound_feed_byte(b);
             if (s_usound_has_fresh_data) {
+                kvc_usound_rx_window_close();
+                s_usound_has_fresh_data = false;
                 if (dist_mm != 0) *dist_mm = s_usound_latest_mm;
                 if (dist_cm != 0) *dist_cm = s_usound_latest_cm;
                 return KVC_USOUND_OK;
@@ -348,7 +457,18 @@ static inline uint8_t kvc_usound_measure(uint16_t *dist_cm, uint16_t *dist_mm) {
         }
         kvc_usound_delay_us(500);
         if (wait_us >= 500U) wait_us -= 500U;
-        else wait_us = 0;
+        else wait_us = 0U;
+    }
+
+    kvc_usound_rx_window_close();
+
+    /* 3. Phân loại lỗi. Phân biệt "không nhận được byte nào" với "có byte nhưng
+     *    khung bị cắt" vì hai nguyên nhân dẫn tới hai việc khác nhau: cái đầu là
+     *    module/đường TX, cái sau là nhiễu làm hỏng khung. */
+    if (s_usound_last_err == KVC_USOUND_ERR_NO_RESPONSE) {
+        /* FSM không kết luận được gì -> hoặc không có byte, hoặc khung bị cắt. */
+        return (s_usound_rx_byte_count == bytes_before) ? KVC_USOUND_ERR_NO_RESPONSE
+                                                        : KVC_USOUND_ERR_TIMEOUT;
     }
 
     if (dist_mm != 0) *dist_mm = 0;
@@ -357,82 +477,192 @@ static inline uint8_t kvc_usound_measure(uint16_t *dist_cm, uint16_t *dist_mm) {
 }
 
 /* ============================================================================
- * 7. HÀM ĐỌC CỰ LY ỔN ĐỊNH, PHẢN HỒI TỨC THÌ (FAST RESPONSIVE ROBUST READ)
- * ============================================================================ */
+ * 7. ĐỌC CỰ LY CÓ LỌC (ROLLING MEDIAN-OF-3)
+ * ============================================================================
+ * KVC-MCU-US-FILTER-20261026-001: LỌC TRUNG VỊ TRƯỢT 3 MẪU.
+ *
+ * VÌ SAO CẦN LỌC: một khung 4 byte chỉ có checksum 8-bit, nên nhiễu trên đường
+ * RX vẫn có thể tạo ra khung "hợp lệ" mang giá trị sai (xác suất ~1/256 mỗi tổ
+ * hợp 4 byte rác). Ngoài ra AJ-SR04M trên mặt nước sóng sánh cho giá trị dao
+ * động vài cm giữa các lần đo. Telemetry 1 Hz mà đưa thẳng giá trị thô thì
+ * dashboard nhảy số và georef tính toạ độ sai.
+ *
+ * VÌ SAO MEDIAN TRƯỢT, KHÔNG PHẢI ĐO 3 LẦN: `kvc_usound_read_filtered` cũ đo
+ * 3 lần rồi lấy trung vị, tốn 3 x 250 ms = 750 ms mỗi chu kỳ. Cộng TX LoRa
+ * 300 ms là 1050 ms, vượt trần 1000 ms của chu kỳ phát và ăn vào biên watchdog.
+ * Median trượt giữ 3 MẪU GẦN NHẤT (mỗi chu kỳ vẫn chỉ đo 1 lần) nên:
+ *   - thời gian mỗi chu kỳ không đổi
+ *   - vẫn loại được 1 mẫu lỗi trong 3, vì trung vị của {đúng, đúng, sai} = đúng
+ *   - độ trễ chỉ 2 chu kỳ (~2 s), chấp nhận được với telemetry 1 Hz
+ *
+ * LỌC BỔ SUNG — CHẶN NGOẠI LAI: nếu mẫu mới lệch quá KVC_USOUND_OUTLIER_CM so
+ * với trung vị hiện tại thì coi là nghi ngờ. Chỉ nhận khi mẫu kế tiếp xác nhận
+ * (lệch cùng hướng). Nhờ vậy một xung nhiễu đơn lẻ không thể đẩy giá trị đi
+ * xa, nhưng thay đổi tư thế THẬT vẫn được theo kịp sau 2 chu kỳ.
+ *
+ * GIỚI HẠN: lọc không sửa được dữ liệu sai một cách hệ thống (ví dụ module báo
+ * lệch đều 5 cm do sai calibration) và không sửa được trục/vật cản sai vị trí.
+ * Muốn kiểm chứng độ chính xác phải đối chiếu thước ở nhiều cự ly.
+ */
+
+/** Ngưỡng nghi ngờ ngoại lai (cm). 150 cm đủ rộng để không chặn thay đổi thật
+ *  của tải treo dưới UAV, nhưng đủ hẹp để chặn xung nhiễu điển hình. */
+#define KVC_USOUND_OUTLIER_CM   150U
+
+/** Số chu kỳ telemetry (1 Hz) giữ lại lịch sử trung vị khi mất echo.
+ *
+ *  VẤN ĐỀ ĐO ĐƯỢC TRÊN KIT: chuỗi log `202 ok / err/5 / 207 ok` cho thấy echo
+ *  yếu bị mất cách quãng. Bản trước xoá trắng lịch sử ngay ở mẫu lỗi đầu tiên,
+ *  nên mẫu tốt kế tiếp được trả THẲNG (s_hist_count == 1 -> out = s_hist[0]),
+ *  không qua trung vị. Một xung nhiễu lọt vào đúng khe đó sẽ đi thẳng ra
+ *  telemetry và vào georef.
+ *
+ *  Nay lịch sử chỉ bị xoá sau 5 chu kỳ liên tiếp không có mẫu dùng được. Giá
+ *  trị công bố trong 5 chu kỳ đó VẪN là 0 kèm mã lỗi (KHÔNG giữ mẫu cũ), nên
+ *  georef không bao giờ dùng số cũ — chỉ có bộ lọc là không bị mất trí nhớ. */
+#define KVC_USOUND_HIST_HOLD_CYCLES  5U
+
+static inline uint16_t kvc_usound_median3(uint16_t a, uint16_t b, uint16_t c) {
+    /* Trung vị của 3 giá trị = max(min(a,b), min(max(a,b), c)).
+     * Công thức này đúng với mọi tổ hợp và không cần mảng hay sắp xếp. */
+    uint16_t lo_ab = (a < b) ? a : b;
+    uint16_t hi_ab = (a > b) ? a : b;
+    uint16_t cand  = (hi_ab < c) ? hi_ab : c;
+    return (lo_ab > cand) ? lo_ab : cand;
+}
+
+/**
+ * @brief Đọc cự ly có lọc trung vị trượt 3 mẫu + chặn ngoại lai.
+ *
+ * @param filtered_cm  Nhận giá trị đã lọc khi trả về KVC_USOUND_OK.
+ * @return KVC_USOUND_OK nếu có giá trị dùng được; mã lỗi KVC_USOUND_ERR_* nếu không.
+ *
+ * Gọi đúng MỘT lần mỗi chu kỳ telemetry (1 Hz). Bên trong gọi
+ * `kvc_usound_measure()` đúng một lần nên thời gian chặn tối đa
+ * KVC_USOUND_TIMEOUT_MS (250 ms) và chỉ đạt mức đó ở chu kỳ thất bại.
+ */
 static inline uint8_t kvc_usound_read_robust(uint16_t *filtered_cm) {
-    static uint16_t s_last_valid_cm = 0;
-    static uint8_t  s_drop_count    = 0;
+    /* Lịch sử 3 mẫu hợp lệ gần nhất (vòng tròn). */
+    static uint16_t s_hist[3]      = {0U, 0U, 0U};
+    static uint8_t  s_hist_count   = 0U;   /* 0..3 */
+    static uint8_t  s_hist_idx     = 0U;
+
+    /* Trạng thái chặn ngoại lai: mẫu nghi ngờ chờ xác nhận. */
+    static uint16_t s_pending_cm   = 0U;
+    static uint8_t  s_pending      = 0U;   /* 1 = đang chờ mẫu xác nhận */
+
+    /* Giữ mẫu cũ một chu kỳ khi lỗi đường truyền (KHÔNG áp dụng cho ngoài dải). */
+    static uint16_t s_last_good_cm = 0U;
+    static uint8_t  s_drop_count   = 0U;
+    /* Số chu kỳ liên tiếp không có mẫu dùng được (mọi mã lỗi). */
+    static uint8_t  s_fail_run     = 0U;
 
     uint16_t cm = 0;
     uint8_t res = kvc_usound_measure(&cm, 0);
 
-    if (res == KVC_USOUND_OK) {
-        s_last_valid_cm = cm;
-        s_drop_count = 0;
-        if (filtered_cm != 0) *filtered_cm = cm;
-        return KVC_USOUND_OK;
+    if (res != KVC_USOUND_OK) {
+        /* Lỗi nhiễu/đường truyền: chưa có thông tin mới, tạm giữ mẫu cũ 1 chu kỳ
+         * để dashboard không nhấp nháy vì một lần trượt. Sau đó mới báo lỗi.
+         *
+         * Lỗi NGOÀI DẢI (OUT_OF_RANGE/NO_ECHO/BLIND_ZONE) thì KHÔNG giữ mẫu cũ:
+         * đó là câu trả lời đúng và mới của cảm biến. Giữ mẫu cũ sẽ khiến telemetry
+         * báo độ cao cũ dù UAV đã ra khỏi tầm, và georef dùng alt_dist_cm để tính
+         * toạ độ mục tiêu nên sẽ ra toạ độ sai. */
+        if (((res == KVC_USOUND_ERR_TIMEOUT) ||
+             (res == KVC_USOUND_ERR_CHECKSUM) ||
+             (res == KVC_USOUND_ERR_NO_RESPONSE)) &&
+            (s_fail_run == 0U) &&
+            (s_last_good_cm > 0U) && (s_drop_count < 1U)) {
+            s_drop_count++;
+            if (filtered_cm != 0) *filtered_cm = s_last_good_cm;
+            return KVC_USOUND_OK;
+        }
+
+        /* Không có mẫu dùng được. GIÁ TRỊ CÔNG BỐ VẪN LÀ 0 kèm mã lỗi (georef
+         * không được dùng số cũ), nhưng lịch sử trung vị chỉ bị xoá sau
+         * KVC_USOUND_HIST_HOLD_CYCLES chu kỳ liên tiếp. Nhờ vậy khi echo trở lại
+         * ngay sau một khe no-echo, mẫu đầu tiên vẫn được lọc như bình thường
+         * thay vì đi thẳng ra ngoài. */
+        if (s_fail_run < 0xFFU) {
+            s_fail_run++;
+        }
+        s_pending = 0U;
+        s_drop_count = 0U;
+        if (s_fail_run >= KVC_USOUND_HIST_HOLD_CYCLES) {
+            /* Mất tín hiệu kéo dài: xoá lịch sử để lần có lại không trộn mẫu cũ. */
+            s_hist_count = 0U;
+            s_hist_idx   = 0U;
+            s_last_good_cm = 0U;
+        }
+        if (filtered_cm != 0) *filtered_cm = 0U;
+        return res;
     }
 
-    /* Nếu gặp sự cố tạm thời (dội trượt 1 nhịp do bề mặt nước sóng sánh):
-     * Chỉ giữ lại 1 chu kỳ để tránh làm trễ việc hiển thị khoảng cách mới */
-    if (s_last_valid_cm > 0 && s_drop_count < 1) {
-        s_drop_count++;
-        if (filtered_cm != 0) *filtered_cm = s_last_valid_cm;
-        return KVC_USOUND_OK;
+    s_drop_count = 0U;
+    s_fail_run   = 0U;
+
+    /* ---- Chặn ngoại lai ----
+     * Chỉ áp dụng khi đã có ít nhất 1 mẫu lịch sử (cần mốc so sánh). */
+    if (s_hist_count > 0U) {
+        uint16_t ref = s_hist[(uint8_t)((s_hist_idx + 2U) % 3U)];  /* mẫu mới nhất */
+        uint16_t diff = (cm > ref) ? (uint16_t)(cm - ref) : (uint16_t)(ref - cm);
+
+        if (diff > KVC_USOUND_OUTLIER_CM) {
+            if ((s_pending != 0U)) {
+                /* Mẫu thứ hai lệch cùng chiều -> xác nhận thay đổi thật. */
+                s_pending = 0U;
+            } else {
+                /* Mẫu đầu tiên lệch xa -> nghi ngờ, chưa đưa vào lịch sử.
+                 * Vẫn trả mẫu đã lọc hiện tại để dashboard không nhảy. */
+                s_pending = 1U;
+                s_pending_cm = cm;
+                if (filtered_cm != 0) *filtered_cm = s_last_good_cm;
+                return KVC_USOUND_OK;
+            }
+        } else {
+            /* Mẫu nằm trong dải bình thường -> huỷ trạng thái nghi ngờ. */
+            s_pending = 0U;
+        }
     }
 
-    /* Mất tín hiệu liên tục -> Hạ cờ báo lỗi thực sự */
-    s_last_valid_cm = 0;
-    if (filtered_cm != 0) *filtered_cm = 0;
-    return res;
+    /* ---- Đẩy mẫu vào lịch sử vòng tròn ---- */
+    s_hist[s_hist_idx] = cm;
+    s_hist_idx = (uint8_t)((s_hist_idx + 1U) % 3U);
+    if (s_hist_count < 3U) {
+        s_hist_count++;
+    }
+
+    /* ---- Xuất trung vị ---- */
+    uint16_t out;
+    if (s_hist_count == 1U) {
+        out = s_hist[0];
+    } else if (s_hist_count == 2U) {
+        /* Hai mẫu: lấy trung bình (chưa đủ để lấy trung vị). */
+        out = (uint16_t)(((uint32_t)s_hist[0] + (uint32_t)s_hist[1]) / 2U);
+    } else {
+        out = kvc_usound_median3(s_hist[0], s_hist[1], s_hist[2]);
+    }
+
+    s_last_good_cm = out;
+    s_usound_last_good_out_cm = out;
+    if (filtered_cm != 0) *filtered_cm = out;
+    return KVC_USOUND_OK;
 }
 
 /* ============================================================================
  * 7. HÀM ĐỌC LỌC TRUNG VỊ (MEDIAN FILTER 3 MẪU) KHỬ NHIỄU MẶT NƯỚC DAO ĐỘNG
  * ============================================================================ */
-static inline uint8_t kvc_usound_read_filtered(uint16_t *filtered_cm) {
-    uint16_t samples[3];
-    uint8_t valid_count = 0;
-
-    for (uint8_t i = 0; i < 3; i++) {
-        uint16_t cm = 0;
-        uint8_t res = kvc_usound_measure(&cm, 0);
-        if (res == KVC_USOUND_OK) {
-            samples[valid_count++] = cm;
-        }
-        /* Giãn cách 20ms giữa 2 lần đo */
-        kvc_usound_delay_us(20000);
-    }
-
-    if (valid_count == 0) {
-        if (filtered_cm != 0) *filtered_cm = 0;
-        return KVC_USOUND_ERR_TIMEOUT;
-    }
-
-    if (valid_count == 1) {
-        if (filtered_cm != 0) *filtered_cm = samples[0];
-        return KVC_USOUND_OK;
-    }
-
-    if (valid_count == 2) {
-        if (filtered_cm != 0) *filtered_cm = (samples[0] + samples[1]) / 2;
-        return KVC_USOUND_OK;
-    }
-
-    /* Đủ 3 mẫu hợp lệ: Sắp xếp lấy giá trị trung vị (Median of 3) */
-    if (samples[0] > samples[1]) {
-        uint16_t tmp = samples[0]; samples[0] = samples[1]; samples[1] = tmp;
-    }
-    if (samples[1] > samples[2]) {
-        uint16_t tmp = samples[1]; samples[1] = samples[2]; samples[2] = tmp;
-    }
-    if (samples[0] > samples[1]) {
-        uint16_t tmp = samples[0]; samples[0] = samples[1]; samples[1] = tmp;
-    }
-
-    if (filtered_cm != 0) *filtered_cm = samples[1];
-    return KVC_USOUND_OK;
-}
+/* ============================================================================
+ * 7b. [ĐÃ GỠ] kvc_usound_read_filtered — đo 3 lần rồi lấy trung vị.
+ * ============================================================================
+ * Hàm này từng tồn tại nhưng KHÔNG được gọi ở đâu, và nếu gọi thì tốn
+ * 3 x 250 ms = 750 ms mỗi chu kỳ (cộng TX LoRa 300 ms là 1050 ms, vượt trần
+ * 1000 ms của chu kỳ phát và ăn vào biên watchdog 6 s).
+ *
+ * Đã thay bằng `kvc_usound_read_robust` dùng MEDIAN TRƯỢT: vẫn giữ 3 mẫu gần
+ * nhất nhưng mỗi chu kỳ chỉ đo 1 lần, nên thời gian chặn của chu kỳ thành công
+ * không đổi mà vẫn loại được 1 mẫu lỗi trong 3. Xem mục 7.
+ */
 
 /* ============================================================================
  * 8. THỐNG KÊ RX UART2 (CHẨN ĐOÁN KVC-M2)
@@ -444,10 +674,46 @@ typedef struct {
     uint32_t isr_count;       /**< Số lần vào UART2_IRQHandler */
     uint32_t byte_count;      /**< Byte thật sự lấy ra khỏi RB */
     uint32_t bytes_pending;   /**< Byte còn trong ring tại thời điểm đọc */
+    uint32_t frame_valid;     /**< Khung qua checksum VÀ <= 6000 mm (trong + ngoài dải) */
+    uint32_t frame_ok;        /**< Khung qua checksum VÀ nằm trong dải 20..500 cm */
+    uint32_t frame_bad;       /**< Khung đủ 4 byte nhưng checksum sai */
+    uint32_t trigger_count;   /**< Số lệnh 0x01 đã gửi */
 } KvcUsoundRxStats;
 
 /** @brief ISR RX UART2. Vector: UART2_IRQHandler (IRQ 39). */
 void UART2_IRQHandler(void);
+
+/**
+ * @brief Lấy giá trị mm THÔ của khung hợp lệ gần nhất, kể cả ngoài dải đo.
+ * @param out_mm     Nhận giá trị mm; không đổi nếu chưa từng có khung hợp lệ.
+ * @param out_valid  true nếu đã từng có khung hợp lệ.
+ *
+ * Dùng để phân biệt hai nguyên nhân rất khác nhau khi log báo lỗi:
+ *   6000 mm       = No Echo, module không thấy phản xạ -> kiểm tra vật cản/đầu dò
+ *   501..5999 mm  = có phản xạ nhưng vượt trần tin cậy
+ *   20..500 mm    = hợp lệ
+ * Không có giá trị này thì `err/3` không nói được gì. Hàm KHÔNG đổi trạng thái.
+ */
+static inline void kvc_usound_get_last_raw(uint16_t *out_mm, bool *out_valid) {
+    if (out_mm != 0) {
+        *out_mm = s_usound_last_raw_mm;
+    }
+    if (out_valid != 0) {
+        *out_valid = s_usound_has_last_raw_mm;
+    }
+}
+
+/**
+ * @brief Lấy giá trị cm ĐÃ LỌC tốt gần nhất. CHẨN ĐOÁN ONLY.
+ * @return Giá trị cm, hoặc 0 nếu chưa từng có mẫu dùng được.
+ *
+ * KHÔNG dùng giá trị này cho telemetry hay georef: nó có thể cũ hơn chu kỳ
+ * hiện tại. Mục đích duy nhất là để log `[M3]` hiển thị `last=` khi chu kỳ
+ * hiện tại lỗi, giúp phân biệt "mất echo thật" với "chỉ trượt một nhịp".
+ */
+static inline uint16_t kvc_usound_get_last_good_cm(void) {
+    return s_usound_last_good_out_cm;
+}
 
 static inline void kvc_usound_get_rx_stats(KvcUsoundRxStats *out) {
     if (out == 0) {
@@ -459,25 +725,24 @@ static inline void kvc_usound_get_rx_stats(KvcUsoundRxStats *out) {
     out->framing_count = s_usound_rx_framing_count;
     out->isr_count     = s_usound_rx_isr_count;
     out->byte_count    = s_usound_rx_byte_count;
+    out->frame_valid   = s_usound_frame_valid_count;
+    out->frame_ok      = s_usound_frame_ok_count;
+    out->frame_bad     = s_usound_frame_bad_count;
+    out->trigger_count = s_usound_trigger_count;
 }
 
 /**
- * @brief Xả ring RX và đặt lại máy trạng thái giải mã về đầu khung.
+ * @brief Đóng cửa sổ nghe và đặt lại máy trạng thái giải mã về đầu khung.
  *
- * DÙNG KHI NÀO: sau một khoảng thời gian dài KHÔNG gọi `kvc_usound_poll()`, ring
- * 1024 byte có thể đã tràn và byte bị mất giữa khung khiến FSM lệch trạng thái.
- * Ví dụ điển hình: `kvc_gnss_init()` chạy autobaud 11–15 s ngay sau
- * `kvc_usound_init()`, trong lúc UART2 ISR vẫn bật nhưng không ai tiêu thụ ring.
+ * DÙNG KHI NÀO: ngay trước khi vào vòng lặp chính, sau `kvc_gnss_init()` (autobaud
+ * 11–15 s). Từ KVC-MCU-1.1 ngắt RX chỉ bật bên trong cửa sổ nghe nên ring không
+ * thể tràn trong lúc autobaud; hàm này vẫn giữ để chắc chắn cửa sổ đang đóng và
+ * FSM sạch trước khi đo mẫu đầu tiên.
  *
- * Gọi hàm này một lần trước khi vào vòng lặp chính để bắt đầu lại từ khung mới,
- * thay vì giải mã tiếp phần đuôi khung bị cắt.
- *
- * Chỉ gọi ở main context khi không có ai đang đọc ring. Không làm mất dữ liệu
- * thật đang cần: chỉ bỏ các byte đã cũ trong ring.
+ * Chỉ gọi ở main context khi không có ai đang đọc ring.
  */
 static inline void kvc_usound_discard_stale_rx(void) {
-    kvc_ring_reset(&s_usound_rx_ring);
-    s_usound_rx_state = KVC_USOUND_STATE_HEADER;
+    kvc_usound_rx_window_close();
     s_usound_has_fresh_data = false;
     s_usound_last_err = KVC_USOUND_ERR_TIMEOUT;
 }

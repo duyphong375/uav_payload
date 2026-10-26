@@ -408,6 +408,11 @@
               <FileType>1</FileType>
               <FilePath>..\src\sensors\kvc_fpga_bbox.c</FilePath>
             </File>
+            <File>
+              <FileName>kvc_usound_decode.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\sensors\kvc_usound_decode.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

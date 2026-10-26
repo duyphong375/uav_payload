@@ -86,13 +86,13 @@ static void delay_ms(uint32_t ms) {
  * ============================================================================
  * VẤN ĐỀ: trước đây `pkt.timestamp_ms += 1000` mỗi vòng, nên timestamp chỉ là
  * "số vòng × 1000", bỏ qua thời gian xử lý và thời gian chặn (TX LoRa 300 ms,
- * đo siêu âm 340 ms, ...). Hệ quả: các ngưỡng expiry 2 s / 3 s và cửa sổ TDM
+ * đo siêu âm 250 ms, ...). Hệ quả: các ngưỡng expiry 2 s / 3 s và cửa sổ TDM
  * 1.5 s bị lệch, và GCS nhận timestamp không khớp thời gian thực.
  *
  * CÁCH SỬA (F6 rồi F6b): time base nằm trong module `kvc_timebase` dùng chung,
  * KHÔNG còn là biến cục bộ của main.c. `delay_ms()` cộng ms, còn
  * `kvc_usound_delay_us()` cộng µs (phần lẻ dưới 1 ms được giữ lại). Nhờ vậy
- * thời gian chờ trong driver siêu âm — tới 100 ms mỗi chu kỳ — không còn bị
+ * thời gian chờ trong driver siêu âm — tới 250 ms ở chu kỳ thất bại — không còn bị
  * mất khỏi time base như bản trước.
  *
  * GIỚI HẠN (phải ghi rõ, không được coi là đồng hồ chuẩn):
@@ -138,11 +138,11 @@ static uint32_t kvc_millis(void) {
 /* Timeout phải LỚN HƠN khoảng cách dài nhất giữa hai lần kick.
  *
  * Một vòng main hiện tại (worst case) gồm:
- *   - kvc_usound_read_robust : tới 100 ms (chờ khung 4 byte @9600)
+ *   - kvc_usound_read_robust : tới 250 ms (chờ khung 4 byte @9600, cửa sổ nghe)
  *   - sx1278_send_packet     : tới 300 ms (poll TxDone)
  *   - sx1278_init_tx (khi params sai): +100 ms (delay_ms(50) x2)
  *   - vòng 1000 bước         : 1000 x (delay_ms(1) + overhead poll) ≈ 2,5 s
- *   Tổng ≈ 3,0 s.
+ *   Tổng ≈ 3,2 s.
  *
  * Bản đầu tôi đặt 2,0 s -> SẼ RESET OAN mỗi vòng. Nay dùng 6 s (biên ~3 s) và
  * vẫn kick thêm một lần giữa vòng 1000 bước (sau 500 bước) để không phụ thuộc
@@ -264,7 +264,7 @@ static void kvc_wdt_feed(void) {
  * telemetry để dễ đối chiếu log M3 với gói RF.
  *
  * Dùng kvc_millis() (time base chung) chứ KHÔNG đếm số lần được gọi: khối xử lý
- * có thể vượt 1 s (siêu âm 340 ms + TX LoRa 300 ms), khi đó vòng chờ không chạy
+ * có thể vượt 1 s (siêu âm 250 ms + TX LoRa 300 ms), khi đó vòng chờ không chạy
  * và bộ đếm theo lần gọi sẽ trôi. Time base vẫn tiến nhờ delay_ms/delay_us.
  *
  * RÀNG BUỘC BĂNG THÔNG UART5: 9615 bps 8N1 ~ 960 byte/s khả dụng. Một dòng M3
@@ -449,7 +449,7 @@ static void kvc_m1_diag_pump(void) {
      * GIỚI HẠN ĐÃ BIẾT: nếu khối xử lý vượt 1 s LIÊN TỤC thì hàm chỉ được gọi
      * ~1 lần/vòng và mỗi dòng M3 (~110 ký tự) có thể mất vài giây mới ra hết.
      * Không mất ký tự (chỉ ghi khi buffer sẵn sàng) nhưng log sẽ thưa. Muốn xả
-     * cả trong lúc chặn (TX LoRa 300 ms, siêu âm 340 ms) phải gọi pump từ
+     * cả trong lúc chặn (TX LoRa 300 ms, siêu âm 250 ms) phải gọi pump từ
      * delay_ms() — việc đó cần đưa macro điều khiển lên trước delay_ms, để task
      * riêng vì chạm thứ tự khai báo của toàn file. */
     uint32_t budget = 32U;
@@ -535,7 +535,11 @@ typedef struct {
     int16_t  pitch_deg10;        /* Pitch, 0.1 độ */
     uint16_t usound_cm;          /* Cự ly siêu âm, cm */
     uint8_t  usound_ok;          /* 1 = KVC_USOUND_OK */
+    uint8_t  usound_code;        /* Mã lỗi KVC_USOUND_ERR_* khi ok = 0 */
     uint8_t  imu_ok;             /* 1 = có góc hợp lệ trong vòng này */
+    uint8_t  pad0;               /* Đệm tường minh, tránh -Wpadded */
+    uint8_t  pad1;               /* Đệm tường minh, tránh -Wpadded */
+    uint8_t  pad2;               /* Đệm tường minh, tránh -Wpadded */
 } KvcM3Snapshot;
 
 /* In số có dấu. Xử lý INT32_MIN mà không tràn (không dùng -v trực tiếp). */
@@ -591,10 +595,28 @@ static void kvc_m3_value_tick(const KvcM3Snapshot *snap) {
     kvc_m1_buf_puts("\r\n[M3] t=");
     kvc_m1_buf_dec32(kvc_millis());
 
-    /* Siêu âm: giá trị + cờ hợp lệ. */
+    /* Siêu âm: giá trị + cờ hợp lệ + mã lỗi khi không hợp lệ. Mã lỗi cho biết
+     * PHẢI kiểm tra gì:
+     *   1 = có byte nhưng khung bị cắt -> tăng cửa sổ nghe
+     *   2 = checksum sai               -> nhiễu làm hỏng bit
+     *   3 = có phản xạ nhưng > 500 cm  -> bình thường (xem raw)
+     *   4 = vật cản trong vùng mù      -> bình thường
+     *   5 = module báo 6000 mm         -> không có phản xạ về đầu dò
+     *   6 = module không đáp lệnh 0x01 -> kiểm tra TX/dây/nguồn module */
     kvc_m1_buf_puts(" US=");
     kvc_m1_buf_dec32((uint32_t)snap->usound_cm);
-    kvc_m1_buf_puts((snap->usound_ok != 0U) ? "cm ok" : "cm err");
+    if (snap->usound_ok != 0U) {
+        kvc_m1_buf_puts("cm ok");
+    } else {
+        kvc_m1_buf_puts("cm err/");
+        kvc_m1_buf_dec32((uint32_t)snap->usound_code);
+        /* last= : mẫu ĐÃ LỌC tốt gần nhất, CHẨN ĐOÁN ONLY. Không được dùng
+         * cho telemetry/georef (xem kvc_usound_get_last_good_cm). Có trường này
+         * thì log phân biệt được "mất echo thật" (last cũng 0) với "trượt một
+         * nhịp" (last vẫn có số) mà không phải giữ mẫu cũ trong alt_dist_cm. */
+        kvc_m1_buf_puts(" last=");
+        kvc_m1_buf_dec32((uint32_t)kvc_usound_get_last_good_cm());
+    }
 
     /* IMU: roll/pitch 0.1 độ + cờ. */
     kvc_m1_buf_puts(" | IMU r=");
@@ -880,6 +902,34 @@ static void kvc_m1_dump_rx_stats(void) {
     kvc_m1_buf_dec32(usd.byte_count);
     kvc_m1_buf_puts(" isr=");
     kvc_m1_buf_dec32(usd.isr_count);
+    /* KVC-MCU-1.1: các bộ đếm theo KẾT QUẢ GIẢI MÃ mới là chỉ số chất lượng dữ
+     * liệu thật. `fe` cao chỉ phản ánh chân TX idle LOW, không phải dữ liệu hỏng.
+     *   val = khung qua checksum (trong + ngoài dải) -> module CÓ trả lời
+     *   ok  = khung nằm trong dải 20..500 cm         -> dùng được
+     *   bad = checksum sai                            -> nhiễu làm hỏng bit
+     * Đọc theo thứ tự: bad>0 -> đường dây; val=0 -> module không đáp;
+     * val>0 & ok=0 -> module đáp nhưng ngoài tầm (xem raw). */
+    kvc_m1_buf_puts(" val=");
+    kvc_m1_buf_dec32(usd.frame_valid);
+    kvc_m1_buf_puts(" ok=");
+    kvc_m1_buf_dec32(usd.frame_ok);
+    kvc_m1_buf_puts(" bad=");
+    kvc_m1_buf_dec32(usd.frame_bad);
+    kvc_m1_buf_puts(" trg=");
+    kvc_m1_buf_dec32(usd.trigger_count);
+    /* raw = mm thô của khung hợp lệ gần nhất, KỂ CẢ ngoài dải.
+     * 6000 = No Echo (không có phản xạ); 501..5999 = có phản xạ nhưng vượt trần. */
+    {
+        uint16_t raw_mm = 0U;
+        bool     raw_ok = false;
+        kvc_usound_get_last_raw(&raw_mm, &raw_ok);
+        kvc_m1_buf_puts(" raw=");
+        if (raw_ok) {
+            kvc_m1_buf_dec32((uint32_t)raw_mm);
+        } else {
+            kvc_m1_buf_puts("na");
+        }
+    }
     kvc_m1_buf_puts("\r\n");
 #endif
 }
@@ -1367,7 +1417,7 @@ int main(void) {
         pkt.seq_num = seq++;
         /* FIX (Codex F6 / KVC-F6b): timestamp_ms được lấy NGAY TRƯỚC khi đóng gói
          * ở cuối vòng (xem khối kvc_finalize_telemetry_packet). Không lấy ở đây
-         * vì các bước sau (IMU bit-bang, chờ siêu âm ~100 ms) đã làm mốc này cũ. */
+         * vì các bước sau (IMU bit-bang, chờ siêu âm ~250 ms) đã làm mốc này cũ. */
 
         /* Nếu IMU chưa nhận diện được, tự động dò tìm lại mỗi chu kỳ để người dùng cắm lại dây là nhận ngay */
         if (!imu_ready) {
@@ -1496,17 +1546,10 @@ int main(void) {
                  * Khung hình chuẩn 640x480, tâm quang học cx = 320, cy = 240.
                  * Góc nhìn HFOV ~ 60 độ => fx ≈ 554 pixel.
                  *
-                 * FIX (Codex F4): KHÔNG dùng độ cao giả 25 m. Trước đây khi cờ
-                 * ALT_VALID = 0, code vẫn lấy h_m = 25.0 và xuất ra target_lat/lon
-                 * trông "hợp lệ" nhưng sai hoàn toàn. Nay nếu thiếu độ cao hợp lệ
-                 * thì target position không hợp lệ. Nếu GNSS còn hợp lệ, giữ tọa độ
-                 * UAV để GCS vẫn có thể hiển thị vị trí UAV; backend dùng ALT_VALID
-                 * để không diễn giải tọa độ UAV đó thành tọa độ target.
-                 *
-                 * GIỚI HẠN CÒN LẠI: fx = 554 và tâm 320x240 là hằng số danh định,
-                 * chưa dùng intrinsics hiệu chuẩn, chưa undistort, chưa bù góc
-                 * nghiêng IMU và chưa có extrinsic camera->body. Đây vẫn là georef
-                 * xấp xỉ, chưa đủ để nghiệm thu (M3). */
+                 * GIỚI HẠN CÒN LẠI: fx = 554 và tâm 320x240 là hằng số danh
+                 * định, chưa dùng intrinsics hiệu chuẩn, chưa undistort, chưa bù
+                 * góc nghiêng IMU và chưa có extrinsic camera->body. Đây vẫn là
+                 * georef xấp xỉ, chưa đủ để nghiệm thu (M3). */
                 bool alt_ok = ((pkt.sensor_flags & KVC_FLAG_ALT_VALID) != 0U) &&
                               (pkt.alt_dist_cm >= 20U) && (pkt.alt_dist_cm <= 800U);
                 bool pose_ok = ((pkt.sensor_flags & KVC_FLAG_GNSS_VALID) != 0U);
@@ -1568,7 +1611,7 @@ int main(void) {
         }
 
         /* Làm mới mốc thời gian NGAY TRƯỚC khi đóng gói: từ KVC-F6b, time base đã
-         * tính cả thời gian chặn (đọc siêu âm ~100 ms, bit-bang I2C, TX LoRa
+         * tính cả thời gian chặn (đọc siêu âm ~250 ms, bit-bang I2C, TX LoRa
          * ~300 ms của vòng trước), nên `pkt.timestamp_ms` lấy ở đầu vòng đã cũ
          * vài trăm ms. Đóng gói bằng giá trị cũ sẽ làm GCS hiển thị mốc lệch và
          * làm sai ngưỡng expiry/TDM ở phía nhận. */
@@ -1598,6 +1641,10 @@ int main(void) {
         KvcM3Snapshot m3_snap;
         m3_snap.usound_cm          = usound_cm;
         m3_snap.usound_ok          = (usound_res == KVC_USOUND_OK) ? 1U : 0U;
+        m3_snap.usound_code        = usound_res;
+        m3_snap.pad0               = 0U;
+        m3_snap.pad1               = 0U;
+        m3_snap.pad2               = 0U;
         m3_snap.roll_deg10         = m3_roll_deg10;
         m3_snap.pitch_deg10        = m3_pitch_deg10;
         m3_snap.imu_ok             = m3_imu_ok;
@@ -1610,7 +1657,7 @@ int main(void) {
 
 #if (KVC_M1_CLOCK_DIAG == 1) || (KVC_M2_RX_STATS_DIAG == 1) || (KVC_M3_VALUE_DIAG == 1)
         /* KVC-M3-20261026-001: định dạng + xả text MỘT lần mỗi vòng main, TRƯỚC
-         * vòng chờ. Lý do: nếu khối xử lý vượt hạn 1 s (siêu âm 340 ms + TX LoRa
+         * vòng chờ. Lý do: nếu khối xử lý vượt hạn 1 s (siêu âm 250 ms + TX LoRa
          * 300 ms + ...) thì vòng chờ bên dưới không chạy lượt nào; nếu chỉ tick
          * trong vòng chờ thì UART5 im lặng đúng lúc cần chẩn đoán overrun nhất.
          * Cả hai tick đều tự chặn theo thời gian nên gọi thêm trong vòng chờ

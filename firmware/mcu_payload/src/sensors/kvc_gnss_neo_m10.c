@@ -75,6 +75,10 @@ static uint8_t        s_recv_cs = 0;
  * không tăng. Định nghĩa ở đây (trước hàm parse) vì hàm parse tăng nó. */
 static volatile uint32_t s_rx_good_sentence_count = 0U;
 
+/* KVC-BENCH-20261028: baud UART3 thực tế đã dùng sau khởi tạo.
+ * 0 = autobaud thất bại, UART3 đang mở "mù" ở KVC_GNSS_BAUD_RATE. */
+static uint32_t s_active_baud = 0U;
+
 /* ============================================================================
  * CÁC HÀM TIỆN ÍCH GIẢI MÃ NỘI BỘ
  * ============================================================================ */
@@ -872,7 +876,16 @@ void kvc_gnss_init(void) {
     SN_UART3->LC = 0x03;          /* WLS=3 (8-bit), 1 stop, no parity, DLAB=0 */
     SN_UART3->FIFOCTRL = 0x07;    /* FIFOEN, RXFIFORST, TXFIFORST */
 
-    (void)kvc_gnss_autobaud();
+    /* KVC-BENCH-20261028: kết quả autobaud được GIỮ LẠI (trước đây vứt bằng
+     * `(void)`), để `[INIT] GNSS baud=` phân biệt được "module đã đúng 9600"
+     * với "không dò ra tốc độ nào, đang chạy mù". */
+#if (KVC_GNSS_SKIP_AUTOBAUD == 1)
+    /* Bỏ dò: mở thẳng ở tốc độ đích. Chỉ dùng khi biết chắc module đã ở 9600
+     * (xem ghi chú KVC_GNSS_SKIP_AUTOBAUD trong header). */
+    s_active_baud = KVC_GNSS_BAUD_RATE;
+#else
+    s_active_baud = kvc_gnss_autobaud();
+#endif
 
     /* 5e. Bật đủ 4 chòm sao (GPS + Galileo + BeiDou + GLONASS) rồi lưu vào flash
      * module. Mục đích: cải thiện HDOP khi bị chắn một phần bầu trời — đo trên
@@ -1114,11 +1127,16 @@ uint16_t kvc_gnss_get_speed_centi_knots(void) {
     return s_state.speed_centi_knots;
 }
 
+uint32_t kvc_gnss_get_active_baud(void) {
+    return s_active_baud;
+}
+
 void kvc_gnss_reset(void) {
     memset(&s_state, 0, sizeof(KvcGnssState));
     s_state.hdop_centi = 0xFFFFU;
     s_state.hdop_x10 = 0xFFFFU;
     s_state.course_deg10 = KVC_GNSS_COURSE_INVALID;
+    s_active_baud = 0U;   /* KVC-BENCH-20261028: chưa biết baud cho tới khi init xong */
     s_rx_state = STATE_WAIT_START;
     s_rx_len = 0;
     s_calc_cs = 0;

@@ -26,9 +26,13 @@
  * (chờ TxDone LoRa tới 300 ms, hoặc delay khởi tạo), FIFO 16 byte tràn và mất
  * frame. Ở 38400 8N1 (260 us/byte) FIFO đầy trong ~4,2 ms.
  *
- * SAU: ISR UART1 rút cạn FIFO vào ring 2048 byte. Main tiêu thụ ring trong
- * kvc_fpga_bbox_poll(). Ring 2048 byte chứa được 1152 byte của cửa sổ chặn
- * 300 ms ở 38400 bps, còn dư ~1,8x.
+ * SAU: ISR UART1 rút cạn FIFO vào ring (KVC_FPGA_RX_RING_SIZE = 4096 byte). Main
+ * tiêu thụ ring trong kvc_fpga_bbox_poll(). Cửa sổ không-consumer dài nhất hiện
+ * tại ~650 ms (siêu âm 250 + TX LoRa 300 + init lại LoRa 100); ở 38400 bps cần
+ * ~2496 byte, nên ring 4096 còn biên ~1,6x.
+ *
+ * KVC-BENCH-20261028 (SỬA COMMENT SAI): bản trước ghi "ring 2048 byte ... dư
+ * ~1,8x" trong khi macro thực tế là 4096. Con số đúng là như trên.
  *
  * ISR CHỈ: đọc LS -> ghi nhận OE/PE/FE -> đọc RB -> push ring.
  * ISR KHÔNG: gọi FSM, tính CRC, SPI, delay hay chờ.

@@ -58,6 +58,8 @@ flowchart TD
 *Mục tiêu: ESP32 tự chọn mạng đúng thứ tự ưu tiên và mở cổng WebSocket sẵn sàng nhận kết nối từ Laptop.*
 
 #### A. Các bước thực hiện & Lệnh kiểm tra:
+> **Mốc thời gian STA → SoftAP (đã thống nhất 28/10/2026):** firmware dùng `KVC_STA_BOOT_BUDGET_MS = 15000` (`firmware/gateway_esp32/src/main.cpp`), tức **15 giây** cho toàn bộ ngân sách thử STA (gồm cả thời gian thử từng SSID trong danh sách). Bản tài liệu này trước đây ghi 10 s và log mẫu ghi "That bai sau 10000 ms" — **cả hai đều sai so với code**. Khi test, lấy **15 s** làm mốc; nếu thấy ESP32 chuyển SoftAP sớm hơn đáng kể thì kiểm lại build flag. Muốn đổi mốc thì phải sửa code và tài liệu trong cùng một task.
+
 0. **Kiểm tra thứ tự ưu tiên (bắt buộc):** nạp firmware **không** truyền `KVC_WIFI_SSID` → ESP32 phải in `[WIFI-STA] Khong co KVC_WIFI_SSID...` rồi mới phát SoftAP. Sau đó nạp lại **có** truyền SSID/mật khẩu hotspot điện thoại (2.4 GHz) → ESP32 phải in `[WIFI-STA] Ket noi STA THANH CONG` và **không** phát SoftAP. Đây là tiêu chí PASS của thứ tự ưu tiên.
 0b. **Kiểm tra hotspot điện thoại (4G):** bật hotspot 2.4 GHz trên điện thoại, nạp firmware kèm SSID/mật khẩu hotspot → gateway phải bắt được và in IP do điện thoại cấp. Nếu điện thoại chỉ phát 5 GHz, ESP32-C3 **không** thấy mạng — đổi sang 2.4 GHz rồi thử lại.
 0c. **Kiểm tra nhiều mạng:** nạp 2 mạng (hotspot điện thoại + Wi-Fi lab), tắt hotspot → gateway phải chuyển sang mạng thứ hai; bật lại hotspot và chờ hơn 30 s → gateway phải quay lại mạng khai báo trước.
@@ -78,7 +80,7 @@ flowchart TD
      KVC GATEWAY ESP32 - PHÂN HỆ TRẠM THU MẶT ĐẤT       
   =======================================================
   [WIFI-STA] Uu tien 1: ket noi Wi-Fi 2.4 GHz "..."
-  [WIFI-STA] That bai sau 10000 ms. Chuyen sang uu tien 2.
+  [WIFI-STA] That bai sau 15000 ms. Chuyen sang uu tien 2.
   [WIFI-AP]  Phat SoftAP du phong THANH CONG!
   [WIFI-AP]  SSID: KVC_GROUND_STATION | Password: kvc123456
   [WIFI-AP]  IP Gateway: 192.168.4.1
@@ -317,7 +319,7 @@ Mỗi lần Thịnh bắt đầu bật hệ thống lên để kiểm thử ho�
 
 ### Bước 1: Cấp nguồn cho ESP32 Gateway (Phần cứng)
 1. Cắm cáp USB kết nối bo mạch ESP32 vào cổng USB Laptop (hoặc pin sạc dự phòng).
-2. ESP32 tự động bật nguồn, thực hiện **ưu tiên 1**: kết nối Wi-Fi 2.4 GHz đã nạp qua build flag; nếu thất bại sau 10 s thì **ưu tiên 2**: phát SoftAP `KVC_GROUND_STATION` (mật khẩu `kvc123456`). Sau đó mở dịch vụ WebSocket ở cổng **`8080`** (`ws://<IP_ESP32>:8080/telemetry`).
+2. ESP32 tự động bật nguồn, thực hiện **ưu tiên 1**: kết nối Wi-Fi 2.4 GHz đã nạp qua build flag; nếu thất bại sau **15 s** (`KVC_STA_BOOT_BUDGET_MS = 15000` trong `main.cpp`) thì **ưu tiên 2**: phát SoftAP `KVC_GROUND_STATION` (mật khẩu `kvc123456`). Sau đó mở dịch vụ WebSocket ở cổng **`8080`** (`ws://<IP_ESP32>:8080/telemetry`).
 *(Nếu cần xem IP do Router cấp, mở Serial Monitor ở tốc độ baud 115200)*.
 
 ### Bước 2: Khởi động Backend Python ở Chế độ REAL (Mở Cửa sổ Terminal 1)

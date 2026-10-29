@@ -1,4 +1,4 @@
-﻿# KVC — Phân hệ MCU Tải trên UAV (Sonix SN34F788)
+# KVC — Phân hệ MCU Tải trên UAV (Sonix SN34F788)
 
 - **Người phụ trách:** **Nguyễn Tá Duy Phong**
 - **Phần cứng mục tiêu:** **Sonix SN34F788FG** (ARM Cortex-M4F, tối đa 192 MHz, 160 KB SRAM, 512 KB Flash; đối chiếu chip/kit thực tế và DFP trước khi tạo project)
@@ -100,3 +100,94 @@ Phân hệ GNSS thu thập tọa độ định vị vị trí UAV phục vụ đ
   ```powershell
   & "C:\Keil_v5\UV4\UV4.exe" -b "firmware\mcu_payload\project_keil\mcu_uav.uvprojx" -j0 -o "build.log"
   ```
+
+---
+
+## 6. Bảng macro biên dịch (cấu hình hành vi firmware)
+
+Tất cả macro dưới đây dùng `#ifndef` nên **truyền được qua `-D` của Keil** (Options for Target → C/C++ → Define) mà không phải sửa source. Giá trị ghi ở cột "Mặc định" là giá trị khi không truyền gì.
+
+| Macro | Mặc định | Ý nghĩa / khi nào đổi |
+| :--- | :---: | :--- |
+| `KVC_FPGA_ENABLE` | **0** | **0** = không khởi tạo UART1, đặt P2.3/P0.12 về mức xác định. Đúng cho bo **không có FPGA**. **1** = bật IF-01 (khi có RTL hoặc chạy `scripts/manual/mock_fpga_bbox.py`). Không đổi layout/baud/IRQ của IF-01. |
+| `KVC_GNSS_SKIP_AUTOBAUD` | **0** | **1** = bỏ dò baud, mở UART3 thẳng ở `KVC_GNSS_BAUD_RATE`. Boot nhanh hơn 11–15 s. **Chỉ bật khi chắc chắn module đã ở 9600**, nếu không GNSS sẽ im lặng không fix. |
+| `KVC_M1_CLOCK_DIAG` | **0** | Chẩn đoán cây xung nhịp (đọc thanh ghi SCU). **Code tạm thời — phải = 0 khi phát hành.** |
+| `KVC_M2_RX_STATS_DIAG` | **1** | Công bố `[RING]` (drop/oe/fe/byt/isr) mỗi ~5 s. Giữ =1 để nghiệm thu. |
+| `KVC_M3_VALUE_DIAG` | **1** | In `[M3]` giá trị cảm biến 1 Hz. Giữ =1 trong giai đoạn bring-up. |
+| `KVC_ENABLE_INDOOR_MOCK_GPS` | **0** | **1** = dùng toạ độ Đà Nẵng khi chưa có fix (chỉ để test GCS trong nhà). **Không bật khi bay.** |
+| `KVC_LORA_BOOT_RETRIES` | 10 | Số lần thử init SX1278 trước khi vào degraded mode (~300 ms/lần). |
+| `KVC_IMU_RETRY_DIV` | 10 | Số chu kỳ telemetry giữa hai lần thử lại IMU khi chưa nhận được. |
+| `KVC_TELEMETRY_PERIOD_MS` | 1000 | Chu kỳ phát. **Không đặt ≥ 3000** (gateway coi mất sóng sau 3 s, BBox hết hạn sau 2 s). |
+| `KVC_TDM_ROTATE_EVERY_PACKET` | 1 | 1 = mỗi gói báo một mục tiêu kế tiếp (round-robin). |
+| `KVC_GNSS_BAUD_RATE` | 9600 | Tốc độ UART3 đích. Không đổi nếu chưa nâng UCLK bằng PLL (xem §5). |
+| `KVC_FPGA_UART_BAUD` | 38400 | Baud UART1 theo IF-01. **Còn câu hỏi mở:** tại UCLK 12 MHz cho 37 500 bps (−2,34 %), vượt ngưỡng 3,125 % — xem IF_FPGA_MCU_UART.md. |
+
+### 6.1 Cấu hình cho bo bench hiện tại (không FPGA, không ESP32)
+
+Không cần truyền gì — giá trị mặc định đã đúng:
+
+```text
+KVC_FPGA_ENABLE        = 0     (mặc định)
+KVC_M1_CLOCK_DIAG      = 0     (mặc định)
+KVC_M2_RX_STATS_DIAG   = 1     (mặc định)
+KVC_M3_VALUE_DIAG      = 1     (mặc định)
+KVC_GNSS_SKIP_AUTOBAUD = 0     (mặc định — dò baud, boot chậm 11-15 s)
+```
+
+Nếu muốn boot nhanh và đã chắc module ở 9600, thêm vào Define: `KVC_GNSS_SKIP_AUTOBAUD=1`.
+
+### 6.2 Khi có FPGA hoặc muốn chạy mock
+
+Thêm vào Define: `KVC_FPGA_ENABLE=1`, rồi nạp `scripts/manual/mock_fpga_bbox.py --baud 38400` qua USB-TTL vào P2.3.
+
+---
+
+## 7. Log UART5 và Hercules
+
+Firmware in log chẩn đoán ra **UART5 (P0.15 TX, P0.14 RX)**. Đây là cổng duy nhất cần mở terminal để xem trạng thái.
+
+| Tham số | Giá trị |
+| :--- | :--- |
+| Baud | **9600** |
+| Frame | 8N1, không flow control |
+| Phần cứng | USB-TTL nối P0.15 (TX kit → RX adapter), **GND chung bắt buộc** |
+
+**Tốc độ thực là 9615 bps**, không phải 115200. Code đặt `PRE=1, DLL=78` với UCLK 12 MHz → 12 000 000 / (16 × 1 × 78) = 9615 bps (+0,16 % so với 9600 danh định). Đặt Hercules 115200 sẽ ra ký tự rác hoàn toàn.
+
+Bản `kvc_pinout.h` trước 28/10/2026 ghi sai 115200; đã sửa.
+
+### 7.1 Các dòng log cần biết
+
+| Tiền tố | Nội dung | Chu kỳ |
+| :--- | :--- | :--- |
+| `=== KVC-MCU-... BOOT ===` | Nhận diện firmware + xác nhận UART5 sống | Một lần sau reset |
+| `[INIT]` | Kết quả từng cảm biến (LORA/IMU/US/GNSS/FPGA) | Một lần, ngay sau init |
+| `[M3]` | Giá trị cảm biến + cờ + `tx=ok/fail` | 1 Hz |
+| `[RING]` | Thống kê RX 3 cổng (drop/oe/fe/byt/isr + val/ok/bad/trg/raw) | ~5 s |
+
+Chi tiết cách đọc từng trường và checklist PASS: [MCU_BENCH_TEST_PLAN.md](../verification/MCU_BENCH_TEST_PLAN.md).
+
+### 7.2 Build headless và lấy số liệu
+
+```powershell
+& "C:\Keil_v5\UV4\UV4.exe" -r "firmware\mcu_payload\project_keil\mcu_uav.uvprojx" -j0 -o "build.log"
+Select-String -Path build.log -Pattern "Error|Warning|Program Size"
+```
+
+`-r` = rebuild toàn bộ (cần thiết để thấy hết warning; `-b` là incremental).
+
+**Baseline 28/10/2026** (ARMCLANG V6.14): `0 Error(s), 8 Warning(s)`, Code 11 948 B, RO 1 076 B, RW 8 B, ZI 7 480 B. Cả 8 warning đều ở code có sẵn: 2 trong `system_SN34F780.c` (vendor), 5 trong `kvc_fpga_bbox.c`, 1 padding `KvcFpgaFrameState`.
+
+Lưu ý: `-Wpadded` **không** được bật trong `MiscControls` của project — warning padding xuất hiện là do `kvc_fpga_bbox.h` được include từ file khác có cấu hình chặt hơn. "0 warning" chỉ đạt được khi xử lý 8 mục trên.
+
+---
+
+## 8. Host test (không cần bo)
+
+```powershell
+pwsh -NoProfile -File scripts/test_firmware.ps1 -SkipBuild -SkipPython
+```
+
+Chạy 7 host test MCU + 2 host test gateway. Baseline 28/10/2026: **9/9 PASS**.
+
+Script **không** build Keil — phải chạy `UV4.exe` riêng (xem §7.2).

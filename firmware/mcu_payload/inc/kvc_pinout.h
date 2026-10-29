@@ -94,7 +94,15 @@ extern "C" {
 #define KVC_PIN_FPGA_READY_PIN      12      /* P0.12 - Pin 3  LQFP64 | JP1 Pin 11 hoặc 12 (EXTI từ FPGA R12 - J2 Pin 13) */
 
 /* ============================================================================
- * 6. CỔNG NẠP & GỠ LỖI UART MONITOR RA MÁY TÍNH (UART5 - 115200 bps)
+ * 6. CỔNG NẠP & GỠ LỖI UART MONITOR RA MÁY TÍNH (UART5)
+ *
+ * TỐC ĐỘ THỰC: 9615 bps 8N1 — PRE = 1, DLL = 0x4E (78) với UCLK = 12 MHz.
+ * Đây là giá trị code đặt trong `kvc_m1_uart5_diag_init()` (main.c), KHÔNG phải
+ * 115200 như comment cũ ghi sai (KVC-BENCH-20261028).
+ *
+ * CẤU HÌNH HERCULES/TERMINAL: đặt **9600 8N1**, không flow control. Chênh lệch
+ * +0,16 % nằm trong dung sai UART nên đọc được bình thường. Đặt 115200 sẽ ra
+ * ký tự rác hoàn toàn.
  * ============================================================================ */
 #define KVC_PIN_DEBUG_URXD5_PORT    SN_GPIO0
 #define KVC_PIN_DEBUG_URXD5_PIN     14      /* P0.14 - Pin 5 LQFP64 | JP1 Pin 15 hoặc 16 (RX từ cáp USB-TTL) */

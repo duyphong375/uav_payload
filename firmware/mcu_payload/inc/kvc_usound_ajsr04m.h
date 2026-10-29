@@ -608,12 +608,24 @@ static inline uint8_t kvc_usound_read_robust(uint16_t *filtered_cm) {
         uint16_t diff = (cm > ref) ? (uint16_t)(cm - ref) : (uint16_t)(ref - cm);
 
         if (diff > KVC_USOUND_OUTLIER_CM) {
-            if ((s_pending != 0U)) {
+            /* KVC-BENCH-20261028 (FIX LOGIC): bản trước chỉ kiểm `s_pending != 0`
+             * rồi kết luận "mẫu thứ hai lệch cùng chiều", nhưng KHÔNG hề so
+             * chiều. Hệ quả: hai ngoại lai liên tiếp NGƯỢC chiều (ví dụ +200 cm
+             * rồi −200 cm quanh cùng mốc) vẫn được chấp nhận như một thay đổi
+             * thật, đẩy giá trị công bố đi rất xa trong 2 chu kỳ.
+             *
+             * Nay so chiều thật: mẫu xác nhận phải lệch về CÙNG phía so với ref
+             * mới được coi là thay đổi thật. */
+            bool same_dir = (s_pending != 0U) &&
+                            ((cm > ref) == (s_pending_cm > ref));
+
+            if (same_dir) {
                 /* Mẫu thứ hai lệch cùng chiều -> xác nhận thay đổi thật. */
                 s_pending = 0U;
             } else {
-                /* Mẫu đầu tiên lệch xa -> nghi ngờ, chưa đưa vào lịch sử.
-                 * Vẫn trả mẫu đã lọc hiện tại để dashboard không nhảy. */
+                /* Mẫu đầu tiên lệch xa (hoặc mẫu thứ hai lệch ngược chiều):
+                 * nghi ngờ, chưa đưa vào lịch sử. Vẫn trả mẫu đã lọc hiện tại
+                 * để dashboard không nhảy. */
                 s_pending = 1U;
                 s_pending_cm = cm;
                 if (filtered_cm != 0) *filtered_cm = s_last_good_cm;

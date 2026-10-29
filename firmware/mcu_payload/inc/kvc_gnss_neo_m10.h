@@ -84,6 +84,20 @@ extern "C" {
 #define KVC_GNSS_BAUD_RATE              9600UL
 #endif
 
+/* KVC-BENCH-20261028: bỏ hẳn bước dò tốc độ (autobaud) lúc khởi động.
+ *
+ * =0 (mặc định): dò lần lượt {9600, 38400, 19200, 57600, 4800}, mỗi tốc độ
+ *    tới 1500 ms. Xấu nhất ~11-15 s. Đây là hành vi an toàn cho module lạ.
+ * =1: mở UART3 thẳng ở KVC_GNSS_BAUD_RATE, không dò. Boot nhanh hơn ~7-15 s.
+ *
+ * CHỈ BẬT =1 KHI BIẾT CHẮC module đã ở 9600 (ví dụ lần chạy trước đã lưu cấu
+ * hình vào flash module). Nếu module còn ở 38400 mà bỏ autobaud thì UART3 nhận
+ * rác và KHÔNG có fix — triệu chứng duy nhất là `[RING] GNSS isr` tăng nhưng
+ * `hd=na`, `v0`, rất dễ chẩn đoán nhầm thành "hỏng dây". */
+#ifndef KVC_GNSS_SKIP_AUTOBAUD
+#define KVC_GNSS_SKIP_AUTOBAUD          0
+#endif
+
 /* Tốc độ module dùng lúc xuất xưởng — cần biết để mở UART3 đúng tốc độ trước
  * khi gửi lệnh đổi baud. Nếu module của bạn đã được đổi sẵn về 9600 và lưu vào
  * flash của bo thì đặt macro này = 9600 để bỏ qua bước đổi. */
@@ -241,6 +255,19 @@ bool kvc_gnss_get_course_deg10(uint32_t now_ms, uint16_t *out_deg10);
  * @return 0 nếu đứng yên hoặc chưa có dữ liệu.
  */
 uint16_t kvc_gnss_get_speed_centi_knots(void);
+
+/**
+ * @brief Tốc độ UART3 thực tế đang dùng sau khi khởi tạo.
+ *
+ * @return Baud đã chọn (9600 nếu thành công), hoặc 0 nếu autobaud không nhận
+ *         được câu NMEA nào và firmware phải mở ở tốc độ đích "mù".
+ *
+ * KVC-BENCH-20261028: trước đây `kvc_gnss_init()` vứt kết quả autobaud
+ * (`(void)kvc_gnss_autobaud();`), nên log không phân biệt được "module đã đúng
+ * 9600" với "autobaud thất bại, đang chạy mù". Hàm này đưa kết quả đó ra cho
+ * dòng `[INIT] GNSS baud=`.
+ */
+uint32_t kvc_gnss_get_active_baud(void);
 
 /**
  * @brief Kiểm tra hạn định thời dữ liệu và hạ cờ valid nếu quá 3 giây không có bản tin mới.

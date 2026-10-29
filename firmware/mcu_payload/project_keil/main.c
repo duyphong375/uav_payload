@@ -49,8 +49,31 @@ void UART2_IRQHandler(void) {
 #define KVC_LORA_BOOT_RETRIES       10U
 #endif
 
+/* KVC-BENCH-20261028: số chu kỳ telemetry giữa hai lần thử lại IMU khi chưa
+ * nhận được cảm biến. Mỗi lần thử chạy bus-recovery 9 xung + 4 lệnh ghi (~1 ms
+ * bit-bang), nên thử mỗi chu kỳ là lãng phí khi IMU hỏng/hở dây.
+ * 10 chu kỳ ≈ 10 s: vẫn đủ nhanh để cắm lại dây là nhận trong vòng 10 s. */
+#ifndef KVC_IMU_RETRY_DIV
+#define KVC_IMU_RETRY_DIV           10U
+#endif
+
 /* Cờ cho biết SX1278 đã khởi tạo được chưa. 0 = degraded mode. */
 static uint8_t s_lora_available = 0U;
+
+/* KVC-BENCH-20261028: đếm kết quả phát LoRa.
+ *
+ * VÌ SAO CẦN: `sx1278_send_packet()` trước đây là void và nhánh timeout
+ * `return` im lặng, nên KHÔNG có cách nào biết MCU đã phát bao nhiêu gói. Hệ quả
+ * là không thể đối chiếu "số gói phát" với "số gói gateway nhận", tức không
+ * nghiệm thu được bất kỳ tiêu chí mất gói nào (kế hoạch GW-2.2 / SH-3.1).
+ *
+ * `fail` tăng ở mọi nhánh thất bại, kể cả khi auto-recovery tầng 1 không cứu
+ * được chip. Đọc cặp `tx=ok/fail` trên dòng `[M3]`: fail > 0 nghĩa là có gói
+ * KHÔNG ra được anten, khác hẳn với "gateway không nhận".
+ *
+ * Khai báo Ở ĐÂY (trước khối M3) vì `kvc_m3_value_tick()` đọc hai biến này. */
+static uint32_t s_tx_ok_count   = 0U;
+static uint32_t s_tx_fail_count = 0U;
 
 /* KVC-DIAG: giá trị RegVersion (0x42) đọc được từ SX1278 ở lần thử CUỐI CÙNG.
  *
@@ -145,9 +168,14 @@ static uint32_t kvc_millis(void) {
  *   - vòng 1000 bước         : 1000 x (delay_ms(1) + overhead poll) ≈ 2,5 s
  *   Tổng ≈ 3,2 s.
  *
- * Bản đầu tôi đặt 2,0 s -> SẼ RESET OAN mỗi vòng. Nay dùng 6 s (biên ~3 s) và
- * vẫn kick thêm một lần giữa vòng 1000 bước (sau 500 bước) để không phụ thuộc
- * hoàn toàn vào ước lượng này. Đây là biện pháp kép: timeout rộng + kick định kỳ.
+ * Bản đầu tôi đặt 2,0 s -> SẼ RESET OAN mỗi vòng. Nay dùng 6 s (biên ~3 s).
+ *
+ * KVC-BENCH-20261028 (SỬA COMMENT SAI): bản trước ghi "vẫn kick thêm một lần
+ * giữa vòng 1000 bước (sau 500 bước)" nhưng CODE KHÔNG HỀ LÀM ĐIỀU ĐÓ — chỉ có
+ * đúng một lệnh `kvc_wdt_feed()` ở đầu mỗi vòng main. Nay sửa comment cho khớp
+ * code thay vì thêm lệnh feed thứ hai: worst case một vòng hiện tại ~655 ms
+ * (US 250 + TX 300 + I2C/GNSS ~100) < 6 s, nên MỘT điểm feed là đủ và còn giữ
+ * được nguyên tắc "chỉ kick ở một chỗ" của manual §9.1.
  *
  * Đánh đổi: phát hiện treo chậm hơn (tối đa ~6 s thay vì 2 s). Với nhiệm vụ
  * UAV tìm kiếm cứu nạn 1 Hz telemetry, 6 s là chấp nhận được; nếu cần phát hiện
@@ -269,8 +297,8 @@ static void kvc_wdt_feed(void) {
  * và bộ đếm theo lần gọi sẽ trôi. Time base vẫn tiến nhờ delay_ms/delay_us.
  *
  * RÀNG BUỘC BĂNG THÔNG UART5: 9615 bps 8N1 ~ 960 byte/s khả dụng. Một dòng M3
- * cỡ ~110 ký tự ở 1 Hz là ~110 B/s; M2 ~200 ký tự mỗi 5 s là ~40 B/s. Tổng
- * ~150 B/s, còn dư ~6x. Pump xả 8 byte/lượt (~8000 B/s) nên không nghẽn. */
+ * cỡ ~140 ký tự ở 1 Hz là ~140 B/s; M2 ~200 ký tự mỗi 5 s là ~40 B/s. Tổng
+ * ~180 B/s, còn dư ~5x. Pump xả 32 byte/lượt (~32000 B/s) nên không nghẽn. */
 #ifndef KVC_M3_VALUE_PERIOD_MS
 #define KVC_M3_VALUE_PERIOD_MS       1000UL
 #endif
@@ -290,12 +318,38 @@ static void kvc_wdt_feed(void) {
 #define KVC_TELEMETRY_PERIOD_MS      1000UL
 #endif
 
+/* KVC-BENCH-20261028: nhận diện firmware đang nạp.
+ * In ra ngay sau reset để log Hercules tự mô tả phiên bản + cấu hình biên dịch,
+ * thay vì phải suy ra từ hành vi. Khi so log giữa hai lần nạp, đây là dòng đầu
+ * tiên cần khớp.
+ *
+ * ĐỔI CHUỖI NÀY mỗi khi nạp một bản khác lên kit. */
+#define KVC_FW_ID                    "KVC-MCU-20261028"
+
 /* PB-FIX (P1-2): trước đây cửa sổ TDM là 1500 ms, dài hơn một chu kỳ phát nên
  * thực tế mục tiêu chỉ nhảy mỗi 2 gói. Nay TDM đếm theo SỐ GÓI: mỗi gói báo
  * một mục tiêu kế tiếp, tất định và dễ kiểm chứng.
  * =0: mỗi gói giữ nguyên mục tiêu, không luân phiên. */
 #ifndef KVC_TDM_ROTATE_EVERY_PACKET
 #define KVC_TDM_ROTATE_EVERY_PACKET  1
+#endif
+
+/* KVC-BENCH-20261028: FPGA OneKiwi (IF-01) có được khởi tạo hay không.
+ *
+ * BỐI CẢNH: bo bench hiện tại KHÔNG có FPGA và phía FPGA chưa có RTL/top-level
+ * phát BBox. Khi UART1 bật ngắt mà P2.3 (URXD1) không được lái, chân CMOS float
+ * sinh byte rác -> `[RING] FPGA fe/byt/isr` tăng liên tục, làm log chẩn đoán
+ * nhiễu và đốt CPU trong ISR vô ích. Đây đúng cơ chế đã gặp với đường RX siêu
+ * âm trước khi tắt ngắt ngoài cửa sổ nghe.
+ *
+ * =0 (mặc định): KHÔNG cấu hình UART1, KHÔNG bật NVIC, đặt P2.3/P0.12 về mức
+ *     xác định. Khối BBox luôn invalid -> cờ AI luôn 0, toạ độ mục tiêu = 0,
+ *     georef không chạy. Đây là hành vi ĐÚNG cho bo không có FPGA.
+ * =1: hành vi cũ. Dùng khi cắm mock_fpga_bbox.py qua USB-TTL, hoặc khi đã có RTL.
+ *
+ * KHÔNG đổi IF-01: khi =1, layout khung, CRC, baud 38400 và vector IRQ giữ nguyên. */
+#ifndef KVC_FPGA_ENABLE
+#define KVC_FPGA_ENABLE 0
 #endif
 
 #define KVC_M1_UART5_TEST_PRE        1U
@@ -368,8 +422,11 @@ static void kvc_m1_buf_puts(const char *s) {
 
 /* hex32: dùng bởi M1 (clock/ABI) VÀ M3 (in RegVersion LoRa dạng hex).
  * Vì vậy phải biên dịch khi M1 hoặc M3 bật — trước đây chỉ theo M1 nên build
- * với M1=0/M3=1 bị "Undefined symbol kvc_m1_buf_hex32". */
-#if (KVC_M1_CLOCK_DIAG == 1) || (KVC_M3_VALUE_DIAG == 1)
+ * với M1=0/M3=1 bị "Undefined symbol kvc_m1_buf_hex32".
+ *
+ * KVC-BENCH-20261028: mở rộng thêm M2 vì khối log `[INIT]` (dùng chung buffer)
+ * được biên dịch khi bất kỳ M1/M2/M3 bật. */
+#if (KVC_M1_CLOCK_DIAG == 1) || (KVC_M2_RX_STATS_DIAG == 1) || (KVC_M3_VALUE_DIAG == 1)
 static void kvc_m1_buf_hex32(uint32_t v) {
     static const char s_hex[] = "0123456789ABCDEF";
     int shift;
@@ -377,6 +434,16 @@ static void kvc_m1_buf_hex32(uint32_t v) {
     for (shift = 28; shift >= 0; shift -= 4) {
         kvc_m1_buf_putc(s_hex[(v >> (uint32_t)shift) & 0x0FU]);
     }
+}
+
+/* KVC-BENCH-20261028: hex 1 byte cho log `[INIT]` (RegVersion, địa chỉ I2C).
+ * Tách khỏi hex32 để dòng log gọn ("ver=0x12" thay vì "ver=0x00000012") và
+ * không phải cắt chuỗi khi đối chiếu bằng mắt. */
+static void kvc_m1_buf_hex8(uint32_t v) {
+    static const char s_hex[] = "0123456789ABCDEF";
+    kvc_m1_buf_puts("0x");
+    kvc_m1_buf_putc(s_hex[(v >> 4) & 0x0FU]);
+    kvc_m1_buf_putc(s_hex[v & 0x0FU]);
 }
 #endif
 
@@ -404,30 +471,90 @@ static void kvc_m1_buf_reset(void) {
     s_m1_snap_ready = 0;
 }
 
-/* Xả toàn bộ buffer, chờ THRE từng byte. CHỈ dùng khi UART1/2/3 chưa nhận
- * dữ liệu (phase 0, trước khi init cảm biến) hoặc ở chế độ test độc lập.
- * Chỉ M1 dùng: M2 luôn xả dần để không chặn polling cảm biến. */
-#if (KVC_M1_CLOCK_DIAG == 1)
-static void kvc_m1_flush_blocking(void) {
+/* Xả toàn bộ buffer, chờ THRE từng byte. CHỈ dùng khi chưa có driver cảm biến
+ * nào đang nhận dữ liệu (trước khi init cảm biến) hoặc ở chế độ test độc lập.
+ * Trong main loop luôn dùng `kvc_m1_diag_pump()` để không chặn polling.
+ *
+ * KVC-BENCH-20261028: khối này trước đây nằm trong `#if (KVC_M1_CLOCK_DIAG == 1)`.
+ * VÌ SAO PHẢI MỞ RỘNG: cấu hình mặc định là M1 = 0, M2 = 1, M3 = 1. Trước đây
+ * không có cách nào in log đồng bộ lúc khởi tạo — bo thiếu FPGA/LoRa im lặng tới
+ * ~20 s và trông như treo. Khối `[INIT]` cần hàm này để chắc chắn dòng banner ra
+ * hết trước khi driver cảm biến bật ngắt.
+ *
+ * (Nay toàn bộ file đã nằm trong khối `#if` M1||M2||M3 ở trên, nên không cần
+ * điều kiện riêng tại đây.) */
+/* ============================================================================
+ * KVC-BENCH-20261028 — LOG ĐỒNG BỘ LÚC KHỞI TẠO
+ * ============================================================================
+ * VÌ SAO CẦN: không có banner thì một bo thiếu FPGA/thiếu LoRa im lặng tới ~20 s
+ * (autobaud GNSS 11-15 s + retry LoRa tối đa 3 s). Không phân biệt được "đang
+ * init" với "treo", và không biết cảm biến nào nhận được.
+ *
+ * AN TOÀN: chỉ dùng TRƯỚC main loop, khi chưa có driver cảm biến nào đang nhận
+ * byte. Sau khi main loop chạy, mọi log đi qua kvc_m1_diag_pump() (không chặn).
+ *
+ * CHI PHÍ: 9615 bps 8N1 ~ 960 byte/s -> một dòng 40 ký tự ~42 ms. Tổng 6 dòng
+ * `[INIT]` ~ 250 ms, chấp nhận được so với 11-15 s autobaud.
+ *
+ * KHÔNG dùng hàm này trong main loop: nó chờ THRE nên sẽ chặn polling UART.
+ * ============================================================================ */
+static void kvc_diag_boot_flush(void) {
     uint16_t i;
+
     if (s_m1_tx_ready == 0U) {
         return;
     }
-    for (i = 0; i < s_m1_snap_len; i++) {
+    for (i = 0U; i < s_m1_snap_len; i++) {
         uint32_t guard = 200000UL;
         while (((SN_UART5->LS & (1U << 5)) == 0U) && (--guard > 0U)) {
             __NOP();
         }
         if (guard == 0U) {
-            s_m1_tx_ready = 0;   /* THRE không bật -> ngừng in, không chặn khởi tạo */
+            s_m1_tx_ready = 0U;   /* THRE không bật: ngừng in, không treo boot */
             break;
         }
         SN_UART5->TH = (uint32_t)(uint8_t)s_m1_snap[i];
     }
-    s_m1_snap_pos   = s_m1_snap_len;
-    s_m1_snap_ready = 0;
+    s_m1_snap_len   = 0U;
+    s_m1_snap_pos   = 0U;
+    s_m1_snap_ready = 0U;
 }
 
+/* Bắt đầu một dòng `[INIT]` mới. Luôn đi cặp với kvc_diag_boot_end(). */
+static void kvc_diag_boot_begin(void) {
+    if (s_m1_tx_ready == 0U) {
+        return;
+    }
+    kvc_m1_buf_reset();
+}
+
+/* Kết thúc dòng: chèn CRLF rồi xả đồng bộ.
+ *
+ * Tách khỏi `kvc_diag_boot_flush()` để phần flush giữ nguyên hành vi cũ khi
+ * khối M1 gọi. Nếu flush tự chèn CRLF, log M1 sẽ có thêm dòng trắng so với
+ * trước — đó là thay đổi hành vi không cần thiết. */
+static void kvc_diag_boot_end(void) {
+    kvc_m1_buf_puts("\r\n");
+    kvc_diag_boot_flush();
+}
+
+/* In nguyên một dòng cố định. */
+static void kvc_diag_boot_puts(const char *s) {
+    if (s_m1_tx_ready == 0U) {
+        return;
+    }
+    kvc_diag_boot_begin();
+    kvc_m1_buf_puts(s);
+    kvc_diag_boot_end();
+}
+
+#if (KVC_M1_CLOCK_DIAG == 1)
+/* Bản cũ của khối M1: hành vi giữ nguyên, nay gọi hàm flush chung để chỉ có MỘT
+ * chỗ chờ THRE. Chỉ biên dịch khi M1 bật, tránh "never referenced" ở cấu hình
+ * mặc định (M1=0, M2=1, M3=1). */
+static void kvc_m1_flush_blocking(void) {
+    kvc_diag_boot_flush();
+}
 #endif /* KVC_M1_CLOCK_DIAG */
 
 /* Xả dần buffer, KHÔNG chặn: mỗi lượt ghi tối đa vài byte nếu THRE sẵn sàng,
@@ -520,9 +647,10 @@ static void kvc_m2_stats_tick(void) {
  *   - Dùng chung buffer và pump của khối M1/M2; nếu buffer đang bận thì bỏ nhịp
  *     (không ghi đè text chưa xả).
  *
- * ĐỊNH DẠNG (một dòng, ~110 ký tự):
+ * ĐỊNH DẠNG (một dòng, ~140 ký tự):
  *   [M3] t=12345 US=142cm ok | IMU r=12 p=-3 v=1 | GNSS q1 f3 s9 hd0.85 \
- *        la160738520 lo1081499210 v1 | BB n1 v1 crc0 | ovr0
+ *        la160738520 lo1081499210 v1 yw=- sp=0 | BB n1 v1 crc0 en0 \
+ *        | LORA d1 ver=0x12 | ovr0 tx=60/0
  * ============================================================================ */
 #if (KVC_M3_VALUE_DIAG == 1)
 
@@ -660,7 +788,11 @@ static void kvc_m3_value_tick(const KvcM3Snapshot *snap) {
         kvc_m1_buf_dec32((uint32_t)kvc_gnss_get_speed_centi_knots());
     }
 
-    /* FPGA BBox: số candidate, cờ valid, số frame lỗi CRC. */
+    /* FPGA BBox: số candidate, cờ valid, số frame lỗi CRC, và cờ bật driver.
+     *
+     * KVC-BENCH-20261028: thêm `en=` ở CUỐI cụm để log cũ vẫn đọc được bằng mắt
+     * theo cùng thứ tự; `en0` nghĩa là driver UART1 không được khởi tạo (bo
+     * không có FPGA), nên `n0 v0 crc0` là ĐÚNG chứ không phải lỗi. */
     bbox = kvc_fpga_bbox_get_state();
     kvc_m1_buf_puts(" | BB n");
     kvc_m1_buf_dec32((bbox != NULL) ? (uint32_t)bbox->candidate_count : 0U);
@@ -668,6 +800,8 @@ static void kvc_m3_value_tick(const KvcM3Snapshot *snap) {
     kvc_m1_buf_dec32(kvc_fpga_bbox_is_valid() ? 1U : 0U);
     kvc_m1_buf_puts(" crc");
     kvc_m1_buf_dec32((bbox != NULL) ? bbox->crc_err_count : 0U);
+    kvc_m1_buf_puts(" en");
+    kvc_m1_buf_dec32((uint32_t)KVC_FPGA_ENABLE);
 
     /* LoRa: cờ sẵn sàng + RegVersion thật đọc được lúc boot.
      * ver=0x12 là đúng; 0x00/0xFF là dấu hiệu dây SPI hoặc nguồn. */
@@ -679,6 +813,14 @@ static void kvc_m3_value_tick(const KvcM3Snapshot *snap) {
     /* Chu kỳ: số vòng vượt hạn 1 s. >0 nghĩa là khối xử lý chậm hơn 1 Hz. */
     kvc_m1_buf_puts(" | ovr");
     kvc_m1_buf_dec32(snap->cycle_overrun_count);
+
+    /* KVC-BENCH-20261028: số gói phát thành công / thất bại (cộng dồn từ reset).
+     * fail > 0 nghĩa là có gói KHÔNG ra được anten — khác hẳn với "gateway
+     * không nhận". Đây là nửa còn lại của phép đối chiếu GW-2.2. */
+    kvc_m1_buf_puts(" tx=");
+    kvc_m1_buf_dec32(s_tx_ok_count);
+    kvc_m1_buf_putc('/');
+    kvc_m1_buf_dec32(s_tx_fail_count);
 
     s_m1_snap_ready = 1;
 }
@@ -1078,7 +1220,26 @@ static void kvc_m1_diag(uint8_t phase) {
 
 #endif /* KVC_M1_CLOCK_DIAG */
 
-#endif /* (KVC_M1_CLOCK_DIAG == 1) || (KVC_M2_RX_STATS_DIAG == 1) */
+#else /* M1 == 0 && M2 == 0 && M3 == 0 */
+
+/* KVC-BENCH-20261028: cấu hình KHÔNG bật bất kỳ khối chẩn đoán nào (bản phát
+ * hành tối giản, UART5 chỉ để nạp/debug).
+ *
+ * Toàn bộ buffer + pump UART5 không được biên dịch, nhưng `main()` vẫn gọi các
+ * hàm soạn dòng `[INIT]` ở 6 chỗ. Nếu không có stub thì build FAIL vì undefined
+ * symbol. Định nghĩa stub rỗng cho CẢ bộ builder thay vì bọc `#if` quanh từng
+ * call-site (6 khối, dễ sót khi thêm dòng log mới).
+ *
+ * Lưu ý: stub KHÔNG sinh mã — ở cấu hình này firmware hoàn toàn không in gì ra
+ * UART5, đúng như chủ ý "bản phát hành tối giản". */
+static void kvc_diag_boot_begin(void) { }
+static void kvc_diag_boot_end(void) { }
+static void kvc_diag_boot_puts(const char *s) { (void)s; }
+static void kvc_m1_buf_puts(const char *s) { (void)s; }
+static void kvc_m1_buf_dec32(uint32_t v) { (void)v; }
+static void kvc_m1_buf_hex8(uint32_t v) { (void)v; }
+
+#endif /* (KVC_M1_CLOCK_DIAG == 1) || (KVC_M2_RX_STATS_DIAG == 1) || (KVC_M3_VALUE_DIAG == 1) */
 
 /* ============================================================================
  * ĐIỀU KHIỂN CHÂN SPI VÀ GPIO CHO MODULE LORA RA-02 (SX1278)
@@ -1102,7 +1263,16 @@ static inline uint8_t lora_miso(void) {
     return (SN_GPIO2->DATAIN & (1U << KVC_PIN_LORA_MISO_PIN)) ? 1 : 0;
 }
 
-/* Truyền nhận 1 byte SPI qua bit-banging tốc độ khoảng 500kHz - 1MHz ổn định trên dây cắm */
+/* SPI bit-bang 1 byte.
+ *
+ * TỐC ĐỘ THỰC (sửa comment sai — KVC-BENCH-20261028): mỗi pha là 25 vòng NOP
+ * trên biến `volatile`, ước ~3-4 chu kỳ/vòng ở 12 MHz => 25*3.5/12e6 ≈ 7,3 µs
+ * cho mỗi nửa chu kỳ, tức ~14,6 µs/bit => SCL ~68 kHz. Bản trước ghi
+ * "500 kHz - 1 MHz" là SAI khoảng một bậc độ lớn.
+ *
+ * Hệ quả: 32 byte (256 bit) ~3,7 ms cho phần nạp FIFO — vẫn không đáng kể so với
+ * 67 ms airtime, nên KHÔNG cần tăng tốc. Muốn tăng phải đo bằng scope trước.
+ * Đây là ước lượng từ số chu kỳ, chưa phải phép đo. */
 static uint8_t spi_transfer(uint8_t data) {
     uint8_t rx = 0;
     for (int i = 7; i >= 0; i--) {
@@ -1191,12 +1361,23 @@ static uint8_t sx1278_init_tx(void) {
     return 1;
 }
 
-/* Phát 1 gói tin dữ liệu ra Anten */
-static void sx1278_send_packet(const uint8_t *payload, uint8_t len) {
+/* Phát 1 gói tin dữ liệu ra Anten.
+ *
+ * KVC-BENCH-20261028: đổi từ `void` sang `uint8_t` (1 = phát xong có TxDone,
+ * 0 = thất bại) và cập nhật s_tx_ok_count / s_tx_fail_count. Mọi nhánh thoát
+ * đều phải đếm — nếu chỉ đếm nhánh thành công thì `tx=ok/fail` không còn phản
+ * ánh đúng số gói đã cố phát. */
+static uint8_t sx1278_send_packet(const uint8_t *payload, uint8_t len) {
     /* 0. AUTO-RECOVERY TẦNG 1: Kiểm tra chip SX1278 có bị sụt áp reset về FSK (bit 7 LongRangeMode == 0) không.
      *    Nếu có, lập tức khôi phục lại cấu hình LoRa chuẩn trước khi gửi */
     if ((sx1278_read_reg(0x01) & 0x80) == 0) {
-        (void)sx1278_init_tx();
+        if (!sx1278_init_tx()) {
+            /* Không khôi phục được chip: gói này chắc chắn không phát ra được.
+             * Vẫn tiếp tục phần còn lại để không treo vòng main — nhưng phải
+             * đếm fail thay vì im lặng như bản trước. */
+            s_tx_fail_count++;
+            return 0U;
+        }
     }
 
     /* 1. Đưa về chế độ Standby */
@@ -1231,8 +1412,9 @@ static void sx1278_send_packet(const uint8_t *payload, uint8_t len) {
     /* AUTO-RECOVERY TẦNG 2: Nếu quá 300ms không nhận được cờ TxDone,
      * chứng tỏ chip LoRa bị brown-out sụt áp hoặc kẹt SPI -> Reset cứng và khởi tạo lại ngay lập tức! */
     if (timeout == 0) {
+        s_tx_fail_count++;
         (void)sx1278_init_tx();
-        return;
+        return 0U;
     }
 
     /* 7. Xóa cờ ngắt sau khi phát xong */
@@ -1240,6 +1422,37 @@ static void sx1278_send_packet(const uint8_t *payload, uint8_t len) {
 
     /* 8. Đưa chip về Standby để giải phóng khối khuếch đại công suất PA */
     sx1278_write_reg(0x01, 0x81);
+
+    s_tx_ok_count++;
+    return 1U;
+}
+
+/* KVC-BENCH-20261028: đưa hai chân giao tiếp FPGA về trạng thái xác định khi
+ * KHÔNG có bo FPGA cắm vào.
+ *
+ * VẤN ĐỀ: P2.3 (URXD1) và P0.12 (DATA_READY) hiện là input không pull. Chân
+ * CMOS float vừa dễ nhiễu vừa tiêu hao dòng; riêng P2.3 khi UART1 bật ngắt sẽ
+ * sinh byte rác liên tục. Đây đúng cơ chế đã gặp với đường RX siêu âm trước khi
+ * tắt ngắt ngoài cửa sổ nghe.
+ *
+ * GIỚI HẠN (chưa xác minh): cần đo thực tế xem pull nội còn tác dụng khi chân ở
+ * chế độ AFIO. Nếu không tác dụng, P2.3 vẫn float — khi đó phải hàn trở treo
+ * 10 kΩ lên 3V3 như phương án A của KVC_PHAN_CONG_2_NGUOI.md mục 1.1.
+ * Hàm này KHÔNG thay đổi gì tới UART1 (không ghi LC/DLL/NVIC).
+ */
+static void kvc_fpga_pins_idle_safe(void) {
+    SN_SCU->APB1CLKG |= (1U << 17) | (1U << 19);   /* P0CLKEN, P2CLKEN */
+
+    /* P2.3 = URXD1: kéo LÊN để đường RX idle HIGH (mức stop bit). Kéo xuống sẽ
+     * tạo start bit giả liên tục nếu ai đó bật ngắt UART1. */
+    SN_GPIO2->PUTYPE |= (1U << KVC_PIN_FPGA_URXD1_PIN);
+    SN_GPIO2->PULLEN |= (1U << KVC_PIN_FPGA_URXD1_PIN);
+
+    /* P0.12 = DATA_READY: input, kéo XUỐNG (mức "không có frame mới"), không
+     * bật EXTI. Kéo xuống để tránh chân float khi FPGA vắng mặt. */
+    SN_GPIO0->PUTYPE &= ~(1U << KVC_PIN_FPGA_READY_PIN);
+    SN_GPIO0->PULLEN |= (1U << KVC_PIN_FPGA_READY_PIN);
+    SN_GPIO0->DIR    &= ~(1U << KVC_PIN_FPGA_READY_PIN);
 }
 
 int main(void) {
@@ -1258,6 +1471,17 @@ int main(void) {
      * lặng. Chỉ cấu hình TX UART5/P0.15, không đọc thanh ghi clock. */
     kvc_m1_uart5_diag_init();
 #endif
+
+    /* KVC-BENCH-20261028: banner ngay sau khi mở UART5, TRƯỚC mọi thứ khác.
+     *
+     * Nếu Hercules không thấy 2 dòng này thì lỗi nằm ở đường TX P0.15 / baud /
+     * GND chung — KHÔNG phải ở cảm biến. Nhờ vậy không mất thời gian nghi ngờ
+     * driver khi thực chất chưa có log nào ra được.
+     *
+     * Đặt trước khối test LED (500 ms) để dòng đầu tiên xuất hiện càng sớm càng
+     * tốt sau reset. */
+    kvc_diag_boot_puts("=== " KVC_FW_ID " BOOT ===");
+    kvc_diag_boot_puts("[INIT] UART5 cfg=9615 8N1 (Hercules: 9600 8N1)");
 
     /* 1. Cấp xung nhịp APB1 cho GPIO Port 0 (IMU), Port 1 (LED) và Port 2 (LoRa Ra-02) */
     SN_SCU->APB1CLKG |= (1U << 17) | (1U << 18) | (1U << 19);
@@ -1320,6 +1544,30 @@ int main(void) {
         s_lora_available = lora_ok ? 1U : 0U;
     }
 
+    /* KVC-BENCH-20261028: kết quả init LoRa kèm RegVersion thật.
+     *
+     * Dùng lại s_lora_last_version (đã đọc trong sx1278_init_tx) — KHÔNG đọc
+     * thêm SPI, nên dòng log này không thể tự gây lỗi bus. Giá trị giúp phân
+     * biệt ngay nguyên nhân:
+     *   0x12 -> chip đúng, lỗi ở bước sau (không phải SPI)
+     *   0x00 -> MISO kẹt thấp / chip mất nguồn / NSS sai
+     *   0xFF -> MISO kẹt cao / dây hở / thiếu pull-up
+     *   khác -> chip khác hoặc SPI sai mode */
+    kvc_diag_boot_begin();
+    kvc_m1_buf_puts("[INIT] LORA ");
+    if (s_lora_available != 0U) {
+        kvc_m1_buf_puts("OK ver=");
+    } else {
+        kvc_m1_buf_puts("FAIL ver=");
+    }
+    kvc_m1_buf_hex8((uint32_t)s_lora_last_version);
+    if (s_lora_available == 0U) {
+        kvc_m1_buf_puts(" tries=");
+        kvc_m1_buf_dec32((uint32_t)KVC_LORA_BOOT_RETRIES);
+        kvc_m1_buf_puts(" mode=DEGRADED(no_tx)");
+    }
+    kvc_diag_boot_end();
+
     /* 4. Khởi tạo cảm biến tư thế IMU GY-87 (MPU-6050) qua bus I2C0 */
     uint8_t imu_addr = 0;
     uint8_t imu_status = mpu6050_init(&imu_addr);
@@ -1347,8 +1595,29 @@ int main(void) {
         KVC_BOARD_LED2_OFF();
     }
 
+    /* KVC-BENCH-20261028: kết quả init IMU + địa chỉ thật tìm được.
+     *
+     * Mã lỗi trùng với số nhịp chớp LED2 nên log và đèn nói cùng một chuyện:
+     *   0 OK (kèm addr 0x68/0x69)
+     *   1 bus kẹt (SDA/SCL chập mass)      2 không ACK ở cả 0x68 và 0x69
+     *   3 có ACK nhưng WHO_AM_I != 0x68    4 ghi lệnh đánh thức thất bại
+     * addr là thông tin chỉ có trong log: GY-87 clone có thể đặt AD0 cao -> 0x69,
+     * và người dùng cần biết điều đó trước khi kết luận "module hỏng". */
+    kvc_diag_boot_begin();
+    kvc_m1_buf_puts("[INIT] IMU ");
+    if (imu_ready) {
+        kvc_m1_buf_puts("OK addr=");
+        kvc_m1_buf_hex8((uint32_t)imu_addr);
+    } else {
+        kvc_m1_buf_puts("FAIL err=");
+        kvc_m1_buf_dec32((uint32_t)imu_status);
+    }
+    kvc_diag_boot_end();
+
     /* 5. Khởi tạo cảm biến siêu âm chống nước AJ-SR04M qua UART2 (9600 bps: P2.14 UTXD2, P2.15 URXD2) */
     kvc_usound_init();
+
+    kvc_diag_boot_puts("[INIT] US uart2=9600 window=250ms (Mode 4, trigger 0x01)");
 
     /* 5b. Khởi tạo module định vị vệ tinh u-blox NEO-M10 qua UART3
      * (9600 bps mặc định theo KVC_GNSS_BAUD_RATE: P2.0 UTXD3, P2.1 URXD3)
@@ -1358,6 +1627,25 @@ int main(void) {
      * bước 5 nhưng KHÔNG ai tiêu thụ ring, nên ring 1024 byte tràn và FSM giải mã
      * siêu âm bị lệch trạng thái. Vì vậy ngay sau đây phải xả ring (xem bước 5d). */
     kvc_gnss_init();
+
+    /* KVC-BENCH-20261028: kết quả GNSS kèm tốc độ THỰC đã chọn.
+     *
+     * `baud=0` = autobaud không nhận được câu NMEA nào ở cả 5 ứng viên; UART3
+     * vẫn được mở ở KVC_GNSS_BAUD_RATE để hệ thống chạy tiếp. Khi đó đừng kết
+     * luận "driver GNSS hỏng" — kiểm tra dây TX module -> P2.1, nguồn module,
+     * anten. Muốn boot nhanh hơn có thể đặt KVC_GNSS_SKIP_AUTOBAUD=1 sau khi
+     * chắc chắn module đã ở 9600. */
+    kvc_diag_boot_begin();
+    kvc_m1_buf_puts("[INIT] GNSS baud=");
+    kvc_m1_buf_dec32(kvc_gnss_get_active_baud());
+    kvc_m1_buf_puts(" target=");
+    kvc_m1_buf_dec32((uint32_t)KVC_GNSS_BAUD_RATE);
+#if (KVC_GNSS_SKIP_AUTOBAUD == 1)
+    kvc_m1_buf_puts(" autobaud=off");
+#else
+    kvc_m1_buf_puts(" autobaud=on");
+#endif
+    kvc_diag_boot_end();
 
     /* 5d. Xả dữ liệu siêu âm ứ đọng trong lúc autobaud GNSS chạy.
      *
@@ -1369,8 +1657,23 @@ int main(void) {
      * không tăng thêm (bbox init ngắn). */
     kvc_usound_discard_stale_rx();
 
-    /* 5c. Khởi tạo driver tiếp nhận BBox FPGA qua UART1 (115200 bps: P2.3 URXD1, P2.2 UTXD1) */
+    /* 5c. FPGA OneKiwi (IF-01).
+     *
+     * KVC-BENCH-20261028: bo hiện tại KHÔNG có FPGA và phía FPGA chưa có
+     * RTL/top-level phát BBox, nên mặc định KHÔNG khởi tạo UART1 (xem
+     * KVC_FPGA_ENABLE).
+     *
+     * VÌ SAO PHẢI TẮT CẢ ĐƯỜNG: khi UART1 bật ngắt mà P2.3 không được lái,
+     * chân float sinh byte rác -> `[RING] FPGA fe/byt/isr` tăng liên tục, log
+     * chẩn đoán nhiễu và ISR đốt CPU vô ích. Đặt =1 khi cắm mock_fpga_bbox.py
+     * qua USB-TTL hoặc khi đã có RTL. */
+    kvc_fpga_pins_idle_safe();
+#if (KVC_FPGA_ENABLE == 1)
     kvc_fpga_bbox_init();
+    kvc_diag_boot_puts("[INIT] FPGA UART1 en=1 38400 8N1 (IF-01)");
+#else
+    kvc_diag_boot_puts("[INIT] FPGA SKIP en=0 (khong co RTL/topmodule)");
+#endif
 
 #if (KVC_M1_CLOCK_DIAG == 1)
     /* KVC-M1-20261025-001: đọc lại CLKSEL/PRE/DLL/DLM của từng cổng SAU khi các
@@ -1436,15 +1739,38 @@ int main(void) {
          * ở cuối vòng (xem khối kvc_finalize_telemetry_packet). Không lấy ở đây
          * vì các bước sau (IMU bit-bang, chờ siêu âm ~250 ms) đã làm mốc này cũ. */
 
-        /* Nếu IMU chưa nhận diện được, tự động dò tìm lại mỗi chu kỳ để người dùng cắm lại dây là nhận ngay */
+        /* Nếu IMU chưa nhận diện được, tự động dò tìm lại để người dùng cắm lại
+         * dây là nhận ngay.
+         *
+         * KVC-BENCH-20261028: chỉ thử lại mỗi KVC_IMU_RETRY_DIV chu kỳ, không thử
+         * mỗi chu kỳ. `mpu6050_init()` chạy cả bus-recovery 9 xung SCL + 4 lệnh
+         * ghi (~1 ms bit-bang); khi IMU hỏng, gọi mỗi giây là đốt thời gian vô
+         * ích và làm nặng thêm ngân sách 1 Hz. 10 chu kỳ ~ 10 s: đủ nhanh để
+         * người dùng thấy nhận lại sau khi cắm dây, đủ thưa để không ảnh hưởng
+         * chu kỳ đo.
+         *
+         * Vẫn giữ nguyên hành vi cũ về mặt chức năng: cắm lại dây -> tự nhận. */
         if (!imu_ready) {
-            imu_status = mpu6050_init(&imu_addr);
-            if (imu_status == MPU6050_ERR_OK) {
-                imu_ready = 1;
-                /* BẬT SÁNG ĐÈN LED2 ĐỨNG YÊN NGAY LẬP TỨC KHI CẢM BIẾN ĐƯỢC KẾT NỐI */
-                KVC_BOARD_LED2_ON();
-            } else {
-                KVC_BOARD_LED2_OFF();
+            static uint8_t s_imu_retry_div = 0U;
+            bool do_retry = false;
+
+            if (s_imu_retry_div == 0U) {
+                do_retry = true;
+            }
+            s_imu_retry_div++;
+            if (s_imu_retry_div >= (uint8_t)KVC_IMU_RETRY_DIV) {
+                s_imu_retry_div = 0U;
+            }
+
+            if (do_retry) {
+                imu_status = mpu6050_init(&imu_addr);
+                if (imu_status == MPU6050_ERR_OK) {
+                    imu_ready = 1;
+                    /* BẬT SÁNG ĐÈN LED2 ĐỨNG YÊN NGAY LẬP TỨC KHI CẢM BIẾN ĐƯỢC KẾT NỐI */
+                    KVC_BOARD_LED2_ON();
+                } else {
+                    KVC_BOARD_LED2_OFF();
+                }
             }
         } else {
             /* Giữ LED2 luôn sáng đứng yên báo hiệu IMU đang kết nối tốt */
@@ -1528,8 +1854,15 @@ int main(void) {
 #endif
         }
 
-        /* Cập nhật và giải mã khung BBox từ FPGA (UART1 P2.3) */
+        /* Cập nhật và giải mã khung BBox từ FPGA (UART1 P2.3).
+         *
+         * KVC-BENCH-20261028: chỉ poll khi driver đã được khởi tạo. Khi
+         * KVC_FPGA_ENABLE=0, ring RX1 không có dữ liệu (UART1 chưa bật) nên
+         * poll vẫn an toàn, nhưng bỏ hẳn lời gọi tránh phải gọi hàm rỗng
+         * 1000 lần/giây và làm rõ ý định trong code. */
+#if (KVC_FPGA_ENABLE == 1)
         kvc_fpga_bbox_poll(kvc_millis());
+#endif
         if (kvc_fpga_bbox_is_valid()) {
             const KvcFpgaFrameState *fpga_state = kvc_fpga_bbox_get_state();
             const KvcFpgaBBoxItem *target = NULL;
@@ -1689,7 +2022,7 @@ int main(void) {
          * không chặn 300 ms mỗi vòng và không gọi SPI vào chip không tồn tại.
          * Cảm biến vẫn được poll bình thường để chẩn đoán. */
         if (s_lora_available != 0U) {
-            sx1278_send_packet((const uint8_t *)&pkt, sizeof(pkt));
+            (void)sx1278_send_packet((const uint8_t *)&pkt, sizeof(pkt));
         }
 
         /* Tắt đèn LED1 sau khi bắn xong */
@@ -1743,7 +2076,9 @@ int main(void) {
          * đó có xảy ra thật hay không, thay vì im lặng coi như đúng 1 Hz. */
         while ((uint32_t)(kvc_millis() - cycle_start_ms) < KVC_TELEMETRY_PERIOD_MS) {
             kvc_gnss_poll(kvc_millis());
+#if (KVC_FPGA_ENABLE == 1)
             kvc_fpga_bbox_poll(kvc_millis());
+#endif
             kvc_usound_poll();
 #if (KVC_M1_CLOCK_DIAG == 1) || (KVC_M2_RX_STATS_DIAG == 1) || (KVC_M3_VALUE_DIAG == 1)
             /* Xả text chẩn đoán dần theo THRE. Không delay, nên không chặn

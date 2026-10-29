@@ -3,6 +3,7 @@
 - **Mã giao diện:** `IF-01`
 - **Hai đầu kết nối:** FPGA OneKiwi Primer 20K (**Nguyễn Tất Vững** - Đầu phát TX) ↔ MCU Sonix SN34F788 (**Nguyễn Tá Duy Phong** - Đầu nhận RX)
 - **Trạng thái:** `DRAFT ABI` (Dự thảo kỹ thuật theo mục IV.2 [KVC_ThietKeHeThong.md](../architecture/KVC_ThietKeHeThong.md); cần Vững và Phong thống nhất trước khi khóa ABI)
+- **Trạng thái phía FPGA (28/10/2026): CHƯA CÓ RTL/top-level phát BBox.** Bo bench hiện tại không có FPGA. Phía MCU đã hỗ trợ vắng mặt qua `KVC_FPGA_ENABLE=0` — xem §1.4.
 
 ---
 
@@ -98,3 +99,43 @@ Mỗi mục tiêu được mã hóa trong đúng 8 byte:
    - Tín hiệu `DATA_READY` trên chân `P0.12` được quy hoạch kích hoạt ngắt EXTI (hiện tại firmware đang đọc kiểm tra ở mức logic/ring buffer, chờ đo kiểm tín hiệu thực tế trên bo FPGA).
    - Kiểm tra 2 byte đầu khung `0x5A 0xA5`. Nếu sai, trượt tìm lại mốc đồng bộ (Resynchronization).
    - Kiểm tra CRC-16; nếu đúng, nạp BBox vào bài toán giao điểm tia quang học tính tọa độ. Nếu sai, bỏ qua frame và tăng bộ đếm lỗi `uart_crc_err`.
+
+---
+
+## 1.4. Yêu cầu phía MCU khi KHÔNG có FPGA (28/10/2026)
+
+Bo bench hiện tại không có FPGA, và phía FPGA chưa có RTL/top-level. Firmware MCU phải **im lặng tuyệt đối** trên đường UART1 thay vì sinh log rác.
+
+| Yêu cầu | Cách hiện thực | Kiểm chứng trong log |
+| :--- | :--- | :--- |
+| Không cấu hình UART1 | `#if (KVC_FPGA_ENABLE == 1)` bọc `kvc_fpga_bbox_init()` | `[INIT] FPGA SKIP en=0` |
+| Không bật NVIC IRQ 38 | Như trên (nằm trong `kvc_fpga_bbox_init`) | `[RING] FPGA` toàn 0 trong 60 s |
+| P2.3 (`URXD1`) không float | `PULLEN` + `PUTYPE` kéo **lên** → idle HIGH (mức stop bit) | Không có `isr`/`byt` tăng |
+| P0.12 (`DATA_READY`) không float | `PULLEN` + `PUTYPE` kéo **xuống**, `DIR` = input, không EXTI | — |
+| Không poll driver | `#if (KVC_FPGA_ENABLE == 1)` bọc `kvc_fpga_bbox_poll()` (2 chỗ) | — |
+| BBox luôn invalid | `kvc_fpga_bbox_is_valid()` trả `false` vì chưa từng nhận frame | `[M3] ... BB n0 v0 crc0 en0` |
+
+**Bật lại:** build với `-DKVC_FPGA_ENABLE=1`, rồi nạp `scripts/manual/mock_fpga_bbox.py --baud 38400` qua USB-TTL vào `P2.3` (GND chung). Không đổi gì trong ABI.
+
+> **Giới hạn chưa xác minh:** pull nội có còn tác dụng khi chân ở chế độ AFIO hay không. Nếu đo thấy P2.3 vẫn float, hàn **10 kΩ từ P2.3 lên 3V3** (cùng lý do với trở treo 10 kΩ cho P2.15 siêu âm — xem [KVC_PHAN_CONG_2_NGUOI.md](../planning/KVC_PHAN_CONG_2_NGUOI.md) mục 1.1).
+
+---
+
+## 1.5. Câu hỏi mở — sai số baud 38.400 (chưa chốt)
+
+Đặc tả §1.3 chọn **38.400 bps** với lý do "tối ưu với UCLK 12 MHz". Nhưng chính dự án đã bác cấu hình này cho GNSS trong [MCU_BUILD_KEIL.md](../configuration/MCU_BUILD_KEIL.md) §5:
+
+> Tại UCLK 12 MHz, divisor 20 cho 37.500 bps (lệch **−2,34 %**); cộng IHRC ±2 % thành ~4,3 %, **vượt** ngưỡng 3,125 % của UART không đồng bộ.
+
+UART1 dùng **cùng UCLK 12 MHz, cùng IHRC, cùng bộ chia** (`KVC_FPGA_UART_DLL = 0x14 = 20`). Do đó về lý thuyết cùng sai số.
+
+**Hai phương án, cần Vững + Phong chốt trước khi có RTL:**
+
+| Phương án | Baud | Sai số @ 12 MHz | Ưu / nhược |
+| :--- | :---: | :--- | :--- |
+| **A** (khuyến nghị) | **19.200** | DLL 39 → 19 231 bps, **+0,16 %** | An toàn; 10 byte/frame (N=0) = 5,2 ms; 170 byte (N=20) = 88 ms. Vẫn dư cho 1–5 Hz |
+| B | 38.400 | DLL 20 → 37 500 bps, **−2,34 %** | Nhanh gấp đôi nhưng nằm ngoài ngưỡng; chỉ chấp nhận nếu đo scope xác nhận cả hai đầu chịu được |
+
+**Không đổi code một phía.** Nếu chọn A, phải sửa đồng thời `KVC_FPGA_UART_DLL`/`KVC_FPGA_UART_BAUD` trong `kvc_fpga_bbox.h`, RTL phía Vững, và §1.3 tài liệu này.
+
+**Bằng chứng cần thu khi có FPGA:** đo bằng scope/logic analyzer tại `P2.3` — đo độ rộng bit thực và đếm `fe` trong `[RING] FPGA`. Số `fe=2497 byt=2497` ghi trong tài liệu 26/10 **không** dùng làm bằng chứng cho UART1: khi đó chưa có RTL nên chân R13 float, và lời giải thích "TX idle LOW + cầu phân áp" áp dụng cho siêu âm (P2.15), không áp dụng cho đường LVCMOS33 push-pull của FPGA. Cùng bảng đó ghi GNSS `fe=0`.

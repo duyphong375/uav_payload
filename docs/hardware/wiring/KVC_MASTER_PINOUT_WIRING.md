@@ -239,9 +239,27 @@ GPIO Sonix SN34F788 — **không cần cầu phân áp**.
 
 | Chân cáp USB-to-TTL | Chân trên MCU Sonix | Tên chân Kit Sonix | Cấu hình cổng nối tiếp |
 | :--- | :--- | :--- | :--- |
-| **RXD (Cáp USB)** | `P0.15` (UTXD5, Pin 6) | `JP1` Pin 17 hoặc 18 | Baudrate: **9.600 bps mặc định** (sai số +0,16% trên UCLK 12 MHz; 115.200 bps khi có PLL), 8N1 |
-| **TXD (Cáp USB)** | `P0.14` (URXD5, Pin 5) | `JP1` Pin 15 hoặc 16 | Nhận lệnh điều khiển từ bàn phím PC |
-| **GND (Cáp USB)** | `VSS` (GND) | **`J5`** Pin 1, 2, 3 hoặc 4 | Nối chung GND máy tính và bo mạch |
+| **RXD (Cáp USB)** | `P0.15` (UTXD5, Pin 6) | `JP1` Pin 17 hoặc 18 | Baudrate: **9.600 8N1** — firmware chạy 9615 bps (PRE=1, DLL=78 @ UCLK 12 MHz, +0,16 %). Đặt Hercules/terminal **9600 8N1, no flow control** |
+| **TXD (Cáp USB)** | `P0.14` (URXD5, Pin 5) | `JP1` Pin 15 hoặc 16 | Nhận lệnh điều khiển từ bàn phím PC (hiện firmware không xử lý lệnh) |
+| **GND (Cáp USB)** | `VSS` (GND) | **`J5`** Pin 1, 2, 3 hoặc 4 | **Bắt buộc nối chung GND** máy tính và bo mạch |
+
+> **Sửa 28/10/2026:** bảng này trước đây ghi "115.200 bps khi có PLL". Firmware hiện **không** bật PLL, nên chỉ có 9615 bps. Đặt terminal 115200 sẽ ra ký tự rác. Chi tiết cách đọc log: [MCU_BENCH_TEST_PLAN.md](../verification/MCU_BENCH_TEST_PLAN.md).
+
+---
+
+### 3.7. Chân FPGA khi KHÔNG có bo FPGA
+
+Bo bench hiện tại (28/10/2026) **không có** FPGA OneKiwi, và phía FPGA chưa có RTL/top-level phát BBox. Firmware mặc định `KVC_FPGA_ENABLE=0` nên **không khởi tạo UART1**, và đặt hai chân giao tiếp về mức xác định:
+
+| Chân MCU | Trạng thái khi `KVC_FPGA_ENABLE=0` | Lý do |
+| :--- | :--- | :--- |
+| `P2.3` (`URXD1`) | Input + **pull-up nội** (idle HIGH) | Tránh start bit giả nếu ai đó bật ngắt UART1; mức HIGH = stop bit |
+| `P0.12` (`DATA_READY`) | Input + **pull-down nội**, không bật EXTI | Mức LOW = "không có frame mới"; tránh chân float |
+| `P2.2` (`UTXD1`) | Không cấu hình (mặc định input) | Không dùng khi vắng FPGA |
+
+> **Chưa xác minh:** pull nội có còn tác dụng khi chân ở chế độ AFIO hay không. Nếu đo thấy P2.3 vẫn float, hàn thêm **10 kΩ từ P2.3 lên 3V3** (phương án A của [KVC_PHAN_CONG_2_NGUOI.md](../../planning/KVC_PHAN_CONG_2_NGUOI.md) mục 1.1 — cùng lý do với trở treo 10 kΩ cho P2.15 siêu âm).
+
+Khi cần test đường BBox bằng script giả lập: build với `KVC_FPGA_ENABLE=1` và chạy `scripts/manual/mock_fpga_bbox.py --baud 38400` nối vào `P2.3` (qua USB-TTL, GND chung).
 
 ---
 

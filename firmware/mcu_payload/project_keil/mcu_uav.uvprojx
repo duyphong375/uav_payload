@@ -414,9 +414,19 @@
               <FilePath>..\src\sensors\kvc_usound_decode.c</FilePath>
             </File>
             <File>
+              <FileName>kvc_usound_filter.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\sensors\kvc_usound_filter.c</FilePath>
+            </File>
+            <File>
               <FileName>kvc_geo_math.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\src\kvc_geo_math.c</FilePath>
+            </File>
+            <File>
+              <FileName>kvc_georef.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\src\kvc_georef.c</FilePath>
             </File>
           </Files>
         </Group>

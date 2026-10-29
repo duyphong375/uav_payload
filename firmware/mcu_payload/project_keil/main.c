@@ -18,7 +18,7 @@
 #include "kvc_usound_ajsr04m.h"
 #include "kvc_gnss_neo_m10.h"
 #include "kvc_fpga_bbox.h"
-#include "kvc_geo_math.h"
+#include "kvc_georef.h"
 #include <string.h>
 #include <stdbool.h>
 
@@ -316,6 +316,20 @@ static void kvc_wdt_feed(void) {
  * cho BBox nhưng sát ngưỡng hơn. Không đặt >= 3000 ms. */
 #ifndef KVC_TELEMETRY_PERIOD_MS
 #define KVC_TELEMETRY_PERIOD_MS      1000UL
+#endif
+
+/* KVC-MCU-OVR-001: dung sai khi phân loại overrun (ms).
+ *
+ * VÌ SAO CẦN: `kvc_millis()` có độ phân giải 1 ms, vòng chờ thoát khi
+ * `elapsed >= period`. Vòng lặp poll cảm biến có thể làm `elapsed` nhảy lên
+ * 1001-1002 ms mà chu kỳ thực vẫn đúng 1 Hz — nếu so `elapsed > period` tuyệt
+ * đối thì `ovr` tăng vô cớ và tiêu chí nghiệm thu "ovr=0 trong 60 s" FAIL giả.
+ *
+ * Chọn 5 ms: đủ chứa jitter 1-2 nhịp 1 ms cộng thời gian một lượt poll, nhưng
+ * vẫn nhỏ hơn nhiều so với một overrun thật (poll siêu âm 250 ms + TX 300 ms).
+ * Không đặt quá 10 ms vì như vậy sẽ che mất overrun nhỏ có ý nghĩa chẩn đoán. */
+#ifndef KVC_OVERRUN_TOLERANCE_MS
+#define KVC_OVERRUN_TOLERANCE_MS     5UL
 #endif
 
 /* KVC-BENCH-20261028: nhận diện firmware đang nạp.
@@ -660,6 +674,7 @@ static void kvc_m2_stats_tick(void) {
  * (dự án build với -Wpadded, coi cảnh báo mới là nợ kỹ thuật). */
 typedef struct {
     uint32_t cycle_overrun_count;/* Số vòng vượt chu kỳ phát */
+    uint32_t cycle_late_max_ms;  /* Độ trễ lớn nhất so với hạn (ms) */
     int16_t  roll_deg10;         /* Roll, 0.1 độ */
     int16_t  pitch_deg10;        /* Pitch, 0.1 độ */
     uint16_t usound_cm;          /* Cự ly siêu âm, cm */
@@ -813,6 +828,11 @@ static void kvc_m3_value_tick(const KvcM3Snapshot *snap) {
     /* Chu kỳ: số vòng vượt hạn 1 s. >0 nghĩa là khối xử lý chậm hơn 1 Hz. */
     kvc_m1_buf_puts(" | ovr");
     kvc_m1_buf_dec32(snap->cycle_overrun_count);
+
+    /* KVC-MCU-OVR-001: độ trễ lớn nhất đo được so với hạn 1000 ms. Giúp phân
+     * biệt "1 Hz đúng, chỉ jitter 1-2 ms" với "thật sự chậm". */
+    kvc_m1_buf_puts(" late_max=");
+    kvc_m1_buf_dec32(snap->cycle_late_max_ms);
 
     /* KVC-BENCH-20261028: số gói phát thành công / thất bại (cộng dồn từ reset).
      * fail > 0 nghĩa là có gói KHÔNG ra được anten — khác hẳn với "gateway
@@ -1098,13 +1118,20 @@ static void kvc_m1_dump_rx_stats(void) {
  * Dựng lại đúng golden vector GV-01 bằng struct thật trong kvc_telemetry.h,
  * tính CRC-16/CCITT-FALSE trên 30 byte đầu rồi so với hằng số đã pin.
  * Mục đích: nếu ai sửa struct/thứ tự field/CRC coverage mà không cập nhật
- * IF-02 + Gateway + parser Python, log UART5 sẽ báo MISMATCH ngay khi boot
+ * IF-02 + Gateway + parser Python, log UART5 sẽ báo FAIL ngay khi boot
  * thay vì phát frame sai xuống trạm đất.
  *
  * Hàm này CHỈ đọc/định dạng, không gửi LoRa, không đổi cấu hình phần cứng.
- * Hiện được gọi từ khối chẩn đoán clock (M1) nên chỉ biên dịch khi M1 bật.
- */
-#if (KVC_M1_CLOCK_DIAG == 1)
+ *
+ * KVC-MCU-TELEMETRY-TEST-001 (29/10/2026): trước đây hàm chỉ biên dịch khi
+ * `KVC_M1_CLOCK_DIAG == 1`, mà macro đó MẶC ĐỊNH 0 — nên bản bench thực tế
+ * KHÔNG hề tự kiểm ABI lúc boot, dù đây là hợp đồng quan trọng nhất với trạm
+ * đất. Nay biên dịch ở M1 hoặc M2 (mặc định 1) và được gọi MỘT lần từ khối
+ * `[INIT]`. Hàm chỉ ĐỊNH DẠNG vào buffer; việc thêm CRLF + xả do caller lo,
+ * nên dùng được cho cả `kvc_diag_boot_*` (blocking) lẫn khối M1.
+ *
+ * CHI PHÍ: một dòng ~60 ký tự @9615 bps ≈ 62 ms, chỉ một lần lúc boot. */
+#if (KVC_M1_CLOCK_DIAG == 1) || (KVC_M2_RX_STATS_DIAG == 1)
 static void kvc_m1_dump_abi_selfcheck(void) {
     KvcTelemetryPacket32 pkt;
     uint16_t crc;
@@ -1131,10 +1158,10 @@ static void kvc_m1_dump_abi_selfcheck(void) {
     kvc_m1_buf_hex32((uint32_t)crc);
     kvc_m1_buf_puts(" EXPECT=");
     kvc_m1_buf_hex32((uint32_t)KVC_GOLDEN_GV01_CRC16);
-    kvc_m1_buf_puts(kvc_telemetry_match_golden_gv01(&pkt) ? " PASS\r\n"
-                                                          : " FAIL\r\n");
+    kvc_m1_buf_puts(kvc_telemetry_match_golden_gv01(&pkt) ? " PASS"
+                                                          : " FAIL");
 }
-#endif /* KVC_M1_CLOCK_DIAG */
+#endif /* KVC_M1_CLOCK_DIAG || KVC_M2_RX_STATS_DIAG */
 
 #if (KVC_M1_CLOCK_DIAG == 1)
 /* phase 0: trước khi init cảm biến — UART1/2/3 chưa nhận dữ liệu nên được phép
@@ -1483,6 +1510,18 @@ int main(void) {
     kvc_diag_boot_puts("=== " KVC_FW_ID " BOOT ===");
     kvc_diag_boot_puts("[INIT] UART5 cfg=9615 8N1 (Hercules: 9600 8N1)");
 
+    /* KVC-MCU-TELEMETRY-TEST-001: tự kiểm ABI IF-02 NGAY khi boot, ở cấu hình
+     * mặc định. Đặt tại đây vì UART5 đã mở và CHƯA có ngắt cảm biến nào bật,
+     * nên được phép xả text đồng bộ (blocking) mà không làm tràn FIFO RX.
+     *
+     * Nếu dòng này báo FAIL thì struct/CRC đã bị sửa lệch IF-02 — DỪNG lại,
+     * không nạp bản đó xuống trạm đất. */
+#if (KVC_M1_CLOCK_DIAG == 1) || (KVC_M2_RX_STATS_DIAG == 1)
+    kvc_diag_boot_begin();
+    kvc_m1_dump_abi_selfcheck();
+    kvc_diag_boot_end();
+#endif
+
     /* 1. Cấp xung nhịp APB1 cho GPIO Port 0 (IMU), Port 1 (LED) và Port 2 (LoRa Ra-02) */
     SN_SCU->APB1CLKG |= (1U << 17) | (1U << 18) | (1U << 19);
 
@@ -1726,6 +1765,9 @@ int main(void) {
      * tăng để biết có xảy ra và xảy ra bao nhiêu lần. */
     uint32_t cycle_start_ms = kvc_millis();
     uint32_t cycle_overrun_count = 0U;
+    /* KVC-MCU-OVR-001: độ trễ lớn nhất so với hạn 1000 ms, để tiêu chí
+     * "ovr=0" không che mất overrun nhỏ. */
+    uint32_t cycle_late_max_ms = 0U;
 
     while (1) {
         /* KVC-F10: kick watchdog ở ĐÚNG MỘT chỗ, đầu mỗi vòng. Không kick trong
@@ -1892,89 +1934,47 @@ int main(void) {
                 pkt.class_id = target->class_id;
                 pkt.confidence = target->confidence;
 
-                /* TÍNH TOÁN TỌA ĐỘ MỤC TIÊU (TARGET GEO-REFERENCING):
-                 * Khung hình chuẩn 640x480, tâm quang học cx = 320, cy = 240.
-                 * Góc nhìn HFOV ~ 60 độ => fx ≈ 554 pixel.
+                /* TÍNH TOÁN TỌA ĐỘ MỤC TIÊU (TARGET GEO-REFERENCING)
                  *
-                 * KVC-MCU-1.5: BỔ SUNG XOAY THEO YAW. Trước đây khối này giả
-                 * định camera LUÔN hướng Bắc, nên khi UAV xoay thì toạ độ mục
-                 * tiêu lệch đúng bằng góc xoay (sai hoàn toàn ở 90/180/270°).
+                 * KVC-MCU-GEO-001 (29/10/2026): toàn bộ phép tính đã chuyển
+                 * sang module `kvc_georef` để host test được. Trước đây khối
+                 * này nằm ngay trong main(), phụ thuộc biến cục bộ nên không
+                 * có test nào chạm tới.
                  *
-                 * Yaw lấy từ `track_made_good` của câu RMC (xem
-                 * kvc_gnss_get_course_deg10). Đó là hướng CHUYỂN ĐỘNG, không
-                 * phải hướng camera, nên chỉ dùng khi UAV bay ngang đủ nhanh;
-                 * hàm getter đã từ chối khi đứng yên hoặc course quá 3 s.
+                 * THAY ĐỔI HÀNH VI DUY NHẤT: khi KHÔNG có Yaw đáng tin, hàm
+                 * trả `KVC_GEO_POS_NONE` (toạ độ 0,0) thay vì giả định hướng
+                 * Bắc rồi phát toạ độ sai. Đây là finding P1 mà cả ba review
+                 * độc lập (Codex, Antigravity, DeepSeek) đều nêu. Cờ
+                 * AI_DETECTED vẫn được giữ để trạm đất biết có phát hiện.
                  *
-                 * GIỚI HẠN CÒN LẠI: fx = 554 và tâm 320x240 là hằng số danh
-                 * định, chưa dùng intrinsics hiệu chuẩn, chưa undistort, chưa bù
-                 * góc nghiêng IMU và chưa có extrinsic camera->body. Yaw cũng
-                 * chỉ là xấp xỉ hướng chuyển động. Đây vẫn là georef xấp xỉ,
-                 * chưa đủ để nghiệm thu (M3). */
-                bool alt_ok = ((pkt.sensor_flags & KVC_FLAG_ALT_VALID) != 0U) &&
-                              (pkt.alt_dist_cm >= 20U) && (pkt.alt_dist_cm <= 800U);
-                bool pose_ok = ((pkt.sensor_flags & KVC_FLAG_GNSS_VALID) != 0U);
+                 * Không đổi IF-02: vẫn dùng đúng 4 bit cờ hiện có, target
+                 * lat/lon = 0 là sentinel "chưa định vị" đã có trong contract.
+                 *
+                 * GIỚI HẠN MÔ HÌNH (không sửa trong task này): chưa bù
+                 * roll/pitch, chưa có intrinsics hiệu chuẩn, Yaw là hướng
+                 * chuyển động GNSS chứ không phải hướng camera. Xem
+                 * `inc/kvc_georef.h` để biết đầy đủ. */
+                KvcGeoInput geo_in;
+                KvcGeoResult geo_out;
 
-                uint16_t yaw_deg10 = 0U;
-                /* KVC-MCU-1.5: Yaw chỉ dùng khi ĐÁNG TIN (RMC status A, course
-                 * ≤ 3 s, tốc độ ≥ 0,5 knot). Khi không có Yaw, hành vi giữ
-                 * nguyên như trước đây: giả định camera hướng Bắc.
-                 *
-                 * VÌ SAO KHÔNG TỪ CHỐI TÍNH TOẠ ĐỘ KHI THIẾU YAW: IF-02 chỉ có
-                 * một cặp lat/lon và 4 bit cờ (bit 4..7 dự phòng). Nếu MCU giữ
-                 * lat/lon = toạ độ UAV mà vẫn bật ALT_VALID + GNSS_VALID, backend
-                 * (esp32_ingress.py:95 `has_wgs84_position`) sẽ coi đó là toạ độ
-                 * mục tiêu HỢP LỆ và báo mục tiêu nằm ngay dưới UAV — sai nguy
-                 * hiểm hơn nhiều so với việc dùng Yaw xấp xỉ. Muốn biểu diễn
-                 * "phát hiện nhưng chưa định vị" cần thêm 1 bit trong byte cờ
-                 * (đề xuất bit 4 = TARGET_POS_VALID); đó là thay đổi IF-02 nên
-                 * phải thống nhất với gateway/backend trước, không tự sửa.
-                 *
-                 * GIỚI HẠN CÒN LẠI (đã ghi trong KVC_PHAN_CONG_2_NGUOI.md §7):
-                 * khi UAV đứng yên hoặc bay chậm, Yaw không có -> georef vẫn
-                 * giả định hướng Bắc như trước, nên nếu camera đang xoay thì toạ
-                 * độ vẫn lệch. Log `[M3]` in `yw=-` để nhận biết trạng thái này. */
-                bool yaw_ok = kvc_gnss_get_course_deg10(kvc_millis(), &yaw_deg10);
-                if (!yaw_ok) {
-                    yaw_deg10 = 0U;   /* 0 = Bắc: hành vi cũ, đã ghi rõ giới hạn */
+                geo_in.gnss_valid    = ((pkt.sensor_flags & KVC_FLAG_GNSS_VALID) != 0U);
+                geo_in.uav_lat_deg7  = uav_lat;
+                geo_in.uav_lon_deg7  = uav_lon;
+                geo_in.alt_valid     = ((pkt.sensor_flags & KVC_FLAG_ALT_VALID) != 0U);
+                geo_in.alt_cm        = pkt.alt_dist_cm;
+                geo_in.yaw_valid     = kvc_gnss_get_course_deg10(kvc_millis(), &geo_in.yaw_deg10);
+                if (!geo_in.yaw_valid) {
+                    geo_in.yaw_deg10 = 0U;   /* giá trị không dùng; hàm tự từ chối */
                 }
+                geo_in.bbox_x_center = target->x_center;
+                geo_in.bbox_y_center = target->y_center;
 
-                if (!alt_ok || !pose_ok) {
-                    /* Không bịa vị trí target; giữ vị trí UAV nếu GNSS vẫn hợp lệ. */
-                    pkt.target_lat = pose_ok ? uav_lat : 0;
-                    pkt.target_lon = pose_ok ? uav_lon : 0;
-                    pkt.target_x_local = 0;
-                    pkt.target_y_local = 0;
-                } else {
-                    float h_m = (float)pkt.alt_dist_cm / 100.0f;
-                    if (h_m < 0.2f) h_m = 0.2f;
+                geo_out = kvc_georef_target(&geo_in, NULL);
 
-                    /* Độ lệch MÉT trong hệ trục ẢNH:
-                     *   right_m  : dương = sang phải ảnh
-                     *   fwd_m    : dương = lên trên ảnh (ra xa camera) */
-                    int32_t right_mm = (int32_t)(((float)target->x_center - 320.0f) * (h_m / 554.0f) * 1000.0f);
-                    int32_t fwd_mm   = (int32_t)((240.0f - (float)target->y_center) * (h_m / 554.0f) * 1000.0f);
-
-                    /* Xoay hệ trục ảnh sang hệ trục địa lý (Đông, Bắc). */
-                    int32_t east_mm  = 0;
-                    int32_t north_mm = 0;
-                    kvc_geo_rotate_to_ne(right_mm, fwd_mm, yaw_deg10, &east_mm, &north_mm);
-
-                    float delta_x_m = (float)east_mm / 1000.0f;    /* Đông */
-                    float delta_y_m = (float)north_mm / 1000.0f;   /* Bắc */
-
-                    /* Đổi độ lệch mét sang tọa độ WGS-84 (nhân 10^7):
-                     * 1m vĩ độ  ≈ 89.977 x 10^-7 độ (1 / 111139 m)
-                     * 1m kinh độ ≈ 93.633 x 10^-7 độ (tại vĩ độ 16° Bắc: 1 / (111139 * cos(16°))) */
-                    int32_t d_lat_deg7 = (int32_t)(delta_y_m * 89.977f);
-                    int32_t d_lon_deg7 = (int32_t)(delta_x_m * 93.633f);
-
-                    pkt.target_lat = uav_lat + d_lat_deg7;
-                    pkt.target_lon = uav_lon + d_lon_deg7;
-
-                    /* Xuất cự ly tương đối thực tế (cm) quanh UAV để màn hình Radar vẽ đúng vị trí mục tiêu */
-                    pkt.target_x_local = (int16_t)(delta_x_m * 100.0f);
-                    pkt.target_y_local = (int16_t)(delta_y_m * 100.0f);
-                }
+                pkt.target_lat     = geo_out.lat_deg7;
+                pkt.target_lon     = geo_out.lon_deg7;
+                pkt.target_x_local = geo_out.x_local_cm;
+                pkt.target_y_local = geo_out.y_local_cm;
             } else {
                 /* Khung hình không có mục tiêu (count == 0) */
                 pkt.sensor_flags &= ~KVC_FLAG_AI_DETECTED;
@@ -2043,6 +2043,7 @@ int main(void) {
         m3_snap.pitch_deg10        = m3_pitch_deg10;
         m3_snap.imu_ok             = m3_imu_ok;
         m3_snap.cycle_overrun_count = cycle_overrun_count;
+        m3_snap.cycle_late_max_ms   = cycle_late_max_ms;
 #else
         /* M3 tắt: roll/pitch vẫn được đọc để ghi pkt.reserved[] nên không có
          * cảnh báo unused; chỉ m3_imu_ok là set-but-not-used nên đọc bỏ. */
@@ -2101,9 +2102,30 @@ int main(void) {
 
         /* Đo chu kỳ thực đã trôi (ms). > period nghĩa là khối xử lý vượt hạn;
          * đếm lại để có số liệu thay vì giả định 1 Hz. Không log mỗi vòng để
-         * không chiếm UART5; log qua thống kê dưới đây khi có overrun. */
-        if ((uint32_t)(kvc_millis() - cycle_start_ms) > KVC_TELEMETRY_PERIOD_MS) {
-            cycle_overrun_count++;
+         * không chiếm UART5; log qua thống kê dưới đây khi có overrun.
+         *
+         * KVC-MCU-OVR-001 (29/10/2026): trước đây so `elapsed > period` tuyệt
+         * đối. Vì `kvc_millis()` có độ phân giải 1 ms và vòng chờ thoát khi
+         * `elapsed >= period`, chỉ cần công việc poll vượt mốc một nhịp là
+         * `elapsed = 1001` -> `ovr` tăng dù chu kỳ vẫn đúng 1 Hz. Điều đó làm
+         * tiêu chí nghiệm thu "`ovr=0` trong 60 s" có thể FAIL giả.
+         *
+         * Nay dùng ngưỡng KVC_OVERRUN_TOLERANCE_MS (5 ms) làm biên dung sai cho
+         * jitter đo được, và ghi lại độ trễ lớn nhất thực tế vào `late_max_ms`
+         * để không che mất overrun thật nhỏ. */
+        {
+            uint32_t elapsed = (uint32_t)(kvc_millis() - cycle_start_ms);
+            uint32_t late_ms = 0U;
+
+            if (elapsed > KVC_TELEMETRY_PERIOD_MS) {
+                late_ms = elapsed - KVC_TELEMETRY_PERIOD_MS;
+            }
+            if (late_ms > cycle_late_max_ms) {
+                cycle_late_max_ms = late_ms;
+            }
+            if (late_ms > KVC_OVERRUN_TOLERANCE_MS) {
+                cycle_overrun_count++;
+            }
         }
     }
 }

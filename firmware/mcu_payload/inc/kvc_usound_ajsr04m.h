@@ -48,6 +48,11 @@
  * mọi thay đổi định dạng khung phải sửa trong kvc_usound_decode.c. */
 #include "kvc_usound_decode.h"
 
+/* KVC-MCU-US-FILTER-001: bộ lọc trung vị + chặn ngoại lai đã tách sang module
+ * thuần logic (kvc_usound_filter.c) để host test được. Driver KHÔNG định nghĩa
+ * lại logic lọc; mọi thay đổi ngưỡng/chiều ngoại lai phải sửa ở đó. */
+#include "kvc_usound_filter.h"
+
 /* KVC-F6b: driver này báo thời gian chờ vào time base dùng chung, nên mọi
  * target/host test có gọi kvc_usound_delay_us() phải link thêm
  * firmware/mcu_payload/src/kvc_timebase.c. */
@@ -505,31 +510,10 @@ static inline uint8_t kvc_usound_measure(uint16_t *dist_cm, uint16_t *dist_mm) {
  * Muốn kiểm chứng độ chính xác phải đối chiếu thước ở nhiều cự ly.
  */
 
-/** Ngưỡng nghi ngờ ngoại lai (cm). 150 cm đủ rộng để không chặn thay đổi thật
- *  của tải treo dưới UAV, nhưng đủ hẹp để chặn xung nhiễu điển hình. */
-#define KVC_USOUND_OUTLIER_CM   150U
-
-/** Số chu kỳ telemetry (1 Hz) giữ lại lịch sử trung vị khi mất echo.
- *
- *  VẤN ĐỀ ĐO ĐƯỢC TRÊN KIT: chuỗi log `202 ok / err/5 / 207 ok` cho thấy echo
- *  yếu bị mất cách quãng. Bản trước xoá trắng lịch sử ngay ở mẫu lỗi đầu tiên,
- *  nên mẫu tốt kế tiếp được trả THẲNG (s_hist_count == 1 -> out = s_hist[0]),
- *  không qua trung vị. Một xung nhiễu lọt vào đúng khe đó sẽ đi thẳng ra
- *  telemetry và vào georef.
- *
- *  Nay lịch sử chỉ bị xoá sau 5 chu kỳ liên tiếp không có mẫu dùng được. Giá
- *  trị công bố trong 5 chu kỳ đó VẪN là 0 kèm mã lỗi (KHÔNG giữ mẫu cũ), nên
- *  georef không bao giờ dùng số cũ — chỉ có bộ lọc là không bị mất trí nhớ. */
-#define KVC_USOUND_HIST_HOLD_CYCLES  5U
-
-static inline uint16_t kvc_usound_median3(uint16_t a, uint16_t b, uint16_t c) {
-    /* Trung vị của 3 giá trị = max(min(a,b), min(max(a,b), c)).
-     * Công thức này đúng với mọi tổ hợp và không cần mảng hay sắp xếp. */
-    uint16_t lo_ab = (a < b) ? a : b;
-    uint16_t hi_ab = (a > b) ? a : b;
-    uint16_t cand  = (hi_ab < c) ? hi_ab : c;
-    return (lo_ab > cand) ? lo_ab : cand;
-}
+/** Ngưỡng nghi ngờ ngoại lai và số chu kỳ giữ lịch sử nay do
+ *  `kvc_usound_filter.h` quy định (KVC-MCU-US-FILTER-001) — một nguồn duy nhất
+ *  để test và driver không lệch nhau. Xem `KVC_USOUND_OUTLIER_CM` và
+ *  `KVC_USOUND_HIST_HOLD_CYCLES` ở đó. */
 
 /**
  * @brief Đọc cự ly có lọc trung vị trượt 3 mẫu + chặn ngoại lai.
@@ -540,125 +524,38 @@ static inline uint16_t kvc_usound_median3(uint16_t a, uint16_t b, uint16_t c) {
  * Gọi đúng MỘT lần mỗi chu kỳ telemetry (1 Hz). Bên trong gọi
  * `kvc_usound_measure()` đúng một lần nên thời gian chặn tối đa
  * KVC_USOUND_TIMEOUT_MS (250 ms) và chỉ đạt mức đó ở chu kỳ thất bại.
+ *
+ * KVC-MCU-US-FILTER-001: thân hàm nay chỉ còn "đo rồi đẩy vào bộ lọc". Toàn
+ * bộ quyết định (giữ mẫu, chặn ngoại lai, trung vị, xoá lịch sử) nằm trong
+ * `kvc_usound_filter_push()` — module thuần logic, có host test.
  */
 static inline uint8_t kvc_usound_read_robust(uint16_t *filtered_cm) {
-    /* Lịch sử 3 mẫu hợp lệ gần nhất (vòng tròn). */
-    static uint16_t s_hist[3]      = {0U, 0U, 0U};
-    static uint8_t  s_hist_count   = 0U;   /* 0..3 */
-    static uint8_t  s_hist_idx     = 0U;
-
-    /* Trạng thái chặn ngoại lai: mẫu nghi ngờ chờ xác nhận. */
-    static uint16_t s_pending_cm   = 0U;
-    static uint8_t  s_pending      = 0U;   /* 1 = đang chờ mẫu xác nhận */
-
-    /* Giữ mẫu cũ một chu kỳ khi lỗi đường truyền (KHÔNG áp dụng cho ngoài dải). */
-    static uint16_t s_last_good_cm = 0U;
-    static uint8_t  s_drop_count   = 0U;
-    /* Số chu kỳ liên tiếp không có mẫu dùng được (mọi mã lỗi). */
-    static uint8_t  s_fail_run     = 0U;
+    static KvcUsoundFilter s_filter;
+    static bool s_filter_ready = false;
 
     uint16_t cm = 0;
-    uint8_t res = kvc_usound_measure(&cm, 0);
+    uint16_t out = 0;
+    bool held = false;
+    uint8_t res;
 
-    if (res != KVC_USOUND_OK) {
-        /* Lỗi nhiễu/đường truyền: chưa có thông tin mới, tạm giữ mẫu cũ 1 chu kỳ
-         * để dashboard không nhấp nháy vì một lần trượt. Sau đó mới báo lỗi.
-         *
-         * Lỗi NGOÀI DẢI (OUT_OF_RANGE/NO_ECHO/BLIND_ZONE) thì KHÔNG giữ mẫu cũ:
-         * đó là câu trả lời đúng và mới của cảm biến. Giữ mẫu cũ sẽ khiến telemetry
-         * báo độ cao cũ dù UAV đã ra khỏi tầm, và georef dùng alt_dist_cm để tính
-         * toạ độ mục tiêu nên sẽ ra toạ độ sai. */
-        if (((res == KVC_USOUND_ERR_TIMEOUT) ||
-             (res == KVC_USOUND_ERR_CHECKSUM) ||
-             (res == KVC_USOUND_ERR_NO_RESPONSE)) &&
-            (s_fail_run == 0U) &&
-            (s_last_good_cm > 0U) && (s_drop_count < 1U)) {
-            s_drop_count++;
-            if (filtered_cm != 0) *filtered_cm = s_last_good_cm;
-            return KVC_USOUND_OK;
-        }
-
-        /* Không có mẫu dùng được. GIÁ TRỊ CÔNG BỐ VẪN LÀ 0 kèm mã lỗi (georef
-         * không được dùng số cũ), nhưng lịch sử trung vị chỉ bị xoá sau
-         * KVC_USOUND_HIST_HOLD_CYCLES chu kỳ liên tiếp. Nhờ vậy khi echo trở lại
-         * ngay sau một khe no-echo, mẫu đầu tiên vẫn được lọc như bình thường
-         * thay vì đi thẳng ra ngoài. */
-        if (s_fail_run < 0xFFU) {
-            s_fail_run++;
-        }
-        s_pending = 0U;
-        s_drop_count = 0U;
-        if (s_fail_run >= KVC_USOUND_HIST_HOLD_CYCLES) {
-            /* Mất tín hiệu kéo dài: xoá lịch sử để lần có lại không trộn mẫu cũ. */
-            s_hist_count = 0U;
-            s_hist_idx   = 0U;
-            s_last_good_cm = 0U;
-        }
-        if (filtered_cm != 0) *filtered_cm = 0U;
-        return res;
+    if (!s_filter_ready) {
+        kvc_usound_filter_reset(&s_filter);
+        s_filter_ready = true;
     }
 
-    s_drop_count = 0U;
-    s_fail_run   = 0U;
+    res = kvc_usound_measure(&cm, 0);
+    res = kvc_usound_filter_push(&s_filter, res, cm, &out, &held);
 
-    /* ---- Chặn ngoại lai ----
-     * Chỉ áp dụng khi đã có ít nhất 1 mẫu lịch sử (cần mốc so sánh). */
-    if (s_hist_count > 0U) {
-        uint16_t ref = s_hist[(uint8_t)((s_hist_idx + 2U) % 3U)];  /* mẫu mới nhất */
-        uint16_t diff = (cm > ref) ? (uint16_t)(cm - ref) : (uint16_t)(ref - cm);
-
-        if (diff > KVC_USOUND_OUTLIER_CM) {
-            /* KVC-BENCH-20261028 (FIX LOGIC): bản trước chỉ kiểm `s_pending != 0`
-             * rồi kết luận "mẫu thứ hai lệch cùng chiều", nhưng KHÔNG hề so
-             * chiều. Hệ quả: hai ngoại lai liên tiếp NGƯỢC chiều (ví dụ +200 cm
-             * rồi −200 cm quanh cùng mốc) vẫn được chấp nhận như một thay đổi
-             * thật, đẩy giá trị công bố đi rất xa trong 2 chu kỳ.
-             *
-             * Nay so chiều thật: mẫu xác nhận phải lệch về CÙNG phía so với ref
-             * mới được coi là thay đổi thật. */
-            bool same_dir = (s_pending != 0U) &&
-                            ((cm > ref) == (s_pending_cm > ref));
-
-            if (same_dir) {
-                /* Mẫu thứ hai lệch cùng chiều -> xác nhận thay đổi thật. */
-                s_pending = 0U;
-            } else {
-                /* Mẫu đầu tiên lệch xa (hoặc mẫu thứ hai lệch ngược chiều):
-                 * nghi ngờ, chưa đưa vào lịch sử. Vẫn trả mẫu đã lọc hiện tại
-                 * để dashboard không nhảy. */
-                s_pending = 1U;
-                s_pending_cm = cm;
-                if (filtered_cm != 0) *filtered_cm = s_last_good_cm;
-                return KVC_USOUND_OK;
-            }
-        } else {
-            /* Mẫu nằm trong dải bình thường -> huỷ trạng thái nghi ngờ. */
-            s_pending = 0U;
-        }
+    /* Giữ đúng ngữ nghĩa cũ: `last=` trong log [M3] chỉ cập nhật khi bộ lọc
+     * THỰC SỰ nhận một mẫu mới, không cập nhật cho mẫu giữ lại/đang nghi ngờ. */
+    if ((res == KVC_USOUND_OK) && !held) {
+        s_usound_last_good_out_cm = out;
     }
 
-    /* ---- Đẩy mẫu vào lịch sử vòng tròn ---- */
-    s_hist[s_hist_idx] = cm;
-    s_hist_idx = (uint8_t)((s_hist_idx + 1U) % 3U);
-    if (s_hist_count < 3U) {
-        s_hist_count++;
+    if (filtered_cm != 0) {
+        *filtered_cm = out;
     }
-
-    /* ---- Xuất trung vị ---- */
-    uint16_t out;
-    if (s_hist_count == 1U) {
-        out = s_hist[0];
-    } else if (s_hist_count == 2U) {
-        /* Hai mẫu: lấy trung bình (chưa đủ để lấy trung vị). */
-        out = (uint16_t)(((uint32_t)s_hist[0] + (uint32_t)s_hist[1]) / 2U);
-    } else {
-        out = kvc_usound_median3(s_hist[0], s_hist[1], s_hist[2]);
-    }
-
-    s_last_good_cm = out;
-    s_usound_last_good_out_cm = out;
-    if (filtered_cm != 0) *filtered_cm = out;
-    return KVC_USOUND_OK;
+    return res;
 }
 
 /* ============================================================================

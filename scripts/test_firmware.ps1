@@ -159,6 +159,31 @@ if ($null -eq $gcc) {
             (Join-Path $mcuSrc 'kvc_geo_math.c'),
             '-o', (Join-Path $outDir 'test_kvc_geo_math.exe'))) `
         -OutputExe (Join-Path $outDir 'test_kvc_geo_math.exe')
+
+    # KVC-MCU-GEO-001: georef tách khỏi main.c, link kèm geo_math (dùng bảng sin).
+    Invoke-TestBinary -Name 'MCU test_kvc_georef' -Compiler $gcc.Source `
+        -Arguments ($common + @(
+            (Join-Path $mcuTests 'test_kvc_georef.c'),
+            (Join-Path $mcuSrc 'kvc_georef.c'),
+            (Join-Path $mcuSrc 'kvc_geo_math.c'),
+            '-o', (Join-Path $outDir 'test_kvc_georef.exe'))) `
+        -OutputExe (Join-Path $outDir 'test_kvc_georef.exe')
+
+    # KVC-MCU-TELEMETRY-TEST-001: khoá ABI IF-02 + golden vector GV-01 ở host.
+    Invoke-TestBinary -Name 'MCU test_kvc_telemetry' -Compiler $gcc.Source `
+        -Arguments ($common + @(
+            (Join-Path $mcuTests 'test_kvc_telemetry.c'),
+            '-o', (Join-Path $outDir 'test_kvc_telemetry.exe'))) `
+        -OutputExe (Join-Path $outDir 'test_kvc_telemetry.exe')
+
+    # KVC-MCU-US-FILTER-001: bộ lọc trung vị + chặn ngoại lai + giữ mẫu.
+    Invoke-TestBinary -Name 'MCU test_kvc_usound_filter' -Compiler $gcc.Source `
+        -Arguments ($common + @(
+            (Join-Path $mcuTests 'test_kvc_usound_filter.c'),
+            (Join-Path $mcuSrc 'sensors\kvc_usound_filter.c'),
+            (Join-Path $mcuSrc 'sensors\kvc_usound_decode.c'),
+            '-o', (Join-Path $outDir 'test_kvc_usound_filter.exe'))) `
+        -OutputExe (Join-Path $outDir 'test_kvc_usound_filter.exe')
 }
 
 # --- 2. Gateway host test ---

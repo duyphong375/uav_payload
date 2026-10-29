@@ -863,9 +863,10 @@ void kvc_gnss_init(void) {
      *
      * Module NEO-M10-0-10 xuất xưởng 38400, nhưng có thể đã được đổi bằng
      * u-center hoặc bởi lần chạy firmware trước. Vì vậy không giả định tốc độ:
-     * kvc_gnss_autobaud() thử lần lượt {38400, 9600, 19200, 57600, 4800}, chọn
-     * tốc độ đầu tiên nhận được câu NMEA có checksum đúng, rồi đưa module về
-     * KVC_GNSS_BAUD_RATE (9600) để MCU chạy với sai số +0,16 % thay vì −2,34 %.
+     * kvc_gnss_autobaud() thử lần lượt {9600, 38400, 19200, 57600, 4800}
+     * (9600 TRƯỚC — xem `kCandidate`), chọn tốc độ đầu tiên nhận được câu NMEA
+     * có checksum đúng, rồi đưa module về KVC_GNSS_BAUD_RATE (9600) để MCU
+     * chạy với sai số +0,16 % thay vì −2,34 %.
      *
      * Đây là lời giải cho trường hợp "module ở tốc độ lạ": không cần u-center,
      * không cần biết trước module đang ở đâu (miễn là trong danh sách trên và

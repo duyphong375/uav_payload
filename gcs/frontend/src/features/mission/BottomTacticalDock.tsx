@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+﻿import React, { useState } from 'react'
 import {
   AlertTriangle,
   ArrowDownUp,
@@ -27,10 +27,15 @@ export interface BottomTacticalDockProps {
   className?: string
 }
 
+const overlayChrome =
+  'kvc-on-overlay bg-[var(--kvc-overlay)] border border-[var(--kvc-line-strong)] text-[var(--kvc-text-on-overlay)]'
+
+const labelClass = 'text-[11px] font-mono font-semibold tracking-wide text-[var(--kvc-text-on-overlay-muted)]'
+const valueClass = 'font-mono tabular-nums text-[var(--kvc-text-on-overlay)]'
+
 /**
- * Thanh Dock Telemetry & SAR HUD trong suốt đặt gọn tại góc dưới bên trái.
- * Đảm bảo 100% diện tích bản đồ được hiển thị trực quan nhất.
- * Cung cấp đầy đủ thông số cho môi trường thử nghiệm (Sa bàn / Local Grid) và thực địa (WGS-84 / LoRa).
+ * Thanh dock telemetry & SAR HUD đặt tại góc dưới bên trái.
+ * Thông số dùng token ngữ nghĩa; trường thiếu hiển thị N/A, không nội suy.
  */
 export const BottomTacticalDock: React.FC<BottomTacticalDockProps> = ({
   showVideoFeed,
@@ -38,14 +43,7 @@ export const BottomTacticalDock: React.FC<BottomTacticalDockProps> = ({
   className = '',
 }) => {
   const { state, dispatch } = useMission()
-  const {
-    camera_position,
-    telemetry,
-    target,
-    has_target,
-    is_stale,
-    alerts,
-  } = state
+  const { camera_position, telemetry, target, has_target, is_stale, alerts } = state
 
   const [isMinimized, setIsMinimized] = useState<boolean>(false)
 
@@ -59,13 +57,13 @@ export const BottomTacticalDock: React.FC<BottomTacticalDockProps> = ({
   const lidarDistM = telemetry.lidar_range_cm !== null ? telemetry.lidar_range_cm / 100 : null
   const isLidarDangerLow = lidarDistM !== null && lidarDistM < 2.0
 
+  const trackLabel = target?.track_id !== null && target?.track_id !== undefined ? `#${target.track_id}` : 'N/A'
+
   // Tọa độ UAV
-  const uavLatStr = hasGpsFix && camera_position.latitude !== null
-    ? `${camera_position.latitude.toFixed(6)}° N`
-    : 'Chờ GNSS 3D Fix'
-  const uavLonStr = hasGpsFix && camera_position.longitude !== null
-    ? `${camera_position.longitude.toFixed(6)}° E`
-    : ''
+  const uavLatStr =
+    hasGpsFix && camera_position.latitude !== null ? `${camera_position.latitude.toFixed(6)}° N` : 'N/A'
+  const uavLonStr =
+    hasGpsFix && camera_position.longitude !== null ? `${camera_position.longitude.toFixed(6)}° E` : ''
 
   // Sao chép tọa độ UAV
   const handleCopyUavCoord = async () => {
@@ -76,7 +74,7 @@ export const BottomTacticalDock: React.FC<BottomTacticalDockProps> = ({
     const text = `${camera_position.latitude.toFixed(6)}, ${camera_position.longitude.toFixed(6)}`
     try {
       await navigator.clipboard.writeText(text)
-      toast.success(`Đã sao chép tọa độ UAV: ${text}`)
+      toast.success(`Đã sao chép tọa độ UAV (WGS-84): ${text}`)
     } catch {
       toast.error('Không thể sao chép vào bộ nhớ tạm')
     }
@@ -84,15 +82,16 @@ export const BottomTacticalDock: React.FC<BottomTacticalDockProps> = ({
 
   // Mục tiêu SAR Handover
   const hasTarget = Boolean(has_target && target && target.pos_valid)
-  const targetTypeLabel = target?.class_name === 'boat' || target?.class_name === 'lifebuoy'
-    ? 'TÀU THUYỀN (Boat)'
-    : target?.class_name === 'person'
-    ? 'NGƯỜI GẶP NẠN (Person)'
-    : 'MỤC TIÊU SAR'
+  const targetTypeLabel =
+    target?.class_name === 'boat' || target?.class_name === 'lifebuoy'
+      ? 'TÀU THUYỀN (Boat)'
+      : target?.class_name === 'person'
+        ? 'NGƯỜI GẶP NẠN (Person)'
+        : 'MỤC TIÊU SAR'
 
   const targetCoordStr = target?.pos_valid
     ? isLocalGrid
-      ? `hệ local X: ${target.local_x_cm ?? 0} cm | Y: ${target.local_y_cm ?? 0} cm`
+      ? `LOCAL (cm) X: ${target.local_x_cm ?? 'N/A'} | Y: ${target.local_y_cm ?? 'N/A'}`
       : `${target.latitude?.toFixed(6) ?? 'N/A'}° N, ${target.longitude?.toFixed(6) ?? 'N/A'}° E`
     : 'Chưa có tọa độ hợp lệ'
 
@@ -105,12 +104,12 @@ export const BottomTacticalDock: React.FC<BottomTacticalDockProps> = ({
     const timeStr = new Date().toLocaleTimeString('vi-VN', { hour12: false })
     const confStr = target.confidence !== null ? `${target.confidence}%` : 'N/A'
     const text = isLocalGrid
-      ? `[KVC SAR HANDOVER] Track #${target.track_id ?? 101} [${targetTypeLabel}] • Local X: ${target.local_x_cm}cm, Y: ${target.local_y_cm}cm • Độ tin cậy: ${confStr} • Thời điểm: ${timeStr}`
-      : `[KVC SAR HANDOVER] Track #${target.track_id ?? 101} [${targetTypeLabel}] • Vĩ độ: ${target.latitude?.toFixed(6)}° N, Kinh độ: ${target.longitude?.toFixed(6)}° E • WGS-84 • Độ tin cậy: ${confStr} • Thời điểm: ${timeStr}`
-    
+      ? `[KVC SAR HANDOVER] Track ${trackLabel} [${targetTypeLabel}] • LOCAL (cm) X: ${target.local_x_cm ?? 'N/A'}, Y: ${target.local_y_cm ?? 'N/A'} • Độ tin cậy: ${confStr} • Thời điểm: ${timeStr}`
+      : `[KVC SAR HANDOVER] Track ${trackLabel} [${targetTypeLabel}] • Vĩ độ: ${target.latitude?.toFixed(6) ?? 'N/A'}° N, Kinh độ: ${target.longitude?.toFixed(6) ?? 'N/A'}° E • WGS-84 • Độ tin cậy: ${confStr} • Thời điểm: ${timeStr}`
+
     try {
       await navigator.clipboard.writeText(text)
-      toast.success(`Đã sao chép tọa độ bàn giao cứu nạn: ${text}`)
+      toast.success(`Đã sao chép toạ độ ${isLocalGrid ? 'LOCAL (cm)' : 'WGS-84'} bàn giao cứu nạn: ${text}`)
     } catch {
       toast.error('Không thể truy cập clipboard')
     }
@@ -125,10 +124,10 @@ export const BottomTacticalDock: React.FC<BottomTacticalDockProps> = ({
         level: 'INFO',
         source: 'SAR_MISSION',
         code: 'SAR_MARK_EVENT',
-        message: `Đánh dấu mốc mục tiêu #${target.track_id ?? 101} [${target.class_name}] tại ${targetCoordStr}`,
+        message: `Đánh dấu mốc mục tiêu ${trackLabel} [${target.class_name}] tại ${targetCoordStr}`,
       },
     })
-    toast.success(`Đã đánh dấu sự kiện mục tiêu #${target.track_id ?? 101} vào nhật ký phiên!`)
+    toast.success(`Đã đánh dấu sự kiện mục tiêu ${trackLabel} vào nhật ký phiên!`)
   }
 
   // RF Link
@@ -142,49 +141,52 @@ export const BottomTacticalDock: React.FC<BottomTacticalDockProps> = ({
 
   return (
     <aside
-      className={`absolute bottom-3 left-3 z-[400] max-w-[calc(100vw-24px)] sm:max-w-md lg:max-w-xl select-none pointer-events-auto transition-all duration-300 font-sans ${className}`}
+      className={`absolute bottom-3 left-3 z-[var(--kvc-z-dock)] max-w-[calc(100vw-24px)] sm:max-w-md lg:max-w-xl select-none pointer-events-auto font-sans ${className}`}
       aria-label="Thanh Dock Đáy Tác Chiến SAR"
     >
-      {/* 1. Dạng thu nhỏ siêu gọn (Mini Floating Capsule Chip) */}
       {isMinimized ? (
-        <div className="bg-slate-950/85 dark:bg-slate-950/90 backdrop-blur-md border border-white/20 dark:border-white/10 rounded-full px-3 py-1.5 flex items-center gap-2.5 text-xs font-mono text-slate-200 shadow-xl">
+        <div className={`${overlayChrome} rounded-full px-3 py-1.5 flex items-center gap-2.5 text-xs`}>
           <div className="flex items-center gap-1.5 truncate">
             <button
               type="button"
               onClick={handleCopyUavCoord}
-              className="flex items-center gap-1 text-white font-bold hover:text-cyan-300 cursor-pointer"
-              title="Nhấp để sao chép tọa độ UAV"
+              className="flex items-center gap-1 text-[var(--kvc-text-on-overlay)] font-bold hover:text-[var(--kvc-accent-ink)] cursor-pointer"
+              title="Sao chép tọa độ UAV (WGS-84)"
             >
-              <MapPin className="h-3 w-3 text-cyan-400 shrink-0" />
-              <span className="truncate">{uavLatStr} {uavLonStr}</span>
+              <MapPin className="h-3 w-3 text-[var(--kvc-accent-ink)] shrink-0" />
+              <span className="truncate font-mono tabular-nums">
+                {uavLatStr} {uavLonStr}
+              </span>
             </button>
-            <span className="text-slate-500">•</span>
-            <span className={isLidarDangerLow ? 'text-rose-400 font-bold animate-pulse' : 'text-slate-300'}>
-              Siêu âm: {lidarDistM !== null ? `${lidarDistM.toFixed(2)}m` : '—'}
+            <span className="text-[var(--kvc-text-faint)]">•</span>
+            <span
+              className={
+                isLidarDangerLow
+                  ? 'text-[var(--kvc-crit-ink)] font-bold'
+                  : 'text-[var(--kvc-text-on-overlay-muted)] font-mono tabular-nums'
+              }
+            >
+              Siêu âm: {lidarDistM !== null ? `${lidarDistM.toFixed(2)} m` : 'N/A'}
             </span>
-            <span className="text-slate-500">•</span>
-            <span className="text-slate-300">
-              Mũi: {camera_position.heading_deg != null ? `${Math.round(camera_position.heading_deg)}°` : '—'}
-            </span>
-            <span className="text-slate-500 hidden sm:inline">•</span>
-            <span className="text-slate-300 hidden sm:inline">
+            <span className="text-[var(--kvc-text-faint)] hidden sm:inline">•</span>
+            <span className="text-[var(--kvc-text-on-overlay-muted)] font-mono tabular-nums hidden sm:inline">
               LoRa: {rssiStr}
             </span>
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0 ml-auto">
             {hasTarget ? (
-              <Badge className="bg-rose-600 text-white font-mono text-[10px] h-5 px-1.5">
-                MỤC TIÊU #{target?.track_id ?? 101}
+              <Badge className="bg-[var(--kvc-crit-fill)] text-[var(--kvc-text-on-fill)] font-mono text-[11px] h-5 px-1.5">
+                MỤC TIÊU {trackLabel}
               </Badge>
             ) : (
-              <span className="text-[10px] text-slate-400 hidden md:inline">Đang quét SAR...</span>
+              <span className="text-[11px] text-[var(--kvc-text-faint)] hidden md:inline">Chưa có mục tiêu</span>
             )}
             <Button
               size="icon"
               variant="ghost"
               onClick={() => setIsMinimized(false)}
-              className="h-6 w-6 text-cyan-400 hover:text-cyan-300 hover:bg-white/10 rounded-full cursor-pointer"
+              className="h-6 w-6 text-[var(--kvc-accent-ink)] hover:bg-[var(--kvc-surface-2)]/25 rounded-full cursor-pointer"
               title="Mở rộng thanh dock tác chiến"
             >
               <ChevronUp className="h-3.5 w-3.5" />
@@ -192,28 +194,29 @@ export const BottomTacticalDock: React.FC<BottomTacticalDockProps> = ({
           </div>
         </div>
       ) : (
-        /* 2. Dạng mở rộng: Thanh HUD nổi trong suốt góc dưới trái (Glassmorphism HUD Card) */
-        <div className="bg-slate-950/85 dark:bg-slate-950/90 backdrop-blur-md border border-white/20 dark:border-white/10 rounded-2xl shadow-2xl p-2.5 sm:p-3 text-slate-100 flex flex-col gap-2">
-          
-          {/* Thanh tiêu đề HUD nhỏ gọn + Trạng thái sóng + Nút điều khiển */}
-          <div className="flex items-center justify-between gap-2 border-b border-white/10 pb-1.5">
+        <div className={`${overlayChrome} rounded-kvc-panel p-2.5 sm:p-3 flex flex-col gap-2`}>
+          {/* Tiêu đề + trạng thái sóng + điều khiển */}
+          <div className="flex items-center justify-between gap-2 border-b border-[var(--kvc-line)]/50 pb-1.5">
             <div className="flex items-center gap-2 min-w-0">
               <span className="relative flex h-2 w-2 shrink-0">
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${is_stale ? 'bg-amber-400' : 'bg-emerald-400'}`} />
-                <span className={`relative inline-flex rounded-full h-2 w-2 ${is_stale ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+                <span
+                  className={`relative inline-flex rounded-full h-2 w-2 ${
+                    is_stale ? 'bg-[var(--kvc-warn)]' : 'bg-[var(--kvc-ok)]'
+                  }`}
+                />
               </span>
-              <span className="text-[10px] font-mono font-bold tracking-wider text-slate-300 uppercase truncate">
-                HUD THỜI GIAN THỰC
-              </span>
-              <span className="text-slate-600">•</span>
-              <span className="text-[11px] font-mono text-indigo-300 flex items-center gap-1 truncate">
+              <span className={`${labelClass} uppercase truncate`}>HUD thời gian thực</span>
+              <span className="text-[var(--kvc-text-faint)]">•</span>
+              <span className="text-[11px] font-mono text-[var(--kvc-accent-ink)] flex items-center gap-1 truncate tabular-nums">
                 <Radio className="h-3 w-3 shrink-0" />
-                <span>LoRa: {rssiStr} <span className="text-slate-400 text-[10px]">({snrStr})</span></span>
+                <span>
+                  LoRa {rssiStr}{' '}
+                  <span className="text-[var(--kvc-text-faint)] text-[11px]">({snrStr})</span>
+                </span>
               </span>
             </div>
 
             <div className="flex items-center gap-1 shrink-0">
-              {/* Nút bật/tắt Video phụ (PiP) nếu có handler */}
               {onToggleVideoFeed && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -221,14 +224,10 @@ export const BottomTacticalDock: React.FC<BottomTacticalDockProps> = ({
                       variant="ghost"
                       size="sm"
                       onClick={onToggleVideoFeed}
-                      className="h-6 px-1.5 text-[10px] gap-1 text-slate-300 hover:text-white hover:bg-white/10 rounded-md cursor-pointer"
+                      className="h-6 px-1.5 text-[11px] gap-1 text-[var(--kvc-text-on-overlay-muted)] hover:text-[var(--kvc-text-on-overlay)] hover:bg-[var(--kvc-surface-2)]/25 rounded-kvc-control cursor-pointer"
                       aria-label="Bật tắt Video phụ"
                     >
-                      {showVideoFeed ? (
-                        <Video className="h-3 w-3 text-cyan-400" />
-                      ) : (
-                        <VideoOff className="h-3 w-3 text-slate-400" />
-                      )}
+                      {showVideoFeed ? <Video className="h-3 w-3" /> : <VideoOff className="h-3 w-3" />}
                       <span className="hidden sm:inline">PiP</span>
                     </Button>
                   </TooltipTrigger>
@@ -238,10 +237,9 @@ export const BottomTacticalDock: React.FC<BottomTacticalDockProps> = ({
                 </Tooltip>
               )}
 
-              {/* Cảnh báo khẩn nếu có */}
               {unacknowledgedAlerts.length > 0 && (
                 <div
-                  className="px-1.5 py-0.5 rounded bg-rose-500/20 border border-rose-500/40 text-rose-400 text-[10px] font-mono flex items-center gap-1 animate-pulse"
+                  className="px-1.5 py-0.5 rounded-kvc-control bg-[var(--kvc-crit-bg)] border border-[var(--kvc-crit-line)] text-[var(--kvc-crit-ink)] text-[11px] font-mono flex items-center gap-1"
                   title={`Có ${unacknowledgedAlerts.length} cảnh báo chưa tiếp nhận`}
                 >
                   <AlertTriangle className="h-3 w-3" />
@@ -249,12 +247,11 @@ export const BottomTacticalDock: React.FC<BottomTacticalDockProps> = ({
                 </div>
               )}
 
-              {/* Nút thu nhỏ Dock */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setIsMinimized(true)}
-                className="h-6 w-6 text-slate-400 hover:text-white hover:bg-white/10 rounded-md cursor-pointer"
+                className="h-6 w-6 text-[var(--kvc-text-on-overlay-muted)] hover:text-[var(--kvc-text-on-overlay)] hover:bg-[var(--kvc-surface-2)]/25 rounded-kvc-control cursor-pointer"
                 title="Thu nhỏ thanh dock tác chiến"
               >
                 <ChevronDown className="h-3.5 w-3.5" />
@@ -262,187 +259,174 @@ export const BottomTacticalDock: React.FC<BottomTacticalDockProps> = ({
             </div>
           </div>
 
-          {/* ========================================================
-              BẢNG THAM SỐ GÓI TIN 32-BYTE CỐ ĐỊNH (FIXED TELEMETRY INSPECTOR)
-              Tất cả các trường dữ liệu luôn hiển thị cố định ở mọi thời điểm
-              ======================================================== */}
           <div className="flex flex-col gap-2">
-            {/* HÀNG 1: TỌA ĐỘ VỊ TRÍ UAV (GPS GNSS) & MỤC TIÊU CỨU NẠN SAR */}
-            <div className="grid grid-cols-2 gap-2 bg-white/5 p-2 rounded-xl border border-white/10">
-              {/* Cột 1: Vị trí UAV theo GPS */}
+            {/* Hàng 1: toạ độ UAV và mục tiêu */}
+            <div className="grid grid-cols-2 gap-2 bg-[var(--kvc-surface-2)]/25 p-2 rounded-kvc-panel border border-[var(--kvc-line)]/40">
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center justify-between gap-1">
-                  <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1">
+                  <span className="text-[11px] font-bold text-[var(--kvc-accent-ink)] uppercase tracking-wider flex items-center gap-1">
                     <MapPin className="h-3 w-3 shrink-0" />
-                    TỌA ĐỘ UAV (GPS GNSS)
+                    Toạ độ UAV
                   </span>
-                  <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded ${hasGpsFix ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300'}`}>
+                  <span
+                    className={`text-[11px] font-mono font-bold px-1.5 py-0.5 rounded-kvc-control border ${
+                      hasGpsFix
+                        ? 'bg-[var(--kvc-ok-bg)] text-[var(--kvc-ok-ink)] border-[var(--kvc-ok-line)]'
+                        : 'bg-[var(--kvc-warn-bg)] text-[var(--kvc-warn-ink)] border-[var(--kvc-warn-line)]'
+                    }`}
+                  >
                     {hasGpsFix ? '3D FIX' : 'NO FIX'}
                   </span>
                 </div>
                 <button
                   type="button"
                   onClick={handleCopyUavCoord}
-                  className="text-left font-mono text-xs font-bold text-white hover:text-cyan-300 truncate mt-0.5 cursor-pointer"
-                  title="Nhấp để sao chép tọa độ UAV"
+                  className={`text-left text-xs font-bold hover:text-[var(--kvc-accent-ink)] truncate mt-0.5 cursor-pointer ${valueClass}`}
+                  title="Sao chép tọa độ UAV (WGS-84)"
                 >
-                  {hasGpsFix
-                    ? `${camera_position.latitude?.toFixed(6)}° N, ${camera_position.longitude?.toFixed(6)}° E`
-                    : <span className="text-slate-500 font-normal">Chờ khóa vệ tinh GNSS...</span>}
+                  {hasGpsFix ? (
+                    `${camera_position.latitude?.toFixed(6)}° N, ${camera_position.longitude?.toFixed(6)}° E`
+                  ) : (
+                    <span className="text-[var(--kvc-text-faint)] font-normal">N/A</span>
+                  )}
                 </button>
               </div>
 
-              {/* Cột 2: Tọa độ Mục tiêu SAR (WGS-84 / Sa bàn) */}
-              <div className="flex flex-col min-w-0 border-l border-white/10 pl-2">
+              <div className="flex flex-col min-w-0 border-l border-[var(--kvc-line)]/40 pl-2">
                 <div className="flex items-center justify-between gap-1">
-                  <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                  <span className="text-[11px] font-bold text-[var(--kvc-ok-ink)] uppercase tracking-wider flex items-center gap-1">
                     <Crosshair className="h-3 w-3 shrink-0" />
-                    MỤC TIÊU SAR ({isLocalGrid ? 'SA BÀN' : 'WGS-84'})
+                    Mục tiêu ({isLocalGrid ? 'LOCAL (cm)' : 'WGS-84'})
                   </span>
                   {hasTarget && (
-                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30">
-                      {target?.class_id === 1 ? 'PERSON' : target?.class_id === 2 ? 'BOAT' : 'TARGET'}
+                    <span className="text-[11px] font-mono font-bold px-1.5 py-0.5 rounded-kvc-control bg-[var(--kvc-crit-bg)] text-[var(--kvc-crit-ink)] border border-[var(--kvc-crit-line)]">
+                      {target?.class_id === 1 ? 'PERSON' : target?.class_id === 2 ? 'LIFEBUOY' : 'TARGET'}
                     </span>
                   )}
                 </div>
                 <button
                   type="button"
                   onClick={handleCopyTargetCoord}
-                  className="text-left font-mono text-xs font-bold text-white hover:text-emerald-300 truncate mt-0.5 cursor-pointer"
-                  title="Nhấp để sao chép tọa độ mục tiêu SAR"
+                  className={`text-left text-xs font-bold hover:text-[var(--kvc-ok-ink)] truncate mt-0.5 cursor-pointer ${valueClass}`}
+                  title={isLocalGrid ? 'Sao chép toạ độ LOCAL (cm) — không phải WGS-84' : 'Sao chép toạ độ WGS-84'}
                 >
                   {isLocalGrid ? (
-                    target?.local_x_cm != null && target?.local_y_cm != null
-                      ? `X: ${target.local_x_cm > 0 ? `+${target.local_x_cm}` : target.local_x_cm} cm | Y: ${target.local_y_cm > 0 ? `+${target.local_y_cm}` : target.local_y_cm} cm`
-                      : <span className="text-slate-500 font-normal">Chưa có tọa độ sa bàn</span>
+                    target?.local_x_cm != null && target?.local_y_cm != null ? (
+                      `X ${target.local_x_cm > 0 ? '+' : ''}${target.local_x_cm} cm | Y ${target.local_y_cm > 0 ? '+' : ''}${target.local_y_cm} cm`
+                    ) : (
+                      <span className="text-[var(--kvc-text-faint)] font-normal">N/A</span>
+                    )
+                  ) : target?.latitude != null && target?.longitude != null ? (
+                    `${target.latitude.toFixed(6)}° N, ${target.longitude.toFixed(6)}° E`
                   ) : (
-                    target?.latitude != null && target?.longitude != null
-                      ? `${target.latitude.toFixed(6)}° N, ${target.longitude.toFixed(6)}° E`
-                      : <span className="text-slate-500 font-normal">Đang quét dòng nước...</span>
+                    <span className="text-[var(--kvc-text-faint)] font-normal">N/A</span>
                   )}
                 </button>
               </div>
             </div>
 
-            {/* HÀNG 2: BẢNG THÔNG SỐ GÓI TIN ĐO XA (3 CỘT CỐ ĐỊNH) */}
-            <div className="grid grid-cols-3 gap-2 text-xs font-mono bg-white/5 p-2 rounded-xl border border-white/10">
-              {/* Ô 1: Cảm biến Siêu âm AJ-SR04M khoảng cách mặt nước */}
+            {/* Hàng 2: tham số gói tin */}
+            <div className="grid grid-cols-3 gap-2 text-xs font-mono bg-[var(--kvc-surface-2)]/25 p-2 rounded-kvc-panel border border-[var(--kvc-line)]/40">
               <div className="flex flex-col">
-                <span className="text-[10px] text-slate-400 font-sans flex items-center gap-1">
-                  <ArrowDownUp className={`h-3 w-3 shrink-0 ${isLidarDangerLow ? 'text-rose-400 animate-pulse' : 'text-cyan-400'}`} />
-                  Siêu âm AJ-SR04M:
+                <span className={`${labelClass} font-sans flex items-center gap-1`}>
+                  <ArrowDownUp
+                    className={`h-3 w-3 shrink-0 ${isLidarDangerLow ? 'text-[var(--kvc-crit-ink)]' : 'text-[var(--kvc-accent-ink)]'}`}
+                  />
+                  Siêu âm:
                 </span>
-                <span className={`font-bold mt-0.5 ${isLidarDangerLow ? 'text-rose-400 animate-pulse' : telemetry.lidar_range_cm !== null ? 'text-white' : 'text-slate-500 font-normal'}`}>
-                  {telemetry.lidar_range_cm !== null ? `${(telemetry.lidar_range_cm / 100).toFixed(2)}m (${telemetry.lidar_range_cm}cm)` : 'N/A'}
+                <span
+                  className={`font-bold mt-0.5 tabular-nums ${
+                    isLidarDangerLow
+                      ? 'text-[var(--kvc-crit-ink)]'
+                      : telemetry.lidar_range_cm !== null
+                        ? 'text-[var(--kvc-text-on-overlay)]'
+                        : 'text-[var(--kvc-text-faint)] font-normal'
+                  }`}
+                >
+                  {telemetry.lidar_range_cm !== null
+                    ? `${(telemetry.lidar_range_cm / 100).toFixed(2)} m`
+                    : 'N/A'}
                 </span>
               </div>
 
-              {/* Ô 2: Tư thế góc nghiêng IMU GY-87 (MPU-6050) */}
               <div className="flex flex-col">
-                <span className="text-[10px] text-slate-400 font-sans flex items-center gap-1">
-                  <Compass className="h-3 w-3 text-amber-400 shrink-0" />
-                  Tư thế IMU GY-87:
+                <span className={`${labelClass} font-sans flex items-center gap-1`}>
+                  <Compass className="h-3 w-3 text-[var(--kvc-warn-ink)] shrink-0" />
+                  Tư thế IMU:
                 </span>
-                <span className="font-bold text-white mt-0.5 truncate">
+                <span className="font-bold mt-0.5 truncate tabular-nums">
                   {telemetry.imu_valid ? (
-                    <span className="text-amber-300">
-                      R:{telemetry.roll_deg != null ? (telemetry.roll_deg > 0 ? `+${telemetry.roll_deg}` : telemetry.roll_deg) : 0}° P:{telemetry.pitch_deg != null ? (telemetry.pitch_deg > 0 ? `+${telemetry.pitch_deg}` : telemetry.pitch_deg) : 0}°
+                    <span className="text-[var(--kvc-warn-ink)]">
+                      R {telemetry.roll_deg ?? 'N/A'}° / P {telemetry.pitch_deg ?? 'N/A'}°
                     </span>
                   ) : (
-                    <span className="text-slate-500 font-normal">N/A (Chưa sẵn sàng)</span>
+                    <span className="text-[var(--kvc-text-faint)] font-normal">N/A</span>
                   )}
                 </span>
               </div>
 
-              {/* Ô 3: Đối tượng AI nhận diện & Độ tin cậy */}
               <div className="flex flex-col">
-                <span className="text-[10px] text-slate-400 font-sans flex items-center gap-1">
+                <span className={`${labelClass} font-sans flex items-center gap-1`}>
                   {target?.class_id === 1 ? (
-                    <User className="h-3 w-3 text-rose-400 shrink-0" />
+                    <User className="h-3 w-3 text-[var(--kvc-crit-ink)] shrink-0" />
                   ) : (
-                    <LifeBuoy className="h-3 w-3 text-amber-400 shrink-0" />
+                    <LifeBuoy className="h-3 w-3 text-[var(--kvc-warn-ink)] shrink-0" />
                   )}
-                  AI Nhận diện:
+                  AI nhận diện:
                 </span>
-                <span className="font-bold text-white mt-0.5 truncate">
+                <span className="font-bold mt-0.5 truncate">
                   {target?.class_name && target?.class_name !== 'unknown' ? (
-                    <span className={target.class_id === 1 ? 'text-rose-400' : 'text-amber-400'}>
-                      {target.class_id === 1 ? 'Người' : target.class_id === 2 ? 'Tàu thuyền' : target.class_name}
-                      <span className="text-cyan-300 ml-1">({target.confidence ?? 0}%)</span>
+                    <span
+                      className={
+                        target.class_id === 1 ? 'text-[var(--kvc-crit-ink)]' : 'text-[var(--kvc-warn-ink)]'
+                      }
+                    >
+                      {target.class_id === 1 ? 'Người' : target.class_id === 2 ? 'Phao/Tàu' : target.class_name}
+                      <span className="text-[var(--kvc-text-on-overlay-muted)] ml-1 tabular-nums">
+                        ({target.confidence ?? 'N/A'}%)
+                      </span>
                     </span>
                   ) : (
-                    <span className="text-slate-500 font-normal">Quét quang học...</span>
+                    <span className="text-[var(--kvc-text-faint)] font-normal">N/A</span>
                   )}
                 </span>
               </div>
 
-              {/* Ô 4: Cờ cảm biến Sensor Flags */}
-              <div className="flex flex-col pt-1.5 border-t border-white/5">
-                <span className="text-[10px] text-slate-400 font-sans flex items-center gap-1">
-                  <Radio className="h-3 w-3 text-emerald-400 shrink-0" />
-                  Cờ Sensor (0x{((telemetry.gps_valid ? 1 : 0) | (telemetry.lidar_valid ? 2 : 0) | (telemetry.imu_valid ? 4 : 0) | (telemetry.ai_detected ? 8 : 0)).toString(16).toUpperCase()}):
-                </span>
-                <div className="flex items-center gap-1 text-[10px] mt-0.5 font-bold">
-                  <span className={telemetry.gps_valid ? 'text-emerald-400' : 'text-slate-600'} title="GPS 3D Fix">GPS</span>
-                  <span className="text-slate-600">•</span>
-                  <span className={telemetry.lidar_valid ? 'text-emerald-400' : 'text-slate-600'} title="Siêu âm ALT hợp lệ">ALT</span>
-                  <span className="text-slate-600">•</span>
-                  <span className={telemetry.imu_valid ? 'text-emerald-400' : 'text-slate-600'} title="IMU góc nghiêng hợp lệ">IMU</span>
-                  <span className="text-slate-600">•</span>
-                  <span className={telemetry.ai_detected ? 'text-rose-400' : 'text-slate-600'} title="AI nhận diện">AI</span>
-                </div>
-              </div>
-
-              {/* Ô 5: Điện áp Pin UAV */}
-              <div className="flex flex-col pt-1.5 border-t border-white/5">
-                <span className="text-[10px] text-slate-400 font-sans">Nguồn Pin UAV:</span>
-                <span className="font-bold text-white mt-0.5">
-                  {telemetry.battery_pct !== null ? `${telemetry.battery_pct}%` : <span className="text-slate-500 font-normal">N/A</span>}
-                </span>
-              </div>
-
-              {/* Ô 6: Sóng LoRa SX1278 & Gói tin */}
-              <div className="flex flex-col pt-1.5 border-t border-white/5">
-                <span className="text-[10px] text-slate-400 font-sans">LoRa #{state.sequence_number ?? 0}:</span>
-                <span className="font-bold text-indigo-300 mt-0.5 truncate">
-                  {rssiStr} <span className="text-slate-400 text-[10px] font-normal">({snrStr})</span>
-                </span>
-              </div>
             </div>
 
-            {/* HÀNG 3: NÚT THAO TÁC BÀN GIAO CỨU NẠN SAR */}
-            <div className="flex items-center justify-between gap-2 pt-0.5">
-              <span className="text-[10px] font-mono text-slate-400 truncate">
-                {targetCoordStr}
-              </span>
+            {/* Hàng 3: bàn giao SAR. Toạ độ đã hiển thị đầy đủ ở hàng 1 nên
+                hàng này chỉ giữ hai thao tác, không lặp lại số. */}
+            <div className="flex items-center justify-end gap-1.5 pt-0.5">
               <div className="flex items-center gap-1.5 shrink-0">
                 <Button
                   size="sm"
                   variant="default"
                   onClick={handleCopyTargetCoord}
-                  className="h-6 px-2 text-[11px] font-semibold gap-1 bg-cyan-600 hover:bg-cyan-500 text-white shadow-xs cursor-pointer"
-                  title="Sao chép tọa độ chuẩn bàn giao cứu nạn"
+                  className="h-6 px-2 text-[11px] font-semibold gap-1 cursor-pointer"
+                  title={
+                    isLocalGrid
+                      ? 'Sao chép toạ độ LOCAL (cm) bàn giao — không phải WGS-84'
+                      : 'Sao chép toạ độ WGS-84 bàn giao'
+                  }
                 >
                   <Copy className="h-3 w-3" />
-                  <span>Sao chép SAR</span>
+                  <span>{isLocalGrid ? 'Sao chép Local (cm)' : 'Sao chép WGS-84'}</span>
                 </Button>
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="ghost"
                   onClick={handleMarkTargetEvent}
-                  className="h-6 px-1.5 text-[11px] font-semibold gap-1 border-white/20 text-slate-200 hover:bg-white/10 cursor-pointer"
+                  className="h-6 px-1.5 text-[11px] font-semibold gap-1 border border-[var(--kvc-line-strong)] bg-transparent text-[var(--kvc-text-on-overlay)] hover:bg-[var(--kvc-surface-2)]/30 hover:text-[var(--kvc-text-on-overlay)] cursor-pointer"
                   title="Đánh dấu mốc sự kiện vào nhật ký phiên"
                 >
-                  <BookmarkPlus className="h-3 w-3 text-cyan-400" />
+                  <BookmarkPlus className="h-3 w-3" />
                   <span className="hidden sm:inline">Đánh dấu</span>
                 </Button>
               </div>
             </div>
           </div>
-
         </div>
       )}
     </aside>
   )
 }
-

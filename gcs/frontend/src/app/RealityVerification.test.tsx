@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+﻿import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AppHeader } from '@/app/AppHeader'
@@ -24,6 +24,8 @@ function renderWithMissionState(customState: Partial<MissionState>, component: R
     setSelectedScenarioId: () => {},
     switchSourceMode: () => {},
     reconnect: () => {},
+    wsUrl: 'ws://127.0.0.1:8000/ws/telemetry',
+    setWsUrl: () => ({ ok: true }),
   }
 
   return render(
@@ -71,32 +73,6 @@ describe('KVC Reality Verification (KVC-GCS-UI-REALITY-001)', () => {
     // ModeContextBar phải thông báo chưa có Ingress ESP32
     expect(screen.getByText(/REAL: ESP32 Chưa Kết Nối/i)).toBeDefined()
     expect(screen.getByText(/Chưa cấu hình Ingress/i)).toBeDefined()
-  })
-
-  it('AC3: REPLAY được đánh dấu xuyên suốt và hiển thị metadata phiên', () => {
-    renderWithMissionState(
-      {
-        source_mode: 'REPLAY',
-        ws_connected: true,
-        replay: {
-          source_file: 'data/sessions/SES-RECORD-001.db',
-          source_session_id: 'SES-RECORD-001',
-          speed_multiplier: 1,
-          is_paused: false,
-          current_record_index: 10,
-          total_records: 100,
-          progress_pct: 10,
-          position_ms: 12000,
-          duration_ms: 120000,
-        },
-      },
-      <ModeContextBar />
-    )
-
-    expect(screen.getByText(/Phát lại nhật ký/i)).toBeDefined()
-    expect(screen.getByText('SES-RECORD-001')).toBeDefined()
-    expect(screen.getByText('12000 ms')).toBeDefined()
-    expect(screen.getByText(/1× ĐANG PHÁT/i)).toBeDefined()
   })
 
   it('AC4: Tách rõ Browser-Backend WS và Hardware Link (ESP32)', () => {

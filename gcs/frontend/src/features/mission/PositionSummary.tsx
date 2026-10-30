@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import {
   ArrowDownUp,
   Camera,
@@ -39,7 +39,7 @@ export const PositionSummary: React.FC<{ className?: string }> = ({ className = 
 
   return (
     <footer
-      className={`h-10 min-h-[40px] border-t border-border bg-card/95 backdrop-blur px-3 sm:px-4 flex items-center justify-between gap-3 text-xs shrink-0 select-none overflow-x-auto whitespace-nowrap shadow-xs ${className}`}
+      className={`h-10 min-h-[40px] border-t border-border bg-card px-3 sm:px-4 flex items-center justify-between gap-3 text-xs shrink-0 select-none overflow-x-auto whitespace-nowrap shadow-xs ${className}`}
       aria-label="Thanh trạng thái Telemetry thời gian thực"
     >
       {/* 1. Vị trí tải nhiệm vụ UAV */}
@@ -49,10 +49,10 @@ export const PositionSummary: React.FC<{ className?: string }> = ({ className = 
             !hasUavFix
               ? 'text-destructive'
               : is_stale
-              ? 'text-amber-500'
+              ? 'text-[var(--kvc-warn-ink)]'
               : source_mode === 'MOCK'
-              ? 'text-purple-600 dark:text-purple-400'
-              : 'text-emerald-600 dark:text-emerald-400'
+              ? 'text-[var(--kvc-mock-ink)]'
+              : 'text-[var(--kvc-ok-ink)]'
           }`}
         />
         <span className="text-muted-foreground font-sans text-xs font-semibold">UAV:</span>
@@ -60,9 +60,9 @@ export const PositionSummary: React.FC<{ className?: string }> = ({ className = 
           <span
             className={`font-bold ${
               is_stale
-                ? 'text-amber-500'
+                ? 'text-[var(--kvc-warn-ink)]'
                 : source_mode === 'MOCK'
-                ? 'text-purple-600 dark:text-purple-300'
+                ? 'text-[var(--kvc-mock-ink)]'
                 : 'text-foreground'
             }`}
           >
@@ -80,7 +80,7 @@ export const PositionSummary: React.FC<{ className?: string }> = ({ className = 
         <Crosshair
           className={`h-4 w-4 shrink-0 ${
             has_target && target && target.pos_valid
-              ? 'text-rose-500'
+              ? 'text-[var(--kvc-crit-ink)]'
               : 'text-muted-foreground/60'
           }`}
         />
@@ -104,7 +104,7 @@ export const PositionSummary: React.FC<{ className?: string }> = ({ className = 
 
       {/* 3. Độ cao bay GNSS */}
       <div className="hidden sm:flex items-center gap-1.5 font-mono text-xs shrink-0" title="Độ cao GNSS">
-        <Mountain className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+        <Mountain className="h-4 w-4 text-[var(--kvc-ok-ink)] shrink-0" />
         <span className="text-muted-foreground font-sans text-xs font-semibold">Alt:</span>
         <span className="font-bold text-foreground">
           {camera_position.altitude_m !== null && camera_position.altitude_m !== undefined
@@ -115,11 +115,11 @@ export const PositionSummary: React.FC<{ className?: string }> = ({ className = 
 
       <div className="hidden sm:block h-4 w-[1px] bg-border shrink-0" />
 
-      {/* 4. Khoảng cách đo dọc tia LiDAR */}
-      <div className="flex items-center gap-1.5 font-mono text-xs shrink-0" title="Khoảng cách đo dọc tia LiDAR">
-        <ArrowDownUp className="h-4 w-4 text-indigo-500 shrink-0" />
-        <span className="text-muted-foreground font-sans text-xs font-semibold">LiDAR:</span>
-        <span className="font-bold text-foreground">
+      {/* 4. Khoảng cách đo dọc tia siêu âm */}
+      <div className="flex items-center gap-1.5 font-mono text-xs shrink-0" title="Khoảng cách tới mặt nước đo bằng siêu âm">
+        <ArrowDownUp className="h-4 w-4 text-[var(--kvc-accent-ink)] shrink-0" />
+        <span className="text-muted-foreground font-sans text-xs font-semibold">Siêu âm:</span>
+        <span className="font-bold text-foreground tabular-nums">
           {telemetry.lidar_range_cm !== null ? `${telemetry.lidar_range_cm} cm` : '—'}
         </span>
       </div>
@@ -131,9 +131,9 @@ export const PositionSummary: React.FC<{ className?: string }> = ({ className = 
         <Signal
           className={`h-4 w-4 shrink-0 ${
             isLoRaGood
-              ? 'text-emerald-600 dark:text-emerald-400'
+              ? 'text-[var(--kvc-ok-ink)]'
               : isLoRaDegraded
-              ? 'text-amber-500'
+              ? 'text-[var(--kvc-warn-ink)]'
               : 'text-destructive'
           }`}
         />
@@ -156,23 +156,23 @@ export const PositionSummary: React.FC<{ className?: string }> = ({ className = 
           variant="outline"
           className={`py-0.5 px-1.5 font-mono text-xs font-bold ${
             is_stale || rx_age_ms > 3000
-              ? 'border-red-500/50 text-red-600 dark:text-red-400 bg-red-500/10'
+              ? 'border-[var(--kvc-crit-line)] text-[var(--kvc-crit-ink)] bg-[var(--kvc-crit-bg)]'
               : rx_age_ms > 1000
-              ? 'border-amber-500/50 text-amber-600 dark:text-amber-400 bg-amber-500/10'
-              : 'border-emerald-500/50 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
+              ? 'border-[var(--kvc-warn-line)] text-[var(--kvc-warn-ink)] bg-[var(--kvc-warn-bg)]'
+              : 'border-[var(--kvc-ok-line)] text-[var(--kvc-ok-ink)] bg-[var(--kvc-ok-bg)]'
           }`}
         >
           {is_stale || rx_age_ms > 3000 ? `${(rx_age_ms / 1000).toFixed(1)}s` : `${rx_age_ms} ms`}
         </Badge>
       </div>
 
-      {/* 7. Nguồn dữ liệu MOCK / REAL / REPLAY (Tím cho MOCK, Xanh cho REAL) */}
+      {/* 7. Nguồn dữ liệu MOCK / REAL (Tím cho MOCK, Xanh cho REAL) */}
       <Badge
         variant="outline"
         className={`font-mono text-xs py-0.5 px-2 font-bold ${
-          source_mode === 'MOCK' || source_mode === 'REPLAY'
-            ? 'border-purple-500/40 text-purple-600 dark:text-purple-300 bg-purple-500/10'
-            : 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
+          source_mode === 'MOCK'
+            ? 'border-[var(--kvc-mock-line)] text-[var(--kvc-mock-ink)] bg-[var(--kvc-mock-bg)]'
+            : 'border-[var(--kvc-ok-line)] text-[var(--kvc-ok-ink)] bg-[var(--kvc-ok-bg)]'
         }`}
         title={`Nguồn dữ liệu: ${source_mode}`}
       >

@@ -79,7 +79,7 @@ Firmware gateway chạy theo đúng thứ tự sau, **không cần chọn tay**:
 | **Đường dẫn Ingress** | **`ws://192.168.4.1:8080/telemetry`** | Endpoint mục tiêu |
 
 #### B. Các bước thực hiện:
-1. **Cắm nguồn ESP32-C3:** Cắm cáp Type-C vào Laptop hoặc pin sạc dự phòng. Sau 10 giây không kết nối được Wi-Fi 2.4 GHz ở ưu tiên 1, ESP32 tự kích hoạt SoftAP `KVC_GROUND_STATION`.
+1. **Cắm nguồn ESP32-C3:** Cắm cáp Type-C vào Laptop hoặc pin sạc dự phòng. Sau **15 giây** (`KVC_STA_BOOT_BUDGET_MS = 15000` trong `src/main.cpp`) không kết nối được Wi-Fi 2.4 GHz ở ưu tiên 1, ESP32 tự kích hoạt SoftAP `KVC_GROUND_STATION`. Tài liệu này trước đây ghi 10 giây; con số đó không khớp code.
 2. **Laptop bắt Wi-Fi:** Mở danh sách mạng Wi-Fi trên thanh Taskbar Windows $\rightarrow$ Chọn mạng **`KVC_GROUND_STATION`** $\rightarrow$ Nhập mật khẩu: `kvc123456`.
 3. **Khởi động Backend và Frontend:** (Xem Mục 3 bên dưới) $\rightarrow$ Hệ thống tự động kết nối và chạy ngay lập tức.
 4. **Sửa code:** **HOÀN TOÀN KHÔNG CẦN SỬA BẤT KỲ DÒNG CODE NÀO.**

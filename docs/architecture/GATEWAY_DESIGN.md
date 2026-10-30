@@ -91,7 +91,7 @@ MCU Sonix trên UAV đóng gói 32 byte theo thứ tự Little-Endian:
 * **Byte 22:** Class ID (`1`: `person`, `2`: `lifebuoy`).
 * **Byte 23:** Confidence (0–100%).
 * **Byte 24:** Sensor Status Flags (Bit 0: GPS Fix, Bit 1: Siêu âm ALT_VALID, Bit 2: IMU, Bit 3: Target Valid).
-* **Byte 25:** Battery UAV (0.1V/bit, vd 126 = 12.6V).
+* **Byte 25:** Status Reserved (dự phòng, luôn `0`; trước đây là điện áp pin 0.1V/bit — KVC đã bỏ phép đo pin).
 * **Byte 26–29:** Reserved (4 bytes dự phòng).
 * **Byte 30–31:** **CRC-16/CCITT-FALSE** (Tính từ Byte 0 đến Byte 29).
 
@@ -101,15 +101,17 @@ Khi nhận gói 32 byte hợp lệ từ LoRa, ESP32 **không cần giải mã t�
 ```json
 {
   "transport_version": 1,
-  "gateway_session_id": 1,
+  "gateway_session_id": 3821045771,
   "gateway_sequence": 42,
   "rx_monotonic_ms": 125430,
-  "rf_payload_hex": "aa55012a78e10100f28292091c6e3b406400c800c800015f0f7e00000000a1b2",
+  "rf_payload_hex": "aa55012ae8030000baba6b06d4b3923f96004001f000015c0f000000000060e2",
   "rssi_dbm": -76,
   "snr_db": 8.5,
   "rx_drop_count": 0
 }
 ```
+
+> **Vector trong ví dụ là GV-02** của [IF-02](../interfaces/IF_MCU_LORA_RF.md) mục 3 (CRC-16 = `0xE260`, lưu LE `60 e2`). GV-02 thay GV-01 sau khi KVC bỏ phép đo pin: byte 25 (`status_reserved`) luôn `0`, layout vẫn 32 byte. `gateway_session_id` chỉ là giá trị minh hoạ: firmware sinh mỗi lần boot từ `esp_random()` trộn MAC eFuse và bảo đảm `>= 2` (xem `session_id.h`), in ra Serial dòng `[SESSION] gateway_session_id = ...`. Vector `aa55012a78e10100...a1b2` từng có trong tài liệu này là fixture lịch sử **có CRC sai**, không dùng làm kỳ vọng.
 
 *Lợi ích kiến trúc:* Thiết kế này giúp firmware ESP32 của bạn cực kỳ nhẹ, không tốn RAM tính toán số thực, không bao giờ bị nghẽn (latency $< 5\text{ms}$), mọi việc giải mã sâu sẽ do Backend Python trên máy tính đảm nhận!
 
@@ -167,7 +169,8 @@ Dưới đây là mã nguồn chuẩn chỉnh từng file bạn có thể lưu t
 
 // =================== CẤU HÌNH WI-FI & WEBSOCKET ===================
 // Ưu tiên 1: STA (Wi-Fi 2.4 GHz có sẵn) qua build flag, không hardcode.
-// Ưu tiên 2: SoftAP dự phòng dưới đây, bật khi STA thất bại sau 10 s.
+// Ưu tiên 2: SoftAP dự phòng dưới đây, bật khi STA thất bại sau 15 s
+// (KVC_STA_BOOT_BUDGET_MS = 15000 trong src/main.cpp).
 #define WIFI_SSID        ""                // Nạp bằng -D KVC_WIFI_SSID=\"...\"
 #define WIFI_PASS        ""                // Nạp bằng -D KVC_WIFI_PASS=\"...\"
 #define AP_SSID          "KVC_GROUND_STATION"
@@ -347,7 +350,10 @@ static void wsEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
 }
 
 void ws_server_init(void) {
-    session_id = (uint32_t)esp_random(); // Session ngẫu nhiên mỗi lần boot
+    // Session id phải đổi mỗi lần boot (IF-03 mục 3). Firmware thực tế dùng
+    // kvc::deriveGatewaySessionId() trộn esp_random() với MAC eFuse và bảo đảm
+    // giá trị >= 2; đoạn dưới chỉ là mô tả tối thiểu.
+    session_id = (uint32_t)esp_random();
     wsServer.begin();
     wsServer.onEvent(wsEvent);
 }
@@ -450,7 +456,7 @@ void loop() {
 
 ## 8. KỊCH BẢN KIỂM THỬ ĐẦU-CUỐI (END-TO-END TEST)
 
-1. Cấp nguồn cho ESP32 $\to$ Serial in ra `[WIFI-STA] Ket noi STA THANH CONG` (đã nối Wi-Fi 2.4 GHz) hoặc `[WIFI-AP] Phat SoftAP du phong THANH CONG` với IP `192.168.4.1` (khi không nối được STA sau 10 s).
+1. Cấp nguồn cho ESP32 $\to$ Serial in ra `[WIFI-STA] Ket noi STA THANH CONG` (đã nối Wi-Fi 2.4 GHz) hoặc `[WIFI-AP] Phat SoftAP du phong THANH CONG` với IP `192.168.4.1` (khi không nối được STA sau 15 s, theo `KVC_STA_BOOT_BUDGET_MS = 15000`).
 2. Dùng laptop quét Wi-Fi $\to$ Nếu ở chế độ dự phòng, thấy mạng **`KVC_GROUND_STATION`** $\to$ Kết nối với mật khẩu `kvc123456`.
 3. Bật mạch phát LoRa của Phong (hoặc bấm Mock Target trên Kit MCU Sonix) $\to$ Serial Monitor của ESP32 báo `[LORA] Valid Packet!`.
 4. Mở trình duyệt trên máy tính kết nối vào Dashboard GCS $\to$ Bản đồ và Radar hiển thị tức thời tọa độ mục tiêu cứu nạn!

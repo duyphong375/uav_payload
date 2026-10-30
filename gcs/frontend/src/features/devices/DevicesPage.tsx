@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import {
   Activity,
   ArrowDownUp,
@@ -50,14 +50,14 @@ export const DevicesPage: React.FC = () => {
       <PageHeader
         breadcrumb="Hệ thống · Chẩn đoán thiết bị"
         title="Thiết bị & kết nối phần cứng"
-        infoTip="Trang chẩn đoán chi tiết phần cứng: Gateway ESP32-C3, vi điều khiển MCU Sonix SN34F788 tải bay, FPGA, cụm cảm biến LiDAR/GNSS và liên kết RF LoRa."
+        infoTip="Trang chẩn đoán chi tiết phần cứng: Gateway ESP32-C3, vi điều khiển MCU Sonix SN34F788 tải bay, FPGA, cụm cảm biến siêu âm/GNSS và liên kết RF LoRa."
         subtitle="Theo dõi tình trạng liên kết truyền thông, cụm cảm biến và thiết bị suy luận AI trên trạm giám sát GCS."
         badge={
           <Badge
-            variant={ws_connected ? 'default' : 'destructive'}
+            variant={ws_connected || source_mode === 'MOCK' ? 'default' : 'destructive'}
             className="text-xs font-mono"
           >
-            {ws_connected ? 'GCS LINK OK' : 'LINK DOWN'}
+            {ws_connected ? 'GCS LINK OK' : source_mode === 'MOCK' ? 'MOCK LOCAL' : 'LINK DOWN'}
           </Badge>
         }
         actions={
@@ -92,15 +92,19 @@ export const DevicesPage: React.FC = () => {
           <CardHeader className="py-3 px-4 border-b border-border/60 bg-muted/20">
             <CardTitle className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Server className="h-4 w-4 text-cyan-500" />
+                <Server className="h-4 w-4 text-[var(--kvc-accent-ink)]" />
                 <span>Trình duyệt ↔ Backend GCS</span>
                 <InfoTip text="Kênh truyền WebSocket hai chiều kết nối giao diện trình duyệt Web với dịch vụ Backend FastAPI." />
               </div>
               <Badge
-                variant={ws_connected ? 'default' : 'destructive'}
-                className="text-[10px] py-0 px-1.5 font-mono"
+                variant={ws_connected || source_mode === 'MOCK' ? 'default' : 'destructive'}
+                className="text-[11px] py-0 px-1.5 font-mono"
               >
-                {ws_connected ? 'ĐÃ KẾT NỐI' : 'MẤT KẾT NỐI'}
+                {ws_connected
+                  ? 'ĐÃ KẾT NỐI'
+                  : source_mode === 'MOCK'
+                    ? 'MÔ PHỎNG CỤC BỘ'
+                    : 'MẤT KẾT NỐI'}
               </Badge>
             </CardTitle>
           </CardHeader>
@@ -113,9 +117,9 @@ export const DevicesPage: React.FC = () => {
               <span className="text-muted-foreground">Nguồn dữ liệu hiện tại:</span>
               <Badge
                 variant="outline"
-                className={`font-mono text-[10px] ${source_mode === 'MOCK'
-                  ? 'border-purple-500/40 text-purple-600 dark:text-purple-300 bg-purple-500/10'
-                  : 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
+                className={`font-mono text-[11px] ${source_mode === 'MOCK'
+                  ? 'border-[var(--kvc-mock-line)] text-[var(--kvc-mock-ink)] bg-[var(--kvc-mock-bg)]'
+                  : 'border-[var(--kvc-ok-line)] text-[var(--kvc-ok-ink)] bg-[var(--kvc-ok-bg)]'
                   }`}
               >
                 {source_mode}
@@ -123,7 +127,7 @@ export const DevicesPage: React.FC = () => {
             </div>
             <div className="flex items-center justify-between py-1 border-b border-border/40">
               <span className="text-muted-foreground">Độ trễ tín hiệu (rx_age):</span>
-              <span className={`font-mono font-semibold ${is_stale ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+              <span className={`font-mono font-semibold ${is_stale ? 'text-[var(--kvc-crit-ink)]' : 'text-[var(--kvc-ok-ink)]'}`}>
                 {rx_age_ms} ms {is_stale ? '(MẤT TÍN HIỆU)' : ''}
               </span>
             </div>
@@ -147,7 +151,7 @@ export const DevicesPage: React.FC = () => {
               </div>
               <Badge
                 variant={esp32Status.badgeVariant}
-                className={`text-[10px] py-0 px-1.5 font-mono ${esp32Status.badgeColorClass}`}
+                className={`text-[11px] py-0 px-1.5 font-mono ${esp32Status.badgeColorClass}`}
               >
                 {esp32Status.shortLabel}
               </Badge>
@@ -166,10 +170,10 @@ export const DevicesPage: React.FC = () => {
                 <span className={`inline-block mr-1.5 h-2 w-2 rounded-full ${esp32Status.dotColorClass}`} />
                 <span className={
                   esp32Status.status === 'LIVE'
-                    ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+                    ? 'text-[var(--kvc-ok-ink)] font-semibold'
                     : esp32Status.status === 'WAITING'
-                      ? 'text-amber-600 dark:text-amber-400 font-semibold'
-                      : 'text-red-600 dark:text-red-400 font-semibold'
+                      ? 'text-[var(--kvc-warn-ink)] font-semibold'
+                      : 'text-[var(--kvc-crit-ink)] font-semibold'
                 }>
                   {esp32Status.description}
                 </span>
@@ -177,7 +181,7 @@ export const DevicesPage: React.FC = () => {
             </div>
             <div className="flex items-center justify-between py-1 border-b border-border/40">
               <span className="text-muted-foreground">Độ trễ tín hiệu ESP32 (rx_age):</span>
-              <span className={`font-mono font-semibold ${is_stale ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>
+              <span className={`font-mono font-semibold ${is_stale ? 'text-[var(--kvc-crit-ink)]' : 'text-[var(--kvc-ok-ink)]'}`}>
                 {rx_age_ms} ms {is_stale ? (source_mode === 'REAL' ? '(MẤT SÓNG >3s)' : '(MẤT TÍN HIỆU)') : '(HOẠT ĐỘNG)'}
               </span>
             </div>
@@ -215,7 +219,7 @@ export const DevicesPage: React.FC = () => {
           </h2>
           <InfoTip text="Bảng kiểm tra tình trạng kết nối, nguồn điện và tín hiệu dữ liệu thực tế của toàn bộ 8 khối thiết bị trên UAV và trạm mặt đất." />
         </div>
-        <div className="border border-border rounded-xl bg-card overflow-hidden shadow-xs">
+        <div className="border border-border rounded-kvc-panel bg-card overflow-hidden shadow-xs">
           <Table>
             <TableHeader className="bg-muted/40">
               <TableRow className="border-border">
@@ -237,15 +241,15 @@ export const DevicesPage: React.FC = () => {
               {/* GNSS / GPS */}
               <TableRow className="border-border/60 hover:bg-muted/30">
                 <TableCell className="text-xs font-semibold text-foreground flex items-center gap-2 py-3">
-                  <Compass className="h-4 w-4 text-cyan-500 shrink-0" />
+                  <Compass className="h-4 w-4 text-[var(--kvc-accent-ink)] shrink-0" />
                   <span>Module Định vị GNSS</span>
                 </TableCell>
                 <TableCell className="py-3">
                   <Badge
                     variant={telemetry.gps_valid && camera_position.is_valid ? 'default' : 'outline'}
-                    className={`text-[10px] py-0 px-1.5 font-mono ${telemetry.gps_valid && camera_position.is_valid
-                      ? 'bg-emerald-600 text-white'
-                      : 'border-amber-500/40 text-amber-500 bg-amber-500/10'
+                    className={`text-[11px] py-0 px-1.5 font-mono ${telemetry.gps_valid && camera_position.is_valid
+                      ? 'bg-[var(--kvc-ok-fill)] text-[var(--kvc-text-on-fill)]'
+                      : 'border-[var(--kvc-warn-line)] text-[var(--kvc-warn-ink)] bg-[var(--kvc-warn-bg)]'
                       }`}
                   >
                     {telemetry.gps_valid && camera_position.is_valid ? '3D FIX' : 'NO FIX'}
@@ -261,18 +265,18 @@ export const DevicesPage: React.FC = () => {
                 </TableCell>
               </TableRow>
 
-              {/* LiDAR */}
+              {/* Siêu âm AJ-SR04M */}
               <TableRow className="border-border/60 hover:bg-muted/30">
                 <TableCell className="text-xs font-semibold text-foreground flex items-center gap-2 py-3">
-                  <ArrowDownUp className="h-4 w-4 text-emerald-500 shrink-0" />
+                  <ArrowDownUp className="h-4 w-4 text-[var(--kvc-ok-ink)] shrink-0" />
                   <span>Cảm biến siêu âm AJ-SR04M</span>
                 </TableCell>
                 <TableCell className="py-3">
                   <Badge
                     variant={telemetry.lidar_valid ? 'default' : 'outline'}
-                    className={`text-[10px] py-0 px-1.5 font-mono ${telemetry.lidar_valid
-                      ? 'bg-emerald-600 text-white'
-                      : 'border-amber-500/40 text-amber-500 bg-amber-500/10'
+                    className={`text-[11px] py-0 px-1.5 font-mono ${telemetry.lidar_valid
+                      ? 'bg-[var(--kvc-ok-fill)] text-[var(--kvc-text-on-fill)]'
+                      : 'border-[var(--kvc-warn-line)] text-[var(--kvc-warn-ink)] bg-[var(--kvc-warn-bg)]'
                       }`}
                   >
                     {telemetry.lidar_valid ? 'HỢP LỆ' : 'KHÔNG HỢP LỆ'}
@@ -289,15 +293,15 @@ export const DevicesPage: React.FC = () => {
               {/* IMU */}
               <TableRow className="border-border/60 hover:bg-muted/30">
                 <TableCell className="text-xs font-semibold text-foreground flex items-center gap-2 py-3">
-                  <Activity className="h-4 w-4 text-amber-500 shrink-0" />
+                  <Activity className="h-4 w-4 text-[var(--kvc-warn-ink)] shrink-0" />
                   <span>Cảm biến góc nghiêng IMU</span>
                 </TableCell>
                 <TableCell className="py-3">
                   <Badge
                     variant={telemetry.imu_valid ? 'default' : 'outline'}
-                    className={`text-[10px] py-0 px-1.5 font-mono ${telemetry.imu_valid
-                      ? 'bg-emerald-600 text-white'
-                      : 'border-amber-500/40 text-amber-500 bg-amber-500/10'
+                    className={`text-[11px] py-0 px-1.5 font-mono ${telemetry.imu_valid
+                      ? 'bg-[var(--kvc-ok-fill)] text-[var(--kvc-text-on-fill)]'
+                      : 'border-[var(--kvc-warn-line)] text-[var(--kvc-warn-ink)] bg-[var(--kvc-warn-bg)]'
                       }`}
                   >
                     {telemetry.imu_valid ? 'HOẠT ĐỘNG' : 'CHƯA SẴN SÀNG'}
@@ -324,11 +328,11 @@ export const DevicesPage: React.FC = () => {
                 <TableCell className="py-3">
                   <Badge
                     variant="outline"
-                    className={`text-[10px] py-0 px-1.5 font-mono ${inference_device === 'FPGA_GW2A'
-                      ? 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
+                    className={`text-[11px] py-0 px-1.5 font-mono ${inference_device === 'FPGA_GW2A'
+                      ? 'border-[var(--kvc-ok-line)] text-[var(--kvc-ok-ink)] bg-[var(--kvc-ok-bg)]'
                       : inference_device === 'PC_REFERENCE'
-                        ? 'border-cyan-500/40 text-cyan-600 dark:text-cyan-400 bg-cyan-500/10'
-                        : 'border-purple-500/40 text-purple-600 dark:text-purple-300 bg-purple-500/10'
+                        ? 'border-[var(--kvc-accent-line)] text-[var(--kvc-accent-ink)] bg-[var(--kvc-accent-bg)]'
+                        : 'border-[var(--kvc-mock-line)] text-[var(--kvc-mock-ink)] bg-[var(--kvc-mock-bg)]'
                       }`}
                   >
                     {inference_device}
@@ -336,7 +340,7 @@ export const DevicesPage: React.FC = () => {
                 </TableCell>
                 <TableCell className="text-xs text-foreground py-3">
                   {telemetry.ai_detected ? (
-                    <span className="text-emerald-600 dark:text-emerald-400 font-semibold font-mono">
+                    <span className="text-[var(--kvc-ok-ink)] font-semibold font-mono">
                       PHÁT HIỆN ĐỐI TƯỢNG (AI DETECTED)
                     </span>
                   ) : (
@@ -357,7 +361,7 @@ export const DevicesPage: React.FC = () => {
                 <TableCell className="py-3">
                   <Badge
                     variant={video.is_connected ? 'default' : 'outline'}
-                    className={`text-[10px] py-0 px-1.5 font-mono ${video.is_connected ? 'bg-emerald-600 text-white' : 'border-red-500/40 text-red-500'
+                    className={`text-[11px] py-0 px-1.5 font-mono ${video.is_connected ? 'bg-[var(--kvc-ok-fill)] text-[var(--kvc-text-on-fill)]' : 'border-[var(--kvc-crit-line)] text-[var(--kvc-crit-ink)]'
                       }`}
                   >
                     {video.source_type}
@@ -380,9 +384,9 @@ export const DevicesPage: React.FC = () => {
                 <TableCell className="py-3">
                   <Badge
                     variant={diagnostics.logger_status === 'OK' ? 'default' : 'outline'}
-                    className={`text-[10px] py-0 px-1.5 font-mono ${diagnostics.logger_status === 'OK'
-                      ? 'bg-emerald-600 text-white'
-                      : 'border-red-500 text-red-500'
+                    className={`text-[11px] py-0 px-1.5 font-mono ${diagnostics.logger_status === 'OK'
+                      ? 'bg-[var(--kvc-ok-fill)] text-[var(--kvc-text-on-fill)]'
+                      : 'border-[var(--kvc-crit)] text-[var(--kvc-crit-ink)]'
                       }`}
                   >
                     {diagnostics.logger_status}

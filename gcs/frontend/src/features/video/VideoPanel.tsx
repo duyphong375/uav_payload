@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+﻿import React, { useRef, useState } from 'react'
 import {
   Camera,
   Expand,
@@ -40,7 +40,6 @@ export const VideoPanel: React.FC = () => {
 
   // Nhãn nguồn video theo mục 5
   const getSourceLabel = () => {
-    if (source_mode === 'REPLAY') return 'REPLAY'
     if (source_mode === 'REAL') return 'REAL'
     return 'MOCK'
   }
@@ -62,10 +61,10 @@ export const VideoPanel: React.FC = () => {
       className="h-full flex flex-col min-h-0 border-border bg-card shadow-xs"
       headerRight={
         <div className="flex items-center gap-1.5 flex-wrap">
-          {/* Nhãn MOCK / REAL / REPLAY */}
+          {/* Nhãn MOCK / REAL */}
           <StatusBadge
             label={getSourceLabel()}
-            variant={source_mode === 'REAL' ? 'emerald' : 'cyan'}
+            variant={source_mode === 'REAL' ? 'ok' : 'accent'}
           />
 
           {/* Bật/Tắt Hộp nhận diện bounding box */}
@@ -108,7 +107,7 @@ export const VideoPanel: React.FC = () => {
     >
       <div
         ref={videoContainerRef}
-        className="relative w-full h-full min-h-0 flex-1 bg-slate-950 flex items-center justify-center overflow-hidden select-none"
+        className="relative w-full h-full min-h-0 flex-1 bg-[var(--kvc-surface)] flex items-center justify-center overflow-hidden select-none"
       >
         {/* Nguồn Video: Mock SVG Test Pattern hoặc Live Feed */}
         {isMock ? (
@@ -135,7 +134,7 @@ export const VideoPanel: React.FC = () => {
 
         {/* Lớp phủ khi mất video (Mục 5: Giữ frame cuối, phủ thông báo, kích thước panel không đổi) */}
         {isVideoOffline && !isMock && (
-          <div className="absolute inset-0 z-20 bg-slate-950/80 backdrop-blur-xs flex flex-col items-center justify-center p-4 text-center">
+          <div className="absolute inset-0 z-20 bg-[var(--kvc-surface)]/95 flex flex-col items-center justify-center p-4 text-center">
             <div className="p-3 rounded-full bg-destructive/15 text-destructive mb-2 border border-destructive/30">
               <VideoOff className="h-6 w-6" />
             </div>
@@ -145,26 +144,26 @@ export const VideoPanel: React.FC = () => {
             <p className="text-[11px] text-muted-foreground max-w-xs mb-2">
               Đường truyền hình ảnh bị gián đoạn. Tọa độ telemetry và định vị GPS vẫn tiếp tục hoạt động độc lập.
             </p>
-            <div className="text-[10px] font-mono text-muted-foreground/80 bg-background/80 px-2 py-0.5 rounded border border-border">
+            <div className="text-[11px] font-mono text-muted-foreground/80 bg-background/80 px-2 py-0.5 rounded border border-border">
               Frame cuối: {lastFrameTimeIso}
             </div>
           </div>
         )}
 
         {/* Thông tin OSD Quang học góc dưới trái (Không tự đặt FPS/Độ phân giải khi không có trong schema) */}
-        <div className="absolute bottom-2 left-2 z-10 bg-slate-900/85 backdrop-blur border border-white/10 px-2.5 py-1 rounded-md text-[10px] font-mono text-slate-300 flex items-center gap-2 shadow-xs">
+        <div className="absolute bottom-2 left-2 z-10 bg-[var(--kvc-surface-2)] border border-[var(--kvc-line)] px-2.5 py-1 rounded-kvc-control text-[11px] font-mono text-[var(--kvc-text-muted)] flex items-center gap-2 shadow-xs">
           <span className="flex items-center gap-1">
-            <Camera className="h-3 w-3 text-cyan-400" />
+            <Camera className="h-3 w-3 text-[var(--kvc-accent-ink)]" />
             <span>{getCameraName()}</span>
           </span>
-          <span className="text-white/30">•</span>
+          <span className="text-[var(--kvc-text-on-overlay)]/30">•</span>
           <span>{isMock ? 'PATTERN MÔ PHỎNG' : 'ĐỘ PHÂN GIẢI: N/A'}</span>
-          <span className="text-white/30">•</span>
-          <span className="text-slate-400">FPS: N/A</span>
+          <span className="text-[var(--kvc-text-on-overlay)]/30">•</span>
+          <span className="text-[var(--kvc-text-on-overlay-muted)]">FPS: N/A</span>
           {bounding_boxes && bounding_boxes.length > 0 && (
             <>
-              <span className="text-white/30">•</span>
-              <span className="text-cyan-400 font-semibold">
+              <span className="text-[var(--kvc-text-on-overlay)]/30">•</span>
+              <span className="text-[var(--kvc-accent-ink)] font-semibold">
                 {bounding_boxes.filter((b) => b.is_synced).length}/{bounding_boxes.length} BBOX ĐỒNG BỘ
               </span>
             </>

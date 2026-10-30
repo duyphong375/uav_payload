@@ -1,6 +1,5 @@
-import React, { useState } from 'react'
+﻿import React, { useState } from 'react'
 import {
-  Battery,
   Clock,
   FlaskConical,
   Menu,
@@ -12,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { InfoTip } from '@/components/shared/InfoTip'
 import { getEsp32PhysicalStatus } from '@/lib/connectionStatus'
+import { AMBER_AGE_MS, isAgeStale } from '@/lib/stale'
 import { GnssSatelliteSheet } from '@/features/telemetry/GnssSatelliteSheet'
 import { ThemeToggle } from '@/features/theme/ThemeToggle'
 import { useMission } from '@/state/MissionProvider'
@@ -56,23 +56,23 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   // Màu và nhãn độ trễ tín hiệu (rx_age_ms)
   const getAgeStatus = (age: number, stale: boolean) => {
     const safeAge = Math.max(0, age)
-    if (stale || safeAge > 3000) {
+    if (isAgeStale(safeAge, stale)) {
       return {
-        color: 'text-red-500 bg-red-500/10 border-red-500/30',
-        dot: 'bg-red-500',
+        color: 'text-[var(--kvc-crit-ink)] bg-[var(--kvc-crit-bg)] border-[var(--kvc-crit-line)]',
+        dot: 'bg-[var(--kvc-crit)]',
         label: `${(safeAge / 1000).toFixed(1)}s (MẤT SÓNG)`,
       }
     }
-    if (safeAge > 1000) {
+    if (safeAge > AMBER_AGE_MS) {
       return {
-        color: 'text-amber-500 bg-amber-500/10 border-amber-500/30',
-        dot: 'bg-amber-500',
+        color: 'text-[var(--kvc-warn-ink)] bg-[var(--kvc-warn-bg)] border-[var(--kvc-warn-line)]',
+        dot: 'bg-[var(--kvc-warn)]',
         label: `${(safeAge / 1000).toFixed(1)}s (Trễ)`,
       }
     }
     return {
-      color: 'text-emerald-500 bg-emerald-500/10 border-emerald-500/30',
-      dot: 'bg-emerald-500',
+      color: 'text-[var(--kvc-ok-ink)] bg-[var(--kvc-ok-bg)] border-[var(--kvc-ok-line)]',
+      dot: 'bg-[var(--kvc-ok)]',
       label: `${Math.round(safeAge)}ms (Tốt)`,
     }
   }
@@ -87,29 +87,29 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
     switch (esp32Status.status) {
       case 'LIVE':
         return {
-          btnClass: 'bg-emerald-600 text-white shadow-[0_0_12px_rgba(16,185,129,0.4)]',
+          btnClass: 'bg-[var(--kvc-ok-fill)] text-[var(--kvc-text-on-fill)]',
           label: 'REAL (LIVE)',
-          ping: 'bg-emerald-300',
-          dot: 'bg-white',
+          ping: 'bg-[var(--kvc-ok)]/60',
+          dot: 'bg-[var(--kvc-text-on-overlay)]',
         }
       case 'LOST_SIGNAL':
         return {
-          btnClass: 'bg-rose-600 text-white animate-pulse shadow-[0_0_12px_rgba(244,63,94,0.4)]',
+          btnClass: 'bg-[var(--kvc-crit-fill)] text-[var(--kvc-text-on-fill)]',
           label: 'REAL (MẤT SÓNG)',
-          ping: 'bg-rose-300',
-          dot: 'bg-white',
+          ping: 'bg-[var(--kvc-crit)]/60',
+          dot: 'bg-[var(--kvc-text-on-overlay)]',
         }
       case 'BACKEND_DOWN':
         return {
-          btnClass: 'bg-rose-950/70 text-rose-300 border border-rose-500/50',
+          btnClass: 'bg-[var(--kvc-crit-bg)] text-[var(--kvc-crit-ink)] border border-[var(--kvc-crit-line)]',
           label: 'REAL (MẤT BACKEND)',
           ping: null,
-          dot: 'bg-rose-500',
+          dot: 'bg-[var(--kvc-crit)]',
         }
       case 'WAITING':
       default:
         return {
-          btnClass: 'bg-rose-600/90 text-white border border-rose-500/60 shadow-xs',
+          btnClass: 'bg-[var(--kvc-crit-fill)]/90 text-[var(--kvc-text-on-fill)] border border-[var(--kvc-crit-line)]',
           label: 'REAL (CHƯA KẾT NỐI)',
           ping: null,
           dot: 'bg-white',
@@ -143,16 +143,16 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         </div>
       </div>
 
-      {/* 2. Ở giữa: Bộ chuyển chế độ 3 lựa chọn MOCK vs REAL vs REPLAY */}
+      {/* 2. Ở giữa: Bộ chuyển chế độ 2 lựa chọn MOCK vs REAL */}
       <div className="flex items-center gap-1.5">
-        <div className="flex items-center p-1 rounded-xl border border-border/80 bg-muted/50 dark:bg-[#111622] shadow-2xs gap-0.5">
+        <div className="flex items-center p-1 rounded-kvc-panel border border-border/80 bg-muted/50 dark:bg-[#111622] shadow-2xs gap-0.5">
           {/* Nút MOCK */}
           <button
             type="button"
             onClick={() => handleSwitchSourceMode('MOCK')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 min-h-[32px] rounded-lg text-xs font-bold transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-primary ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 min-h-[32px] rounded-kvc-control text-xs font-bold transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-primary ${
               source_mode === 'MOCK'
-                ? 'bg-purple-600 text-white shadow-[0_0_12px_rgba(168,85,247,0.35)]'
+                ? 'bg-[var(--kvc-mock-fill)] text-[var(--kvc-text-on-fill)]'
                 : 'text-muted-foreground hover:text-foreground'
             }`}
             title={`Chế độ Mô phỏng MOCK (${APP_CONFIG.MOCK_TRANSPORT === 'LOCAL' ? 'Cục bộ offline' : 'Backend loopback'})`}
@@ -160,7 +160,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           >
             <FlaskConical className="h-3.5 w-3.5" />
             <span>MOCK</span>
-            <span className="text-[9px] px-1 py-0.2 rounded bg-black/20 uppercase font-mono hidden sm:inline">
+            <span className="text-[11px] px-1 py-0.2 rounded bg-black/20 uppercase font-mono hidden sm:inline">
               {APP_CONFIG.MOCK_TRANSPORT}
             </span>
           </button>
@@ -169,7 +169,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           <button
             type="button"
             onClick={() => handleSwitchSourceMode('REAL')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 min-h-[32px] rounded-lg text-xs font-bold transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-primary ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 min-h-[32px] rounded-kvc-control text-xs font-bold transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-primary ${
               source_mode === 'REAL'
                 ? realBtnConfig.btnClass
                 : 'text-muted-foreground hover:text-foreground'
@@ -190,24 +190,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
               </span>
             )}
           </button>
-
-          {/* Nút REPLAY */}
-          <button
-            type="button"
-            onClick={() => handleSwitchSourceMode('REPLAY')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 min-h-[32px] rounded-lg text-xs font-bold transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-primary ${
-              source_mode === 'REPLAY'
-                ? 'bg-cyan-600 text-white shadow-[0_0_12px_rgba(6,182,212,0.35)]'
-                : 'text-muted-foreground hover:text-foreground'
-            }`}
-            title="Chế độ Phát lại nhật ký SQLite (REPLAY)"
-            aria-label="Chế độ Phát lại REPLAY"
-          >
-            <Clock className="h-3.5 w-3.5" />
-            <span>REPLAY</span>
-          </button>
         </div>
-        <InfoTip text="Nguồn dữ liệu: MOCK (kịch bản mô phỏng), REAL (dữ liệu từ Gateway ESP32 qua Ingress), REPLAY (phát lại nhật ký SQLite). Trình duyệt chỉ nhận qua Backend GCS localhost." />
+        <InfoTip text="Nguồn dữ liệu: MOCK (kịch bản mô phỏng), REAL (dữ liệu từ Gateway ESP32 qua Ingress). Trình duyệt chỉ nhận qua Backend GCS localhost." />
       </div>
 
       {/* 3. Bên phải: Chỉ số hệ thống tóm tắt & Công cụ */}
@@ -215,7 +199,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         {/* Kết nối WebSocket Trình duyệt ↔ Backend GCS */}
         {source_mode === 'MOCK' && APP_CONFIG.MOCK_TRANSPORT === 'LOCAL' ? (
           <div
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 min-h-[32px] rounded-lg border text-xs font-semibold bg-purple-500/10 border-purple-500/30 text-purple-600 dark:text-purple-400"
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 min-h-[32px] rounded-kvc-control border text-xs font-semibold bg-[var(--kvc-mock-bg)] border-[var(--kvc-mock-line)] text-[var(--kvc-mock-ink)]"
             title="Đang chạy mô phỏng cục bộ trên trình duyệt (Offline)"
           >
             <FlaskConical className="h-4 w-4 shrink-0" />
@@ -223,10 +207,10 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
           </div>
         ) : (
           <div
-            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 min-h-[32px] rounded-lg border text-xs font-semibold ${
+            className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 min-h-[32px] rounded-kvc-control border text-xs font-semibold ${
               ws_connected
-                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
-                : 'bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400'
+                ? 'bg-[var(--kvc-ok-bg)] border-[var(--kvc-ok-line)] text-[var(--kvc-ok-ink)]'
+                : 'bg-[var(--kvc-crit-bg)] border-[var(--kvc-crit-line)] text-[var(--kvc-crit-ink)]'
             }`}
             title={ws_connected ? 'WebSocket Trình duyệt ↔ Backend GCS đang kết nối' : 'Mất kết nối WebSocket tới Backend GCS'}
           >
@@ -244,7 +228,7 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         {/* Tình trạng kết nối thật Gateway ESP32 ↔ Backend GCS (chế độ REAL) */}
         {source_mode === 'REAL' && (
           <div
-            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 min-h-[32px] rounded-lg border text-xs font-semibold ${esp32Status.badgeColorClass}`}
+            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 min-h-[32px] rounded-kvc-control border text-xs font-semibold ${esp32Status.badgeColorClass}`}
             title={esp32Status.description}
           >
             <Radio className="h-3.5 w-3.5 shrink-0" />
@@ -272,40 +256,24 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         <button
           type="button"
           onClick={() => setSatelliteSheetOpen(true)}
-          className="hidden lg:flex items-center gap-1.5 px-2 py-1 rounded-md border border-border/80 bg-muted/30 hover:bg-muted/70 hover:border-cyan-500/50 transition-all text-xs cursor-pointer group"
+          className="hidden lg:flex items-center gap-1.5 px-2 py-1 rounded-md border border-border/80 bg-muted/30 hover:bg-muted/70 hover:border-[var(--kvc-accent-line)] transition-all text-xs cursor-pointer group"
           title="Xem trạng thái GNSS và các chỉ số có dữ liệu"
           aria-label="Xem chi tiết vệ tinh GNSS"
         >
-          <Satellite className="h-3.5 w-3.5 text-cyan-500 shrink-0 group-hover:scale-110 transition-transform" />
+          <Satellite className="h-3.5 w-3.5 text-[var(--kvc-accent-ink)] shrink-0 group-hover:scale-110 transition-transform" />
           <span className="text-muted-foreground">GNSS:</span>
           <span
             className={`font-semibold font-mono ${
               camera_position.is_valid && telemetry.gps_valid
-                ? 'text-emerald-500'
-                : 'text-amber-500'
+                ? 'text-[var(--kvc-ok-ink)]'
+                : 'text-[var(--kvc-warn-ink)]'
             }`}
           >
             {camera_position.is_valid && telemetry.gps_valid ? 'FIX HỢP LỆ' : 'NO FIX'}
           </span>
         </button>
 
-        {/* Pin tải nhiệm vụ */}
-        {telemetry.battery_pct !== null && (
-          <div className="hidden md:flex items-center gap-1.5 px-2 py-1 rounded-md border border-border/80 bg-muted/30 text-xs font-mono">
-            <Battery className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-            <span
-              className={`font-semibold ${
-                telemetry.battery_pct <= 20
-                  ? 'text-red-500'
-                  : telemetry.battery_pct <= 35
-                  ? 'text-amber-500'
-                  : 'text-foreground'
-              }`}
-            >
-              {telemetry.battery_pct}%
-            </span>
-          </div>
-        )}
+        {/* Pin tải nhiệm vụ: KVC đã bỏ phép đo pin nên không hiển thị chỉ số pin */}
 
         {/* Nút chuyển đổi Theme Light/Dark/System */}
         <ThemeToggle />

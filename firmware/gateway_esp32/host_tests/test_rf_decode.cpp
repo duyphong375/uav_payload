@@ -5,10 +5,10 @@
  * Chạy được trên PC, không cần ESP32. Kiểm tra:
  * 1. Layout ABI: sizeof == 32 và offset từng trường khớp IF-02.
  * 2. CRC-16/CCITT-FALSE: giá trị chuẩn "123456789" = 0x29B1.
- * 3. Golden vector GV-01: CRC 0x304E và chuỗi hex 64 ký tự khớp IF-02 mục 3.
+ * 3. Golden vector GV-02: CRC 0xE260 và chuỗi hex 64 ký tự khớp IF-02 mục 3.
  * 4. validatePacketCrc: chấp nhận gói đúng, từ chối sai độ dài/sync/CRC.
  * 5. bytesToHexString: đúng 64 ký tự, chữ thường, zero-padded, chặn tràn đệm.
- * 6. matchesGoldenGv01: đúng với GV-01 và sai khi lệch một trường.
+ * 6. matchesGoldenGv02: đúng với GV-02 và sai khi lệch một trường.
  *
  * Biên dịch (từ thư mục gốc repo):
  *   g++ -std=c++17 -Wall -Wextra -O2 -Ifirmware/gateway_esp32/src `
@@ -35,8 +35,8 @@ static int s_tests_passed = 0;
 
 namespace {
 
-/* Dựng golden vector GV-01 theo đúng IF-02 mục 3. */
-kvc::RfTelemetryPacket32 make_golden_gv01() {
+/* Dựng golden vector GV-02 theo đúng IF-02 mục 3 (byte 25 reserved = 0). */
+kvc::RfTelemetryPacket32 make_golden_gv02() {
     kvc::RfTelemetryPacket32 pkt;
     std::memset(&pkt, 0, sizeof(pkt));
 
@@ -53,14 +53,14 @@ kvc::RfTelemetryPacket32 make_golden_gv01() {
     pkt.class_id = 1;
     pkt.confidence = 92;
     pkt.sensor_flags = 0x0F;
-    pkt.battery_raw = 126;
+    pkt.status_reserved = 0;
     pkt.crc16 = kvc::calculateCrc16(reinterpret_cast<const uint8_t *>(&pkt),
                                     kvc::kRfCrcCoverage);
     return pkt;
 }
 
-constexpr const char *kGoldenGv01Hex =
-    "aa55012ae8030000baba6b06d4b3923f96004001f000015c0f7e000000004e30";
+constexpr const char *kGoldenGv02Hex =
+    "aa55012ae8030000baba6b06d4b3923f96004001f000015c0f000000000060e2";
 
 /* ---------- 1. Layout ABI ---------- */
 void test_layout() {
@@ -89,8 +89,8 @@ void test_layout() {
                 "confidence @23");
     TEST_ASSERT(offsetof(kvc::RfTelemetryPacket32, sensor_flags) == 24U,
                 "sensor_flags @24");
-    TEST_ASSERT(offsetof(kvc::RfTelemetryPacket32, battery_raw) == 25U,
-                "battery_raw @25");
+    TEST_ASSERT(offsetof(kvc::RfTelemetryPacket32, status_reserved) == 25U,
+                "status_reserved @25");
     TEST_ASSERT(offsetof(kvc::RfTelemetryPacket32, reserved) == 26U,
                 "reserved @26");
     TEST_ASSERT(offsetof(kvc::RfTelemetryPacket32, crc16) == 30U, "crc16 @30");
@@ -112,33 +112,33 @@ void test_crc_known_value() {
                 "do dai 0 phai tra ve gia tri khoi tao 0xFFFF");
 }
 
-/* ---------- 3. Golden vector GV-01 ---------- */
+/* ---------- 3. Golden vector GV-02 ---------- */
 void test_golden_vector() {
-    std::printf("[3] Golden vector GV-01\n");
+    std::printf("[3] Golden vector GV-02\n");
 
-    const kvc::RfTelemetryPacket32 pkt = make_golden_gv01();
-    TEST_ASSERT(pkt.crc16 == kvc::kGoldenGv01Crc16, "CRC GV-01 phai la 0x304E");
-    TEST_ASSERT(kvc::matchesGoldenGv01(&pkt),
-                "matchesGoldenGv01 phai nhan dien dung GV-01");
+    const kvc::RfTelemetryPacket32 pkt = make_golden_gv02();
+    TEST_ASSERT(pkt.crc16 == kvc::kGoldenGv02Crc16, "CRC GV-02 phai la 0xE260");
+    TEST_ASSERT(kvc::matchesGoldenGv02(&pkt),
+                "matchesGoldenGv02 phai nhan dien dung GV-02");
 
     char hex[sizeof(pkt) * 2 + 1] = {0};
     const bool ok = kvc::bytesToHexString(
         reinterpret_cast<const uint8_t *>(&pkt), sizeof(pkt), hex, sizeof(hex));
     TEST_ASSERT(ok, "phai ma hoa hex duoc");
     TEST_ASSERT(std::strlen(hex) == 64U, "chuoi hex phai dai 64 ky tu");
-    TEST_ASSERT(std::strcmp(hex, kGoldenGv01Hex) == 0,
-                "chuoi hex phai khop GV-01 cua IF-02");
+    TEST_ASSERT(std::strcmp(hex, kGoldenGv02Hex) == 0,
+                "chuoi hex phai khop GV-02 cua IF-02");
 }
 
 /* ---------- 4. validatePacketCrc ---------- */
 void test_validate() {
     std::printf("[4] validatePacketCrc\n");
 
-    const kvc::RfTelemetryPacket32 pkt = make_golden_gv01();
+    const kvc::RfTelemetryPacket32 pkt = make_golden_gv02();
     const uint8_t *raw = reinterpret_cast<const uint8_t *>(&pkt);
 
     TEST_ASSERT(kvc::validatePacketCrc(raw, sizeof(pkt)),
-                "goi GV-01 phai hop le");
+                "goi GV-02 phai hop le");
 
     TEST_ASSERT(!kvc::validatePacketCrc(raw, 31U),
                 "do dai 31 phai bi tu choi");
@@ -199,25 +199,25 @@ void test_hex_encoding() {
                 "outputSize 0 phai bi tu choi");
 }
 
-/* ---------- 6. matchesGoldenGv01 phát hiện lệch ---------- */
+/* ---------- 6. matchesGoldenGv02 phát hiện lệch ---------- */
 void test_golden_mismatch() {
-    std::printf("[6] matchesGoldenGv01 phat hien lech\n");
+    std::printf("[6] matchesGoldenGv02 phat hien lech\n");
 
-    kvc::RfTelemetryPacket32 pkt = make_golden_gv01();
-    TEST_ASSERT(kvc::matchesGoldenGv01(&pkt), "GV-01 goc phai khop");
+    kvc::RfTelemetryPacket32 pkt = make_golden_gv02();
+    TEST_ASSERT(kvc::matchesGoldenGv02(&pkt), "GV-02 goc phai khop");
 
     pkt.seq_num = 43U;
-    TEST_ASSERT(!kvc::matchesGoldenGv01(&pkt), "lech seq_num phai bi phat hien");
+    TEST_ASSERT(!kvc::matchesGoldenGv02(&pkt), "lech seq_num phai bi phat hien");
 
-    pkt = make_golden_gv01();
+    pkt = make_golden_gv02();
     pkt.alt_dist_cm = 241U;
-    TEST_ASSERT(!kvc::matchesGoldenGv01(&pkt), "lech alt_dist_cm phai bi phat hien");
+    TEST_ASSERT(!kvc::matchesGoldenGv02(&pkt), "lech alt_dist_cm phai bi phat hien");
 
-    pkt = make_golden_gv01();
+    pkt = make_golden_gv02();
     pkt.sensor_flags = 0x0EU;
-    TEST_ASSERT(!kvc::matchesGoldenGv01(&pkt), "lech sensor_flags phai bi phat hien");
+    TEST_ASSERT(!kvc::matchesGoldenGv02(&pkt), "lech sensor_flags phai bi phat hien");
 
-    TEST_ASSERT(!kvc::matchesGoldenGv01(nullptr),
+    TEST_ASSERT(!kvc::matchesGoldenGv02(nullptr),
                 "con tro NULL phai tra ve false");
 }
 

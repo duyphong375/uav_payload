@@ -101,7 +101,7 @@ Cấu hình mục tiêu theo [thiết kế hệ thống](../../docs/architecture
 
 ### 5.3. Giới Hạn Video Stream và Telemetry
 - Video là nguồn tham chiếu tùy chọn trên PC; chưa có bằng chứng camera IMX219 hoặc kênh video riêng đã được triển khai. Camera payload theo quyết định G1 trong thiết kế.
-- LoRa chỉ truyền metadata, **không truyền video**. RF payload 32 byte còn là draft chờ duyệt ABI. Wi-Fi SoftAP/WebSocket v1 là transport mục tiêu giữa ESP32 và laptop nhưng chưa có REAL ingress. USB envelope 48 byte thuộc kiến trúc cũ; telemetry 20 byte là ghi nhận source lịch sử. Frontend hiện chưa hỗ trợ các ABI phần cứng này.
+- LoRa chỉ truyền metadata, **không truyền video**. RF payload 32 byte là ABI đã được HUMAN duyệt ngày 29/10/2026 (IF-02), nhưng chưa HARDWARE-VERIFIED. Wi-Fi SoftAP/WebSocket v1 là transport mục tiêu giữa ESP32 và laptop nhưng chưa có REAL ingress. USB envelope 48 byte thuộc kiến trúc cũ; telemetry 20 byte là ghi nhận source lịch sử. Frontend hiện chưa hỗ trợ các ABI phần cứng này.
 - Bounding Box overlay chỉ được vẽ lên khung video khi có dữ liệu đồng bộ; nếu thiếu liên kết đồng bộ frame, hệ thống thông báo overlay chưa khả dụng thay vì vẽ sai lệch.
 
 ### 5.4. Bản Đồ Offline

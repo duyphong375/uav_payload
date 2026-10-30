@@ -1,0 +1,156 @@
+/* KVC GCS — semantic design tokens (field-ops).
+ * Contract: docs/architecture/KVC_GCS_DESIGN_CONTRACT.md
+ * Feature components must consume these tokens, not raw palette classes.
+ *
+ * Ba vai trò màu cho mỗi trạng thái — không được dùng lẫn:
+ *   bản gốc        viền, chấm, icon, dải màu (không chứa chữ)
+ *   hậu tố -fill   nền ĐẶC, chỉ dùng với --kvc-text-on-fill
+ *   hậu tố -ink    CHỮ trên bề mặt của theme hiện tại
+ *
+ * --kvc-text-on-overlay* chỉ hợp lệ khi tổ tiên có .kvc-on-overlay;
+ * scope đó tái định nghĩa --kvc-*-ink sang bản sáng để đọc trên nền tối.
+ */
+
+:root {
+  /* Surfaces */
+  --kvc-bg: oklch(0.978 0.006 240);
+  --kvc-surface: oklch(1 0 0);
+  --kvc-surface-2: oklch(0.962 0.008 240);
+  --kvc-overlay: oklch(0.2 0.02 250 / 0.94);
+  --kvc-video-stage: oklch(0.14 0.012 250);
+  --kvc-line: oklch(0.9 0.006 240);
+  --kvc-line-strong: oklch(0.78 0.012 240);
+
+  /* Text */
+  --kvc-text: oklch(0.18 0.015 240);
+  --kvc-text-muted: oklch(0.45 0.014 240);
+  --kvc-text-faint: oklch(0.54 0.012 240);
+  --kvc-text-on-overlay: oklch(0.97 0.004 240);
+  --kvc-text-on-overlay-muted: oklch(0.82 0.01 240);
+  --kvc-text-on-fill: oklch(1 0 0);
+
+  /* Semantic states — viền/chấm/icon */
+  --kvc-accent: oklch(0.52 0.17 235);
+  --kvc-accent-bg: oklch(0.52 0.17 235 / 0.1);
+  --kvc-accent-line: oklch(0.52 0.17 235 / 0.4);
+  --kvc-accent-fill: oklch(0.54 0.17 235);
+  --kvc-accent-ink: oklch(0.5 0.16 235);
+
+  --kvc-ok: oklch(0.55 0.15 155);
+  --kvc-ok-bg: oklch(0.55 0.15 155 / 0.12);
+  --kvc-ok-line: oklch(0.55 0.15 155 / 0.4);
+  --kvc-ok-fill: oklch(0.54 0.15 155);
+  --kvc-ok-ink: oklch(0.5 0.14 155);
+
+  --kvc-warn: oklch(0.68 0.16 70);
+  --kvc-warn-bg: oklch(0.68 0.16 70 / 0.14);
+  --kvc-warn-line: oklch(0.68 0.16 70 / 0.42);
+  --kvc-warn-fill: oklch(0.57 0.16 70);
+  --kvc-warn-ink: oklch(0.52 0.14 70);
+
+  --kvc-crit: oklch(0.57 0.21 27);
+  --kvc-crit-bg: oklch(0.57 0.21 27 / 0.12);
+  --kvc-crit-line: oklch(0.57 0.21 27 / 0.42);
+  --kvc-crit-fill: oklch(0.58 0.21 27);
+  --kvc-crit-ink: oklch(0.54 0.19 27);
+
+  --kvc-mock: oklch(0.55 0.17 300);
+  --kvc-mock-bg: oklch(0.55 0.17 300 / 0.12);
+  --kvc-mock-line: oklch(0.55 0.17 300 / 0.4);
+  --kvc-mock-fill: oklch(0.58 0.17 300);
+  --kvc-mock-ink: oklch(0.53 0.16 300);
+
+  /* Geometry */
+  --kvc-radius-control: 6px;
+  --kvc-radius-panel: 10px;
+
+  /* Z scale */
+  --kvc-z-map: 0;
+  --kvc-z-map-overlay: 10;
+  --kvc-z-dock: 20;
+  --kvc-z-panel: 30;
+  --kvc-z-banner: 40;
+  --kvc-z-modal: 50;
+}
+
+.dark {
+  --kvc-bg: oklch(0.135 0.015 250);
+  --kvc-surface: oklch(0.185 0.015 250);
+  --kvc-surface-2: oklch(0.225 0.015 250);
+  --kvc-overlay: oklch(0.12 0.02 250 / 0.94);
+  --kvc-video-stage: oklch(0.11 0.01 250);
+  --kvc-line: oklch(0.28 0.015 250);
+  --kvc-line-strong: oklch(0.38 0.018 250);
+
+  --kvc-text: oklch(0.96 0.005 240);
+  --kvc-text-muted: oklch(0.72 0.01 240);
+  --kvc-text-faint: oklch(0.62 0.012 240);
+  --kvc-text-on-overlay: oklch(0.97 0.004 240);
+  --kvc-text-on-overlay-muted: oklch(0.82 0.01 240);
+  --kvc-text-on-fill: oklch(1 0 0);
+
+  --kvc-accent: oklch(0.68 0.15 235);
+  --kvc-accent-bg: oklch(0.68 0.15 235 / 0.14);
+  --kvc-accent-line: oklch(0.68 0.15 235 / 0.45);
+  --kvc-accent-fill: oklch(0.54 0.17 235);
+  --kvc-accent-ink: oklch(0.72 0.14 235);
+
+  --kvc-ok: oklch(0.7 0.15 155);
+  --kvc-ok-bg: oklch(0.7 0.15 155 / 0.14);
+  --kvc-ok-line: oklch(0.7 0.15 155 / 0.45);
+  --kvc-ok-fill: oklch(0.54 0.15 155);
+  --kvc-ok-ink: oklch(0.74 0.15 155);
+
+  --kvc-warn: oklch(0.77 0.15 70);
+  --kvc-warn-bg: oklch(0.77 0.15 70 / 0.16);
+  --kvc-warn-line: oklch(0.77 0.15 70 / 0.45);
+  --kvc-warn-fill: oklch(0.57 0.16 70);
+  --kvc-warn-ink: oklch(0.8 0.15 70);
+
+  --kvc-crit: oklch(0.68 0.2 25);
+  --kvc-crit-bg: oklch(0.68 0.2 25 / 0.16);
+  --kvc-crit-line: oklch(0.68 0.2 25 / 0.45);
+  --kvc-crit-fill: oklch(0.58 0.21 27);
+  --kvc-crit-ink: oklch(0.72 0.19 25);
+
+  --kvc-mock: oklch(0.68 0.16 300);
+  --kvc-mock-bg: oklch(0.68 0.16 300 / 0.16);
+  --kvc-mock-line: oklch(0.68 0.16 300 / 0.45);
+  --kvc-mock-fill: oklch(0.58 0.17 300);
+  --kvc-mock-ink: oklch(0.74 0.15 300);
+}
+
+/* Lớp phủ tối tồn tại ở cả hai theme (HUD trên bản đồ, video, dock tác chiến).
+ * Trong phạm vi này, "ink" phải là bản sáng để đọc được trên nền tối. */
+.kvc-on-overlay {
+  --kvc-text: oklch(0.97 0.004 240);
+  --kvc-text-muted: oklch(0.82 0.01 240);
+  --kvc-text-faint: oklch(0.74 0.012 240);
+  --kvc-line: oklch(0.32 0.015 250);
+  --kvc-line-strong: oklch(0.44 0.018 250);
+
+  --kvc-accent-ink: oklch(0.7 0.15 235);
+  --kvc-ok-ink: oklch(0.72 0.15 155);
+  --kvc-warn-ink: oklch(0.78 0.15 70);
+  --kvc-crit-ink: oklch(0.7 0.2 27);
+  --kvc-mock-ink: oklch(0.72 0.16 300);
+}
+
+/* Serif cho riêng trang Nhật ký phiên. Class thường thua utility Tailwind,
+ * nên chỗ cần số thẳng cột vẫn giữ font-mono như bình thường. */
+.kvc-serif {
+  font-family: var(--font-kvc-serif);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.005em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

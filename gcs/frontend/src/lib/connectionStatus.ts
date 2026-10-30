@@ -1,4 +1,4 @@
-import { APP_CONFIG } from '@/config/appConfig'
+﻿import { APP_CONFIG } from '@/config/appConfig'
 import type { HardwareLink, SourceMode } from '@/types/telemetry'
 
 export type Esp32PhysicalStatus =
@@ -42,8 +42,8 @@ export function getEsp32PhysicalStatus(
         ? 'Dữ liệu giả lập phát từ dịch vụ Backend FastAPI (:8000) lưu SQLite'
         : 'Trình duyệt tự sinh kịch bản mô phỏng offline (không kết nối Backend)',
       badgeVariant: 'outline',
-      badgeColorClass: 'border-purple-500/40 text-purple-600 dark:text-purple-300 bg-purple-500/10',
-      dotColorClass: 'bg-purple-500',
+      badgeColorClass: 'border-[var(--kvc-mock-line)] text-[var(--kvc-mock-ink)] bg-[var(--kvc-mock-bg)]',
+      dotColorClass: 'bg-[var(--kvc-mock)]',
       pingClass: null,
       iconName: 'flask',
     }
@@ -56,8 +56,8 @@ export function getEsp32PhysicalStatus(
       shortLabel: 'REPLAY',
       description: 'Đang phát lại dữ liệu nhật ký từ cơ sở dữ liệu SQLite đã ghi',
       badgeVariant: 'outline',
-      badgeColorClass: 'border-cyan-500/40 text-cyan-700 dark:text-cyan-300 bg-cyan-500/10',
-      dotColorClass: 'bg-cyan-500',
+      badgeColorClass: 'border-[var(--kvc-accent-line)] text-[var(--kvc-accent-ink)] bg-[var(--kvc-accent-bg)]',
+      dotColorClass: 'bg-[var(--kvc-accent)]',
       pingClass: null,
       iconName: 'radio',
     }
@@ -71,8 +71,8 @@ export function getEsp32PhysicalStatus(
       shortLabel: 'MẤT KẾT NỐI',
       description: 'Trình duyệt mất kết nối tới Backend FastAPI (cổng 8000). Hãy kiểm tra dịch vụ backend.',
       badgeVariant: 'destructive',
-      badgeColorClass: 'border-red-500/40 text-red-600 dark:text-red-400 bg-red-500/10',
-      dotColorClass: 'bg-red-500',
+      badgeColorClass: 'border-[var(--kvc-crit-line)] text-[var(--kvc-crit-ink)] bg-[var(--kvc-crit-bg)]',
+      dotColorClass: 'bg-[var(--kvc-crit)]',
       pingClass: null,
       iconName: 'wifi-off',
     }
@@ -89,9 +89,9 @@ export function getEsp32PhysicalStatus(
       shortLabel: 'ĐÃ KẾT NỐI',
       description: `Đang nhận gói tin trực tiếp từ Gateway ESP32 qua ${hardwareLink.port || 'Wi-Fi SoftAP'}.`,
       badgeVariant: 'default',
-      badgeColorClass: 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10',
-      dotColorClass: 'bg-emerald-500',
-      pingClass: 'bg-emerald-400',
+      badgeColorClass: 'border-[var(--kvc-ok-line)] text-[var(--kvc-ok-ink)] bg-[var(--kvc-ok-bg)]',
+      dotColorClass: 'bg-[var(--kvc-ok)]',
+      pingClass: 'bg-[var(--kvc-ok)]/70',
       iconName: 'radio',
     }
   }
@@ -104,9 +104,9 @@ export function getEsp32PhysicalStatus(
       shortLabel: 'CHỜ SÓNG RF',
       description: `Gateway ESP32 đã kết nối qua ${hardwareLink.port || 'Wi-Fi'}. Đang lắng nghe sóng LoRa 433MHz từ MCU Sonix...`,
       badgeVariant: 'outline',
-      badgeColorClass: 'border-amber-500/50 text-amber-600 dark:text-amber-400 bg-amber-500/10',
-      dotColorClass: 'bg-amber-500',
-      pingClass: 'bg-amber-400',
+      badgeColorClass: 'border-[var(--kvc-warn-line)] text-[var(--kvc-warn-ink)] bg-[var(--kvc-warn-bg)]',
+      dotColorClass: 'bg-[var(--kvc-warn)]',
+      pingClass: 'bg-[var(--kvc-warn)]/70',
       iconName: 'radio',
     }
   }
@@ -118,8 +118,8 @@ export function getEsp32PhysicalStatus(
     shortLabel: 'CHƯA KẾT NỐI',
     description: 'Chế độ REAL: Đang chờ kết nối từ Gateway ESP32-C3 qua cổng Ingress WebSocket (:8080).',
     badgeVariant: 'destructive',
-    badgeColorClass: 'border-rose-500/50 text-rose-600 dark:text-rose-400 bg-rose-500/10',
-    dotColorClass: 'bg-rose-500',
+    badgeColorClass: 'border-[var(--kvc-crit-line)] text-[var(--kvc-crit-ink)] bg-[var(--kvc-crit-bg)]',
+    dotColorClass: 'bg-[var(--kvc-crit)]',
     pingClass: null,
     iconName: 'radio-off',
   }

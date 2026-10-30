@@ -6,7 +6,7 @@
 
 > Cập nhật nội dung: **15/10/2026**. Bo đã có: **OneKiwi Primer 20K V1.1** theo xác nhận của nhóm. Tài liệu mô tả **thiết kế mục tiêu**, không xác nhận các khối phần cứng đã chạy. Gateway trạm đất chọn họ SoC **ESP32-C3** để chạy Wi-Fi SoftAP/WebSocket và dùng nguồn riêng; mã kit/board, module, flash và pinout cụ thể còn chờ xác minh phần cứng. Hiện trạng xem [báo cáo tiến độ](KVC_PROJECT_STATUS.md); công việc xem phân công (không có trong bản sản phẩm) và checklist (không có trong bản sản phẩm).
 >
-> Cách đọc: mục III là linh kiện/cấu hình cần xác minh; mục IV là nhiệm vụ và **giao thức dự thảo chưa duyệt**; mục VII là nghiệm thu; mục VIII là nguồn tham chiếu. Bản này không chứa lịch 21 ngày; ngày/gate trong kế hoạch cũ là tham chiếu lịch sử.
+> Cách đọc: mục III là linh kiện/cấu hình cần xác minh; mục IV gồm nhiệm vụ và **giao thức** — ABI RF 32 byte (IF-02) đã được HUMAN duyệt ngày 29/10/2026, các giao thức khác còn dự thảo; mục VII là nghiệm thu; mục VIII là nguồn tham chiếu. Bản này không chứa lịch 21 ngày; ngày/gate trong kế hoạch cũ là tham chiếu lịch sử.
 
 ### I. THÔNG TIN CHUNG
 
@@ -30,7 +30,7 @@ KVC hướng tới tình huống cứu nạn bão lũ khi kết nối Internet h
 Kiến trúc mục tiêu sử dụng **xử lý tại biên**. Các khối dưới đây cần triển khai và kiểm thử:
 - **Phát hiện tại chỗ trên UAV:** Camera quang học thu hình ảnh mặt nước → FPGA OneKiwi Primer 20K tiền xử lý và chạy mạng nơ-ron tích chập (CNN) tăng tốc phần cứng để phát hiện người trôi dạt (`person`) và phao cứu sinh (`lifebuoy`).
 - **Định vị không gian:** MCU Sonix SN34F788 nhận kết quả Bounding Box từ FPGA qua UART, đọc đồng bộ các cảm biến đo đạc (cảm biến siêu âm chống nước AJ-SR04M, GY-87 IMU 10-DOF, GNSS NEO-M10-0-10) và giải bài toán giao điểm tia quang học với mặt phẳng nước để xác định tọa độ thực tế.
-- **Truyền tin vô tuyến tầm xa:** Thay vì truyền video, hệ thống chỉ đóng gói các thông tin cứu nạn quan trọng thành các gói tin nhị phân siêu nhỏ (**32 byte/gói**) và truyền metadata qua **LoRa 433 MHz**. RF 32 byte là dự thảo; cự ly, tỷ lệ nhận và độ trễ chưa được xác nhận bằng phép đo.
+- **Truyền tin vô tuyến tầm xa:** Thay vì truyền video, hệ thống chỉ đóng gói các thông tin cứu nạn quan trọng thành các gói tin nhị phân siêu nhỏ (**32 byte/gói**) và truyền metadata qua **LoRa 433 MHz**. ABI RF 32 byte đã được duyệt (IF-02, 29/10/2026); cự ly, tỷ lệ nhận và độ trễ vẫn chưa được xác nhận bằng phép đo.
 - **Trạm giám sát mặt đất (GCS):** ESP32-C3 trạm đất giải mã gói LoRa, đọc RSSI/SNR và gửi dữ liệu sang laptop qua **Wi-Fi SoftAP/WebSocket**. ESP32 có nguồn riêng và hoạt động độc lập với laptop. Laptop chạy Dashboard web và dịch vụ GCS để nhận dữ liệu, hiển thị, lưu log và replay; không tham gia xử lý nhiệm vụ trên UAV hay điều khiển ESP32.
 
 #### 2. Ranh giới kỹ thuật và phạm vi nghiệm thu PoC
@@ -141,7 +141,7 @@ flowchart TB
         MCU_GND -->|Wi-Fi SoftAP + WebSocket| INGRESS
     end
 
-    RF1 <==>|"Sóng vô tuyến LoRa 433 MHz (Gói nhị phân 32-byte @ 2–5Hz)"| RF2
+    RF1 <==>|"Sóng vô tuyến LoRa 433 MHz (Gói nhị phân 32-byte, firmware hiện tại 1 Hz)"| RF2
 ```
 
 #### 5. Cơ chế và phương thức hoạt động của LoRa trong dự án KVC
@@ -172,9 +172,9 @@ Kênh truyền LoRa (Long Range) đóng vai trò là xương sống thông tin l
 4. **Chiến lược chu kỳ và tần suất phát (Duty Cycle & Time-on-Air):**
    - Với payload 32 byte, explicit header, CRC LoRa bật, preamble 8 symbol, $BW = 125\text{ kHz}$, $CR = 4/5$ và không bật LDRO ở SF7/SF8, công thức airtime LoRa cho kết quả xấp xỉ **71,9 ms tại SF7** và **133,6 ms tại SF8**. Đây là phép tính theo tham số nêu trên, cần đối chiếu với cấu hình thanh ghi thực tế và [Semtech LoRa Calculator](https://calculator.semtech.com/).
    - **Tần suất phát quy định:**
-     - **Chế độ phát hiện mục tiêu (Target Event):** Khi AI xác nhận có người hoặc phao (`TARGET_CONFIRMED = 1`), MCU Sonix kích hoạt phát ở tốc độ **2 – 5 Hz** (200 – 500 ms/gói) để cập nhật liên tục đường đi của nạn nhân bị trôi dạt.
+     - **Chế độ phát hiện mục tiêu (Target Event) — DESIGN, chưa có trong firmware:** Khi AI xác nhận có người hoặc phao (`TARGET_CONFIRMED = 1`), thiết kế dự kiến phát ở tốc độ **2 – 5 Hz** (200 – 500 ms/gói) để cập nhật liên tục đường đi của nạn nhân bị trôi dạt. Firmware hiện tại chỉ có một chu kỳ cố định `KVC_TELEMETRY_PERIOD_MS = 1000` (1 Hz) cho mọi trạng thái, nên đây là mục tiêu chưa triển khai; bật 2–5 Hz cần tính lại duty-cycle và được giao thay đổi cụ thể.
      - **Chế độ tuần tra thông thường (Telemetry Heartbeat):** Khi chưa phát hiện mục tiêu, hệ thống phát telemetry định kỳ **1 Hz** (1000 ms/gói) để báo cáo trạng thái UAV và chất lượng cảm biến.
-     - **Chế độ chẩn đoán hệ thống (Status):** Phát định kỳ **5 giây/lần** (Type `0x03`).
+     - **Chế độ chẩn đoán hệ thống (Status) — DESIGN, chưa có trong firmware:** thiết kế dự kiến phát định kỳ **5 giây/lần** (Type `0x03`); `kvc_telemetry.h` hiện chỉ định nghĩa `0x01` telemetry và `0x02` heartbeat, chưa có `0x03`.
     - *Lưu ý kỹ thuật:* Không phát liên tục 10 Hz. Với các giả định trên, 10 Hz tương ứng khoảng 71,9% airtime tại SF7 và vượt 100% tại SF8, trước cả retransmission hay thời gian xử lý. Chỉ số duty cycle hợp lệ phải được tính lại từ cấu hình đã nạp và quy định vận hành.
 
 5. **Luồng xử lý tại Trạm đất (Ground Station) và GCS:**
@@ -201,10 +201,10 @@ Kênh truyền LoRa (Long Range) đóng vai trò là xương sống thông tin l
 | **Tải UAV — Cảm biến cự ly siêu âm** | **AJ-SR04M (JSN-SR04T)** | Siêu âm chống nước IP67, 40 kHz, dải 0,2–6 m, UART 9600 bps / Trig-Echo, nguồn 5V logic 3,3V/5V | Đo khoảng cách thẳng đứng từ UAV xuống mặt nước để xác định độ cao mặt phẳng phục vụ chiếu tia, phản xạ tốt trên bề mặt nước. |
 | **Tải UAV — IMU 10-DOF** | **GY-87** | MPU-6050 (Accel 3 trục + Gyro 3 trục), I2C 400 kHz. Module còn có HMC5883L (la bàn) và BMP180 (áp suất) nhưng **firmware không dùng**: HMC5883L hoãn tới khi có kit để hiệu chuẩn, BMP180 đã loại khỏi thiết kế (xem [IF_MCU_SENSORS.md](../interfaces/IF_MCU_SENSORS.md) §3.2 B–C). | Cung cấp gia tốc để ước lượng Roll/Pitch. **Chưa có Yaw tuyệt đối**, nên $\mathbf{R}_{\text{camera}}$ hiện chỉ đủ khi camera hướng Bắc; muốn đủ 3 góc phải bổ sung Yaw (dự kiến từ GNSS `track_made_good`). |
 | **Tải UAV — GNSS Định vị** | **u-blox NEO-M10-0-10** | Thu đồng thời GPS + GLONASS + Galileo + BeiDou + QZSS + SBAS (theo datasheet module), cập nhật 1–10 Hz (mặc định 1 Hz), UART TTL 8N1 — firmware chạy 9600 sau khi gửi UBX CFG-PRT đổi từ 38400 mặc định, anten SMA ngoài trời | Xác định tọa độ vị trí toàn cầu WGS-84 của UAV ngoài trời khi đạt 3D fix (`GPS_VALID = 1`). |
-| **Tải UAV — Module phát LoRa (TX)** | **Ai-Thinker Ra-02 (SX1278)** | Dải 410–525 MHz, SPI, nguồn 3,3V; datasheet V1.1: công suất tối đa 18 ± 1 dBm tại 433 MHz | Phát metadata dự thảo 32 byte xuống trạm đất theo chu kỳ được đo/duyệt. |
+| **Tải UAV — Module phát LoRa (TX)** | **Ai-Thinker Ra-02 (SX1278)** | Dải 410–525 MHz, SPI, nguồn 3,3V; datasheet V1.1: công suất tối đa 18 ± 1 dBm tại 433 MHz | Phát metadata 32 byte theo ABI IF-02 đã duyệt (29/10/2026) xuống trạm đất theo chu kỳ được đo/duyệt. |
 | **Tải UAV — Chỉ báo & Debug tại chỗ** | **LED Trạng thái & UART Debug (SN-LINK Lite)** | LED GPIO (Power, GNSS Fix, Ready/Error) + Cổng UART Debug ảo (VCOM) tích hợp | Chỉ báo trực quan trạng thái tải trước bay; in log chẩn đoán chi tiết qua terminal PC khi debug bàn lab (lược bỏ OLED trên tải để tối ưu khối lượng và chống rung lắc). |
 | **Trạm Mặt Đất — Gateway MCU** | **ESP32-C3 DevKit (mã kit TBD)** | CPU RISC-V đơn nhân tối đa 160 MHz, 400 KB SRAM (16 KB cache), Wi-Fi 2.4 GHz 802.11 b/g/n, Bluetooth LE 5; flash/GPIO khả dụng theo module và kit | Thu gói LoRa qua SPI, đọc RSSI/SNR, phát Wi-Fi SoftAP và WebSocket telemetry tới dịch vụ GCS trên laptop. Đây là cấu hình mục tiêu; cần xác minh tài nguyên, nguồn và GPIO trên đúng kit trước khi tích hợp. |
-| **Trạm Mặt Đất — Module thu LoRa (RX)** | **Ai-Thinker Ra-02 (SX1278)** | Dải 410–525 MHz, SPI, nguồn 3,3V; datasheet V1.1: độ nhạy tới -141 dBm tại 433 MHz, SF12, BW 125 kHz | Thu payload RF dự thảo 32 byte, kiểm CRC và đo chất lượng liên kết RF. |
+| **Trạm Mặt Đất — Module thu LoRa (RX)** | **Ai-Thinker Ra-02 (SX1278)** | Dải 410–525 MHz, SPI, nguồn 3,3V; datasheet V1.1: độ nhạy tới -141 dBm tại 433 MHz, SF12, BW 125 kHz | Thu payload RF 32 byte theo ABI IF-02 đã duyệt (29/10/2026), kiểm CRC và đo chất lượng liên kết RF. |
 | **Trạm Mặt Đất — Màn hình hiện trường** | **OLED SSD1306 0.96 inch I2C** | Độ phân giải 128×64 pixel, giao tiếp I2C 400 kHz, nguồn 3,3V | Hiển thị tức thời RSSI/SNR, số gói nhận được và tọa độ nạn nhân độc lập ngoài trời không cần laptop. |
 | **Trạm Mặt Đất — Khối nguồn độc lập** | **Pin Li-ion 18650 2S (7.4V) + Buck MP1584** | Mạch hạ áp Buck DC-DC MP1584 hạ về rail 5V ổn định + Tụ hóa 220 µF chống sụt áp tức thời | Cung cấp nguồn riêng biệt cho trạm đất, đảm bảo vận hành liên tục khi laptop tắt hoặc mất kết nối. |
 | **Trạm Giám Sát — Laptop GCS Offline** | **Laptop Windows/Linux** | Web Dashboard (React/TypeScript/Vite) + Backend Python FastAPI + SQLite Logger (WAL mode) | Nhận dữ liệu qua WebSocket nội bộ, hiển thị radar local, vẽ vị trí nạn nhân trên bản đồ WGS-84, lưu và phát lại log. |
@@ -280,7 +280,7 @@ Danh mục dưới đây phân loại chính xác linh kiện theo 5 phân hệ 
 | **MCU Trạm đất** | Driver SPI điều khiển Ra-02 ở chế độ nhận, kiểm CRC, đọc RSSI/SNR và xuất telemetry qua Wi-Fi SoftAP/WebSocket v1. ESP32-C3 có nguồn riêng; kiểm thử tài nguyên khi các tác vụ chạy đồng thời. | Bổ sung cơ chế phát gói ACK phản hồi khi đường truyền rảnh. |
 | **Dashboard GCS** | Ingress nhận dữ liệu từ ESP32 qua transport được chốt, kiểm tra session và giải mã RF v1, bộ quản lý trạng thái (Reducer), giao diện Radar local và Bản đồ WGS-84, SQLite logger (WAL), Replay phiên. | Hiển thị lớp bản đồ vệ tinh ngoại tuyến (Tile map), thống kê nâng cao. |
 
-Ghi chú về thuật ngữ: “sa bàn” trong các mô tả field local/origin ở dự thảo wire dưới đây là tên gọi lịch sử của hệ tọa độ local đã hiệu chuẩn, không phải yêu cầu có mô hình sa bàn tại nơi thi. Có thể áp dụng tại khu vực bể bơi khi origin/pose/đơn vị được xác lập.
+Ghi chú về thuật ngữ: “sa bàn” trong các mô tả field local/origin ở đặc tả wire IF-02 dưới đây là tên gọi lịch sử của hệ tọa độ local đã hiệu chuẩn, không phải yêu cầu có mô hình sa bàn tại nơi thi. Có thể áp dụng tại khu vực bể bơi khi origin/pose/đơn vị được xác lập.
 
 #### 2. Giao tiếp nội bộ FPGA ↔ MCU Sonix
 - **Đặc tả vật lý:** UART 8N1 (8 bit dữ liệu, không parity, 1 stop bit), mức điện áp logic 3,3V CMOS. Tốc độ danh định trong mã nguồn firmware MCU hiện tại là **38.400 bps** (cấu hình tối ưu với clock ngoại vi UCLK 12 MHz từ nguồn dao động nội IHRC; nếu chạy 115.200 bps ở UCLK 12 MHz thì sai số baud tối thiểu là 6,99% gây lỗi khung framing error; muốn chạy 115.200 bps hoặc cao hơn cần cấu hình PLL nâng UCLK lên ≥ 24 MHz). Nối chung GND chặt chẽ.
@@ -308,7 +308,7 @@ Ghi chú về thuật ngữ: “sa bàn” trong các mô tả field local/origi
 | **22** | 1 byte | Class ID | `uint8` | Phân loại mục tiêu: `1` = `person` (người); `2` = `lifebuoy` (phao cứu sinh) |
 | **23** | 1 byte | Confidence | `uint8` | Độ tin cậy AI nhận diện (0–100%) |
 | **24** | 1 byte | Sensor Status Flags | `uint8` | Cờ trạng thái 8-bit (chi tiết bảng bit bên dưới) |
-| **25** | 1 byte | Battery Raw | `uint8` | Điện áp pin UAV (0,1 V / bit, vd 126 = 12.6V); `0` = Chưa đo / chưa kết nối ADC |
+| **25** | 1 byte | Status Reserved | `uint8` | **Dự phòng**, luôn `0`. Trước đây là `battery_raw` (0,1 V/bit); KVC đã bỏ phép đo pin nên byte này không còn mang nghĩa điện áp và phía nhận bỏ qua. Giữ offset để không đổi layout/CRC. |
 | **26–29** | 4 byte | Reserved / IMU Angle | `uint8[4]` | 4 byte dự phòng; hoặc góc Roll/Pitch IMU khi Bit 2 hợp lệ |
 | **30–31** | 2 byte | CRC-16 Checksum | `uint16` | CRC-16 tính trên bytes 0–29, lưu low-byte trước |
 
@@ -319,8 +319,9 @@ Ghi chú về thuật ngữ: “sa bàn” trong các mô tả field local/origi
 - **Bit 3 (`AI_DETECTED`):** `1` = Có BBox mục tiêu cứu nạn từ FPGA.
 - **Bits 4–7:** Dự phòng cho mở rộng hệ thống (mặc định gán `0`).
 
-##### c. Bảng gói tin Type=0x03 (Boot / Status chẩn đoán)
-Gói Status dùng chung Sync (0–1), Version (2), Type `0x03` (3), Sequence (4–5), Session (26–29) và CRC (30–31). Thân gói tin (offset 6–25) phát định kỳ 5 giây/lần:
+##### c. Bảng gói tin Type=0x03 (Boot / Status chẩn đoán) — DESIGN, chưa triển khai
+Thân gói dưới đây là thiết kế đề xuất, **không** thuộc ABI 32 byte đã duyệt và **chưa có trong firmware**: `kvc_telemetry.h` mới định nghĩa `0x01` telemetry và `0x02` heartbeat, không có `0x03`. Bố cục nêu dưới đây cũng khác khung IF-02 (dùng Version/Type/Sequence 2 byte), nên muốn dùng phải có human approval cho một ABI mới.
+Gói Status dự kiến dùng chung Sync (0–1), Version (2), Type `0x03` (3), Sequence (4–5), Session (26–29) và CRC (30–31). Thân gói tin (offset 6–25) dự kiến phát định kỳ 5 giây/lần:
 - `Boot count (Offset 6–7, uint16)`: Số lần khởi động lại của MCU.
 - `Status time (Offset 8–11, uint32)`: Thời gian uptime của MCU (ms).
 - `TxDone count (Offset 12–15, uint32)`: Tổng số gói đã phát thành công trong phiên.
@@ -338,15 +339,15 @@ Mỗi message WebSocket là một JSON UTF-8 có đủ các trường sau:
 | Trường | Kiểu | Quy tắc |
 | --- | --- | --- |
 | `transport_version` | `uint8` | Luôn `1`. |
-| `gateway_session_id` | `uint32` | Sinh mới khi ESP32 khởi động; laptop dùng để nhận ra gateway restart. |
+| `gateway_session_id` | `uint32` | Sinh mới khi ESP32 khởi động bằng `esp_random()` trộn MAC eFuse, bảo đảm `>= 2`; laptop dùng để nhận ra gateway restart. Giá trị in ra Serial lúc boot: `[SESSION] gateway_session_id = ...`. |
 | `gateway_sequence` | `uint32` | Tăng một đơn vị cho mỗi message chuyển tiếp; wrap modulo $2^{32}$. |
 | `rx_monotonic_ms` | `uint32` | Millisecond từ lúc ESP32 khởi động, chỉ dùng sắp thứ tự trong session; không là UTC. |
 | `rf_payload_hex` | string | Chính xác 64 ký tự hex, chứa nguyên 32 byte RF v1 đã vượt CRC-16; không chuyển endian hay sửa field RF. |
 | `rssi_dbm` | number | RSSI gói nhận do driver SX1278 quy đổi, đơn vị dBm. |
 | `snr_db` | number | SNR gói nhận do driver SX1278 quy đổi, đơn vị dB. |
-| `rx_drop_count` | `uint32` | Tổng message hợp lệ bị loại ở ESP32 vì buffer đầy kể từ lúc boot. |
+| `rx_drop_count` | `uint32` | Tổng message **hợp lệ** bị loại ở ESP32 vì buffer đầy kể từ lúc boot. Firmware hiện hành phát trực tiếp, **chưa có FIFO 64**, nên giá trị luôn `0`; frame sai độ dài/CRC-16 không cộng vào trường này mà đếm riêng ở `rx_invalid_count` (chỉ in Serial). |
 
-ESP32 loại gói RF sai CRC-16 trước khi tạo message. Không có lệnh điều khiển UAV, ACK RF hoặc dữ liệu video trên endpoint này. Khi laptop mất kết nối, ESP32 giữ tối đa 64 message hợp lệ theo FIFO; nếu đầy thì loại message cũ nhất và tăng `rx_drop_count`. Laptop reconnect với backoff 1–5 giây, xóa trạng thái sequence khi `gateway_session_id` đổi và báo stale khi không có message hợp lệ trong 3 giây. Các giá trị buffer/timeout là mục tiêu v1 phải được kiểm bằng test mất kết nối; chưa là chức năng đã chạy.
+ESP32 loại gói RF sai CRC-16 trước khi tạo message. Không có lệnh điều khiển UAV, ACK RF hoặc dữ liệu video trên endpoint này. **Thiết kế mục tiêu (chưa triển khai):** khi laptop mất kết nối, ESP32 giữ tối đa 64 message hợp lệ theo FIFO; nếu đầy thì loại message cũ nhất và tăng `rx_drop_count`. Laptop reconnect với backoff 1–5 giây, xóa trạng thái sequence khi `gateway_session_id` đổi và báo stale khi không có message hợp lệ trong 3 giây. Các giá trị buffer/timeout là mục tiêu v1 phải được kiểm bằng test mất kết nối; chưa là chức năng đã chạy.
 
 ---
 
@@ -390,7 +391,7 @@ Luồng mục tiêu: LoRa → ESP32 (SPI/RSSI/SNR) → Wi-Fi SoftAP/WebSocket v1
 
 WAL/FULL giúp bảo vệ giao dịch đã commit theo khả năng hệ điều hành/thiết bị lưu trữ, không bảo đảm cứu mọi event còn trong RAM khi mất điện. Phép thử kill process không thay phép thử mất nguồn. Khi sao lưu phiên cần thực hiện đúng quy trình SQLite. [S14][S15]
 
-Nguồn hiện hành: [backend README](../configuration/DASHBOARD_BACKEND.md), [frontend README](../configuration/DASHBOARD_FRONTEND.md), [data contract](../interfaces/KVC_GCS_DATA_CONTRACT.md). Contract phân biệt schema ứng dụng đã có với wire draft; không dùng bảng draft để suy ra endpoint REAL đã triển khai.
+Nguồn hiện hành: [backend README](../configuration/DASHBOARD_BACKEND.md), [frontend README](../configuration/DASHBOARD_FRONTEND.md), [data contract](../interfaces/KVC_GCS_DATA_CONTRACT.md). Contract phân biệt schema ứng dụng đã có với wire ABI IF-02 (đã duyệt 29/10/2026, chưa capture thật); không dùng bảng ABI để suy ra endpoint REAL đã triển khai.
 
 ---
 
@@ -461,7 +462,7 @@ Dữ liệu cần phản ánh hai bối cảnh trình diễn: video lũ lụt c�
 | :--- | :---: | :--- | :--- |
 | **GoAI không hỗ trợ mạng hoặc thiếu tài nguyên FPGA** | **Rất cao** | Compiler báo lỗi toán tử không hỗ trợ; thiếu LUT/BRAM; timing không đạt. | **Phương án A:** Đánh giá detector nhẹ hơn; mọi candidate vẫn phải qua kiểm operator, tài nguyên và chạy trên bo, không tự đổi khỏi YOLO11n nếu chưa được nhóm chốt và kiểm chứng.<br/>**Phương án B:** PoC phần cứng (FPGA đảm nhiệm Camera RX + UART; MCU định vị; AI chạy trên laptop làm tham chiếu có nhãn `PC_REFERENCE`). |
 | **Lệch phân bố dữ liệu AI (Domain Shift)** | **Cao** | Model tốt trên video lũ lụt nhưng sai ở bể bơi hoặc đầu vào live, hay ngược lại. | QA dữ liệu theo từng miền/phiên, mục tiêu tổng ≥ 1.000 ảnh và 20–30% negative; đánh giá riêng từng miền, bổ sung dữ liệu thật phù hợp, không tuning bằng locked-test. |
-| **Sai lệch giao thức dữ liệu giữa FPGA, MCU và GCS** | **Cao** | Lệch byte offset, sai endian, lỗi checksum CRC khi giải mã. | Giữ ABI LoRa 32B ở trạng thái dự thảo; dùng transport WebSocket v1 ở mục IV.4 làm baseline, tạo JSON schema validation và vector kiểm thử liên thiết bị trước khi tích hợp. |
+| **Sai lệch giao thức dữ liệu giữa FPGA, MCU và GCS** | **Cao** | Lệch byte offset, sai endian, lỗi checksum CRC khi giải mã. | ABI LoRa 32B (IF-02) đã duyệt ngày 29/10/2026 nên không đổi layout; dùng transport WebSocket v1 ở mục IV.4 làm baseline, tạo JSON schema validation và vector kiểm thử liên thiết bị, capture frame thật trước khi tích hợp. |
 | **Cảm biến siêu âm bị sai lệch do góc nghiêng tải UAV** | **Cao** | Cự ly đo phản xạ thay đổi khi tải bị rung lắc/nghiêng. | Bắt buộc kết hợp góc Roll/Pitch từ IMU GY-87 để dựng ma trận bù góc trước khi chiếu tia; ngoài dải gán sentinel `65535`. |
 | **Nhiễu nguồn / Sụt áp khi LoRa phát công suất lớn** | **Vừa** | MCU bị reset bất ngờ hoặc cảm biến bị treo khi module LoRa bắt đầu phát. | Bổ sung rail nguồn 3,3V riêng cho LoRa, hàn tụ lọc 100 µF + 100 nF sát chân nguồn, nối mass hình sao (Star Ground). |
 | **Mất dữ liệu GCS khi ứng dụng bị tắt đột ngột** | **Vừa** | File cơ sở dữ liệu SQLite bị hỏng hoặc mất các bản ghi cảnh báo mới. | Cấu hình bắt buộc SQLite WAL mode (`PRAGMA synchronous=FULL`); commit tức thời các bản ghi có sự kiện mục tiêu. |

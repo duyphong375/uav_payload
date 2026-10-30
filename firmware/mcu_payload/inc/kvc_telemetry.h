@@ -103,8 +103,11 @@ typedef struct __attribute__((packed)) {
     /* Byte 24: Cờ trạng thái cảm biến (Bit 0..3) */
     uint8_t sensor_flags;
 
-    /* Byte 25: Điện áp pin UAV (0.1 V/bit, ví dụ 126 = 12.6V) */
-    uint8_t battery_raw;
+    /* Byte 25: Dự phòng — trước đây là battery_raw (điện áp pin 0,1 V/bit).
+     * KVC bỏ hẳn phép đo pin (không có ADC pin trong firmware), nên byte này
+     * không còn mang nghĩa điện áp. Giữ nguyên vị trí + kích thước để không
+     * đổi offset/CRC; firmware luôn ghi 0 và phía nhận bỏ qua. */
+    uint8_t status_reserved;
 
     /* Byte 26..29: 4 byte dự phòng mở rộng */
     uint8_t reserved[4];
@@ -134,7 +137,7 @@ typedef char kvc_telemetry_packet_size_check[(sizeof(KvcTelemetryPacket32) == 32
 #define KVC_TELEMETRY_OFF_CLASS_ID   22U
 #define KVC_TELEMETRY_OFF_CONFIDENCE 23U
 #define KVC_TELEMETRY_OFF_FLAGS      24U
-#define KVC_TELEMETRY_OFF_BATTERY    25U
+#define KVC_TELEMETRY_OFF_STATUS_RES 25U
 #define KVC_TELEMETRY_OFF_RESERVED   26U
 #define KVC_TELEMETRY_OFF_CRC16      30U
 
@@ -150,20 +153,21 @@ typedef char kvc_telemetry_off_alt_check[(offsetof(KvcTelemetryPacket32, alt_dis
 typedef char kvc_telemetry_off_class_check[(offsetof(KvcTelemetryPacket32, class_id) == KVC_TELEMETRY_OFF_CLASS_ID) ? 1 : -1];
 typedef char kvc_telemetry_off_conf_check[(offsetof(KvcTelemetryPacket32, confidence) == KVC_TELEMETRY_OFF_CONFIDENCE) ? 1 : -1];
 typedef char kvc_telemetry_off_flags_check[(offsetof(KvcTelemetryPacket32, sensor_flags) == KVC_TELEMETRY_OFF_FLAGS) ? 1 : -1];
-typedef char kvc_telemetry_off_batt_check[(offsetof(KvcTelemetryPacket32, battery_raw) == KVC_TELEMETRY_OFF_BATTERY) ? 1 : -1];
+typedef char kvc_telemetry_off_status_res_check[(offsetof(KvcTelemetryPacket32, status_reserved) == KVC_TELEMETRY_OFF_STATUS_RES) ? 1 : -1];
 typedef char kvc_telemetry_off_res_check[(offsetof(KvcTelemetryPacket32, reserved) == KVC_TELEMETRY_OFF_RESERVED) ? 1 : -1];
 typedef char kvc_telemetry_off_crc_check[(offsetof(KvcTelemetryPacket32, crc16) == KVC_TELEMETRY_OFF_CRC16) ? 1 : -1];
 
-/* Golden vector GV-01 (IF-02 mục 3) — dùng chung với Gateway ESP32 và parser Python.
+/* Golden vector GV-02 (IF-02 mục 3) — dùng chung với Gateway ESP32 và parser Python.
+ * GV-02 thay GV-01 sau khi KVC bỏ phép đo pin: byte 25 (status_reserved) = 0.
  * Sinh bởi kvc_finalize_telemetry_packet() trên struct dưới đây, không sửa tay.
- * Kỳ vọng: sizeof = 32, CRC-16/CCITT-FALSE trên 30 byte đầu = 0x304E (lưu LE 4e 30). */
-#define KVC_GOLDEN_GV01_CRC16       0x304EU
+ * Kỳ vọng: sizeof = 32, CRC-16/CCITT-FALSE trên 30 byte đầu = 0xE260 (lưu LE 60 e2). */
+#define KVC_GOLDEN_GV02_CRC16       0xE260U
 
-static inline bool kvc_telemetry_match_golden_gv01(const KvcTelemetryPacket32 *pkt) {
+static inline bool kvc_telemetry_match_golden_gv02(const KvcTelemetryPacket32 *pkt) {
     if (pkt == NULL) {
         return false;
     }
-    return (pkt->crc16 == KVC_GOLDEN_GV01_CRC16) &&
+    return (pkt->crc16 == KVC_GOLDEN_GV02_CRC16) &&
            (pkt->sync[0] == KVC_TELEMETRY_SYNC0) &&
            (pkt->sync[1] == KVC_TELEMETRY_SYNC1) &&
            (pkt->msg_id == KVC_MSG_ID_TELEMETRY) &&
@@ -177,7 +181,7 @@ static inline bool kvc_telemetry_match_golden_gv01(const KvcTelemetryPacket32 *p
            (pkt->class_id == KVC_CLASS_ID_PERSON) &&
            (pkt->confidence == 92U) &&
            (pkt->sensor_flags == 0x0FU) &&
-           (pkt->battery_raw == 126U);
+           (pkt->status_reserved == 0U);
 }
 
 /* ============================================================================

@@ -18,8 +18,8 @@
 
 ### 1.1. Hiện trạng giao thức và mức bằng chứng — 15/10/2026
 
-- Source telemetry 20 byte cũ đã được ghi nhận trong AGENTS.md/workflow lịch sử. Snapshot hiện có frontend React/TypeScript và backend FastAPI MOCK/logger/replay; chưa có parser serial/legacy; không suy đoán layout hoặc khôi phục parser 20 byte. MVP không đặt mục tiêu hỗ trợ giao thức cũ.
-- RF 32 byte vẫn là **DRAFT** tại mục IV.3 [thiết kế hệ thống](../architecture/KVC_ThietKeHeThong.md), chưa coi là giao thức đã nạp trên bo. Transport ESP32–laptop mục IV.4 đã chốt Wi-Fi SoftAP/WebSocket v1 nhưng cũng chưa có bằng chứng firmware, ingress hoặc capture REAL.
+- Source telemetry 20 byte cũ chỉ còn là ghi nhận lịch sử; layout không thể khôi phục (xem [IF-02](IF_MCU_LORA_RF.md)). Snapshot hiện có frontend React/TypeScript và backend FastAPI MOCK/logger/replay; không có parser serial/legacy và không suy đoán layout 20 byte. MVP không đặt mục tiêu hỗ trợ giao thức cũ.
+- RF 32 byte (IF-02) là **ABI đã được HUMAN duyệt ngày 29/10/2026** cho cả hai owner MCU và Gateway, không còn là DRAFT. Duyệt ABI không đồng nghĩa đã nạp/chạy trên bo: chưa có capture REAL giữa MCU ↔ ESP32. Transport ESP32–laptop mục IV.4 đã chốt Wi-Fi SoftAP/WebSocket v1 nhưng cũng chưa có bằng chứng firmware, ingress hoặc capture REAL.
 - Endpoint ứng dụng hiện hành có trong gcs/backend/main.py và backend README; schemas/state, logger và replay đã có tests. Wi-Fi/WebSocket ingress từ ESP32 là mục tiêu tích hợp; owner đối chiếu types/adapter/reducer và golden vectors theo task. Khác biệt source/contract phải được ghi nhận, không đổi hardware để vừa UI.
 - Vector review/KVC-PLAN-002_reference_vectors.json là tham chiếu thiết kế lịch sử nếu còn, không phải phép thử sản phẩm. C+D tạo bộ golden C/Python có version/hash trong gcs/backend/fixtures theo task được giao; không phụ thuộc duy nhất file Git ignored.
 - REAL ingress chưa có thiết bị/capture thì BLOCKED; tiếp tục MOCK độc lập có nhãn. Tiêu chí hệ thống ở mục VII thiết kế; mốc G1/G2/G3 trong kế hoạch cũ là lịch sử, không phải lịch hiện hành. Replay ứng dụng đã có, ingress REAL chưa có.
@@ -69,7 +69,7 @@ Toàn bộ dữ liệu trao đổi giữa Backend và Frontend được chuẩn 
 
 | Tên trường | Ý nghĩa | Kiểu dữ liệu | Đơn vị / Miền giá trị | Bắt buộc | Nguồn tạo | Quy tắc Null & Validation |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `battery_pct` | Mức dung lượng pin của tải | `integer` hoặc `null` | % (0 .. 100) | Có | Thiết bị MCU | Giá trị 255 trên phần cứng ánh xạ thành `null` (Unknown). Ngoài 0..100 là invalid. |
+| `battery_pct` | Mức dung lượng pin của tải — **KVC đã bỏ phép đo pin nên trường này luôn `null` với nguồn REAL** | `integer` hoặc `null` | % (0 .. 100) | Có | (không còn nguồn) | Luôn `null` từ ingress ESP32 vì byte 25 IF-02 đổi thành `status_reserved` (luôn 0). MOCK/REPLAY vẫn có thể mang số để kiểm UI nhưng không đại diện đo thật. Ngoài 0..100 là invalid. |
 | `lidar_range_cm` | Khoảng cách đo mặt nước từ cảm biến siêu âm (tên trường schema lịch sử) | `integer` hoặc `null` | cm (20 .. 800) | Có | Cảm biến siêu âm AJ-SR04M | Giá trị 65535 hoặc khi `ALT_VALID=0` ánh xạ thành `null`. Không tự ý coi là độ cao thẳng đứng. |
 | `gps_valid` | Trạng thái cảm biến GNSS | `boolean` | `true` / `false` | Có | Cảm biến GNSS | Trích xuất từ Bit 0 của cờ Flags. |
 | `lidar_valid` | Trạng thái cự ly siêu âm hợp lệ (ALT_VALID) | `boolean` | `true` / `false` | Có | Cảm biến siêu âm AJ-SR04M | Trích xuất từ Bit 1 của cờ Flags (ALT_VALID). |

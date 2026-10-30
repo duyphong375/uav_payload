@@ -22,7 +22,7 @@ def make_rf_payload(
     x_local_cm: int,
     y_local_cm: int,
     lidar_cm: int,
-    battery_v: float,    # 10.5V - 12.6V
+    battery_v: float,    # KHÔNG dùng: KVC đã bỏ đo pin; giữ tham số để không phá call site
     has_gps: bool = True,
     ai_detect: bool = True,
     roll_deg: float = 1.2,
@@ -31,7 +31,9 @@ def make_rf_payload(
     fmt = "<2sBBIIIhhHBBBB4sH"
     lat_scaled = int(lat * 1e7) if has_gps else 0
     lon_scaled = int(lon * 1e7) if has_gps else 0
-    battery_raw = int(battery_v * 10)  # 0.1V/bit
+    # Byte 25 IF-02 nay la status_reserved (luon 0). Truoc day la battery_raw.
+    status_reserved = 0
+    del battery_v
     
     # Flags: bit0=GPS, bit1=LiDAR, bit2=IMU, bit3=AI
     sensor_flags = 0
@@ -59,7 +61,7 @@ def make_rf_payload(
         class_id,
         confidence,
         sensor_flags,
-        battery_raw,
+        status_reserved,
         reserved_bytes,
         0xABCD,  # CRC16
     )
@@ -96,7 +98,7 @@ def send_packet(seq: int, class_id: int, name: str, lat: float, lon: float, conf
     )
     try:
         with urllib.request.urlopen(req, timeout=2.0) as resp:
-            print(f"[TX #{seq:03d}] Đã gửi: {name} (Class {class_id}) | LiDAR={lidar}cm | Pin={bat:.1f}V | HTTP {resp.status}")
+            print(f"[TX #{seq:03d}] Đã gửi: {name} (Class {class_id}) | LiDAR={lidar}cm | HTTP {resp.status}")
     except Exception as err:
         print(f"[!] Lỗi kết nối tới Backend ({BACKEND_INGRESS_URL}): {err}")
         print("    -> Bạn đã chạy 'python -m gcs.backend.main' chưa?")

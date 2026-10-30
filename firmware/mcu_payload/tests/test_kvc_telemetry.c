@@ -3,7 +3,7 @@
  * @brief Host Unit Test cho ABI IF-02 (KVC-MCU-TELEMETRY-TEST-001).
  *
  * VÌ SAO CẦN: layout 32 byte được khoá bằng static_assert trong header, nhưng
- * không có test NÀO chạy tới. Bản self-check GV-01 trên MCU lại nằm trong
+ * không có test NÀO chạy tới. Bản self-check GV-02 trên MCU lại nằm trong
  * `#if (KVC_M1_CLOCK_DIAG == 1)` mà macro đó mặc định 0, nên bản bench thực tế
  * không hề tự kiểm ABI lúc boot. Test này bù cả hai lỗ hổng ở phía host.
  *
@@ -13,8 +13,8 @@
  *   3. Hằng số RF (freq/sync/bw/sf/cr) khớp đặc tả
  *   4. CRC-16/CCITT-FALSE với vector chuẩn
  *   5. CRC thay đổi khi đảo 1 bit
- *   6. GV-01 khớp toàn bộ trường + CRC 0x304E
- *   7. GV-01 phát hiện lệch từng trường
+ *   6. GV-02 khớp toàn bộ trường + CRC 0xE260 (byte 25 reserved = 0)
+ *   7. GV-02 phát hiện lệch từng trường
  *   8. Little-Endian trên dây (byte thấp trước)
  *   9. Class ID: LIFEBUOY là tên chuẩn, BOAT là alias
  *  10. Cờ sensor_flags đúng bit
@@ -40,21 +40,21 @@ static int s_tests_passed = 0;
     } \
 } while (0)
 
-/* Dựng đúng GV-01 như IF-02 mục 3 mô tả. */
-static void build_gv01(KvcTelemetryPacket32 *pkt) {
+/* Dựng đúng GV-02 như IF-02 mục 3 mô tả (đã bỏ đo pin: byte 25 = 0). */
+static void build_gv02(KvcTelemetryPacket32 *pkt) {
     memset(pkt, 0, sizeof(*pkt));
-    pkt->msg_id         = KVC_MSG_ID_TELEMETRY;
-    pkt->seq_num        = 42U;
-    pkt->timestamp_ms   = 1000UL;
-    pkt->target_lat     = 107723450L;
-    pkt->target_lon     = 1066578900L;
-    pkt->target_x_local = 150;
-    pkt->target_y_local = 320;
-    pkt->alt_dist_cm    = 240U;
-    pkt->class_id       = KVC_CLASS_ID_PERSON;
-    pkt->confidence     = 92U;
-    pkt->sensor_flags   = 0x0FU;
-    pkt->battery_raw    = 126U;
+    pkt->msg_id          = KVC_MSG_ID_TELEMETRY;
+    pkt->seq_num         = 42U;
+    pkt->timestamp_ms    = 1000UL;
+    pkt->target_lat      = 107723450L;
+    pkt->target_lon      = 1066578900L;
+    pkt->target_x_local  = 150;
+    pkt->target_y_local  = 320;
+    pkt->alt_dist_cm     = 240U;
+    pkt->class_id        = KVC_CLASS_ID_PERSON;
+    pkt->confidence      = 92U;
+    pkt->sensor_flags    = 0x0FU;
+    pkt->status_reserved = 0U;
     kvc_finalize_telemetry_packet(pkt);
 }
 
@@ -80,7 +80,7 @@ static void test_layout(void) {
     TEST_ASSERT(offsetof(KvcTelemetryPacket32, class_id)      == 22U, "class_id @22");
     TEST_ASSERT(offsetof(KvcTelemetryPacket32, confidence)    == 23U, "confidence @23");
     TEST_ASSERT(offsetof(KvcTelemetryPacket32, sensor_flags)  == 24U, "flags @24");
-    TEST_ASSERT(offsetof(KvcTelemetryPacket32, battery_raw)   == 25U, "battery @25");
+    TEST_ASSERT(offsetof(KvcTelemetryPacket32, status_reserved) == 25U, "status_reserved @25");
     TEST_ASSERT(offsetof(KvcTelemetryPacket32, reserved)      == 26U, "reserved @26");
     TEST_ASSERT(offsetof(KvcTelemetryPacket32, crc16)         == 30U, "crc16 @30");
 }
@@ -116,9 +116,9 @@ static void test_crc(void) {
     TEST_ASSERT(kvc_calculate_crc16(kCheck, 9U) == 0x29B1U,
                 "vector chuan \"123456789\" -> 0x29B1");
 
-    build_gv01(&a);
+    build_gv02(&a);
     crc_a = a.crc16;
-    TEST_ASSERT(crc_a == KVC_GOLDEN_GV01_CRC16, "GV-01 CRC = 0x304E");
+    TEST_ASSERT(crc_a == KVC_GOLDEN_GV02_CRC16, "GV-02 CRC = 0xE260");
 
     /* Đảo 1 bit ở payload -> CRC phải khác. */
     b = a;
@@ -136,14 +136,14 @@ static void test_crc(void) {
 }
 
 /* ============================================================================
- * TEST 6: GV-01 KHỚP
+ * TEST 6: GV-02 KHỚP
  * ============================================================================ */
 static void test_golden_vector(void) {
     KvcTelemetryPacket32 pkt;
 
-    printf("[TEST 6] Golden vector GV-01...\n");
+    printf("[TEST 6] Golden vector GV-02...\n");
 
-    build_gv01(&pkt);
+    build_gv02(&pkt);
 
     TEST_ASSERT(pkt.sync[0] == 0xAAU && pkt.sync[1] == 0x55U, "sync AA 55");
     TEST_ASSERT(pkt.msg_id == KVC_MSG_ID_TELEMETRY, "msg_id = 0x01");
@@ -154,10 +154,10 @@ static void test_golden_vector(void) {
     TEST_ASSERT(pkt.class_id == KVC_CLASS_ID_PERSON, "class = person");
     TEST_ASSERT(pkt.confidence == 92U, "confidence = 92");
     TEST_ASSERT(pkt.sensor_flags == 0x0FU, "flags = 0x0F");
-    TEST_ASSERT(pkt.battery_raw == 126U, "battery = 126");
+    TEST_ASSERT(pkt.status_reserved == 0U, "status_reserved = 0 (da bo do pin)");
 
-    TEST_ASSERT(kvc_telemetry_match_golden_gv01(&pkt), "match_golden tra true");
-    TEST_ASSERT(!kvc_telemetry_match_golden_gv01(NULL), "NULL -> false");
+    TEST_ASSERT(kvc_telemetry_match_golden_gv02(&pkt), "match_golden tra true");
+    TEST_ASSERT(!kvc_telemetry_match_golden_gv02(NULL), "NULL -> false");
 
     /* So sánh với chuỗi hex trong IF-02 mục 3 để bắt lệch endian. */
     {
@@ -168,11 +168,11 @@ static void test_golden_vector(void) {
             0xD4, 0xB3, 0x92, 0x3F,
             0x96, 0x00, 0x40, 0x01,
             0xF0, 0x00, 0x01, 0x5C,
-            0x0F, 0x7E, 0x00, 0x00,
-            0x00, 0x00, 0x4E, 0x30,
+            0x0F, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x60, 0xE2,
         };
         TEST_ASSERT(memcmp(&pkt, kExpected, sizeof(kExpected)) == 0,
-                    "byte-for-byte khop GV-01 trong IF-02");
+                    "byte-for-byte khop GV-02 trong IF-02");
     }
 }
 
@@ -182,23 +182,23 @@ static void test_golden_vector(void) {
 static void test_golden_detects_mismatch(void) {
     KvcTelemetryPacket32 pkt;
 
-    printf("[TEST 7] GV-01 phat hien lech tung truong...\n");
+    printf("[TEST 7] GV-02 phat hien lech tung truong...\n");
 
-    build_gv01(&pkt);
+    build_gv02(&pkt);
     pkt.seq_num = 43U;
-    TEST_ASSERT(!kvc_telemetry_match_golden_gv01(&pkt), "seq sai -> khong khop");
+    TEST_ASSERT(!kvc_telemetry_match_golden_gv02(&pkt), "seq sai -> khong khop");
 
-    build_gv01(&pkt);
+    build_gv02(&pkt);
     pkt.sensor_flags = 0x07U;
-    TEST_ASSERT(!kvc_telemetry_match_golden_gv01(&pkt), "flags sai -> khong khop");
+    TEST_ASSERT(!kvc_telemetry_match_golden_gv02(&pkt), "flags sai -> khong khop");
 
-    build_gv01(&pkt);
+    build_gv02(&pkt);
     pkt.crc16 ^= 0x0001U;
-    TEST_ASSERT(!kvc_telemetry_match_golden_gv01(&pkt), "crc sai -> khong khop");
+    TEST_ASSERT(!kvc_telemetry_match_golden_gv02(&pkt), "crc sai -> khong khop");
 
-    build_gv01(&pkt);
+    build_gv02(&pkt);
     pkt.sync[0] = 0x00U;
-    TEST_ASSERT(!kvc_telemetry_match_golden_gv01(&pkt), "sync sai -> khong khop");
+    TEST_ASSERT(!kvc_telemetry_match_golden_gv02(&pkt), "sync sai -> khong khop");
 }
 
 /* ============================================================================
@@ -210,7 +210,7 @@ static void test_little_endian(void) {
 
     printf("[TEST 8] Little-Endian tren duong truyen...\n");
 
-    build_gv01(&pkt);
+    build_gv02(&pkt);
     raw = (const uint8_t *)&pkt;
 
     /* timestamp_ms = 1000 = 0x000003E8 -> e8 03 00 00 */

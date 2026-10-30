@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import { Satellite } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
@@ -20,7 +20,7 @@ export const GnssSatelliteSheet: React.FC<GnssSatelliteSheetProps> = ({ open, on
       <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col bg-card overflow-y-auto">
         <SheetHeader className="p-5 border-b border-border">
           <div className="flex items-center gap-2">
-            <Satellite className="h-5 w-5 text-cyan-500" />
+            <Satellite className="h-5 w-5 text-[var(--kvc-accent-ink)]" />
             <SheetTitle>Phần Vệ Tinh GNSS Định Vị</SheetTitle>
           </div>
           <SheetDescription>GNSS u-blox M10 (bo mạch ghi NEO-M10N) — cấu hình carrier cần xác nhận</SheetDescription>
@@ -34,7 +34,7 @@ export const GnssSatelliteSheet: React.FC<GnssSatelliteSheetProps> = ({ open, on
             <p className="font-semibold">Vị trí từ nguồn dữ liệu hiện hành</p>
             <p>Vĩ độ: <span className="font-mono">{hasFix && camera_position.latitude !== null ? camera_position.latitude.toFixed(6) : 'N/A'}</span></p>
             <p>Kinh độ: <span className="font-mono">{hasFix && camera_position.longitude !== null ? camera_position.longitude.toFixed(6) : 'N/A'}</span></p>
-            <p className="text-muted-foreground">MOCK là dữ liệu giả lập; REPLAY là dữ liệu của phiên đã ghi.</p>
+            <p className="text-muted-foreground">MOCK là dữ liệu giả lập; REAL là dữ liệu từ Gateway ESP32.</p>
           </Card>
           <Card className="p-4 space-y-2">
             <p className="font-semibold">Chi tiết vệ tinh chưa có dữ liệu</p>

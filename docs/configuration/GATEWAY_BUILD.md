@@ -12,7 +12,7 @@
 1. **Thu tín hiệu LoRa:** Đọc gói từ MCU Sonix trên UAV; nhận RF payload 32 byte cấu trúc `KvcTelemetryPacket32` (IF-02) và cấu hình điều chế candidate 433.0 MHz, Sync Word 0x12, BW 125 kHz, SF7/SF8, CR 4/5.
 2. **Đo lường chất lượng sóng:** Trích xuất chỉ số cường độ sóng **RSSI (dBm)** và tỷ số tín hiệu trên nhiễu **SNR (dB)** từ chip SX1278.
 3. **Thiết lập mạng theo thứ tự ưu tiên:** (1) kết nối Wi-Fi 2.4 GHz đã cấu hình sẵn qua build flags `-D KVC_WIFI_SSID` / `-D KVC_WIFI_PASS` (hỗ trợ tới 4 mạng `..._SSID2..4`; **"4G" của dự án là hotspot do điện thoại phát, không cần module 4G**); (2) nếu không có credential hoặc hết ngân sách khởi động mà chưa nối được thì tự phát SoftAP `KVC_GROUND_STATION` (mật khẩu `kvc123456`, IP `192.168.4.1`). Khi ưu tiên 1 nối lại được, firmware tự đóng SoftAP. ESP32-C3 chỉ hỗ trợ 2.4 GHz.
-4. **Chạy WebSocket Server:** Đã triển khai WebSocket Server (cổng 8080, endpoint `/telemetry`) trong `src/main.cpp`, đóng gói JSON envelope theo chuẩn IF-03 (`rssi`, `snr`, `packet_id`, `raw_hex`). Backend GCS đã có module `gcs/backend/esp32_ingress.py` tiếp nhận và giải mã thông suốt.
+4. **Chạy WebSocket Server:** Đã triển khai WebSocket Server (cổng 8080, endpoint `/telemetry`) trong `src/main.cpp`, đóng gói JSON envelope theo chuẩn IF-03 với các trường `transport_version`, `gateway_session_id`, `gateway_sequence`, `rx_monotonic_ms`, `rf_payload_hex`, `rssi_dbm`, `snr_db`, `rx_drop_count`. Backend GCS đã có module `gcs/backend/esp32_ingress.py` tiếp nhận và giải mã thông suốt.
 5. **Duy trì hoạt động độc lập:** ESP32 dùng nguồn pin riêng, tiếp tục nhận và đếm gói LoRa ngay cả khi laptop tắt hoặc ngắt kết nối Wi-Fi.
 
 ---

@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import { Crosshair, LocateFixed } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -28,7 +28,7 @@ export const FloatingMapControls: React.FC<FloatingMapControlsProps> = ({
 
   return (
     <div
-      className={`absolute bottom-3 right-3 z-[400] flex flex-col gap-1.5 p-1 rounded-xl bg-slate-950/80 dark:bg-slate-950/85 backdrop-blur-md border border-white/20 dark:border-white/10 shadow-xl select-none pointer-events-auto ${className}`}
+      className={`kvc-on-overlay absolute bottom-3 right-3 z-[var(--kvc-z-panel)] flex flex-col gap-1.5 p-1 rounded-kvc-panel bg-[var(--kvc-overlay)] border border-[var(--kvc-line-strong)] shadow-sm select-none pointer-events-auto ${className}`}
       aria-label="Cụm điều khiển khung nhìn nổi"
     >
       {/* Nút Đặt lại khung nhìn về Tâm UAV */}
@@ -38,10 +38,10 @@ export const FloatingMapControls: React.FC<FloatingMapControlsProps> = ({
             variant="ghost"
             size="icon"
             onClick={onResetView}
-            className="h-8 w-8 text-slate-200 hover:text-cyan-400 hover:bg-white/10 cursor-pointer"
+            className="h-8 w-8 text-[var(--kvc-text-on-overlay-muted)] hover:text-[var(--kvc-accent-ink)] hover:bg-[var(--kvc-surface-2)]/40 cursor-pointer"
             aria-label="Đặt lại khung nhìn"
           >
-            <LocateFixed className="h-4 w-4 text-cyan-400" />
+            <LocateFixed className="h-4 w-4 text-[var(--kvc-accent-ink)]" />
           </Button>
         </TooltipTrigger>
         <TooltipContent side="left">
@@ -57,10 +57,10 @@ export const FloatingMapControls: React.FC<FloatingMapControlsProps> = ({
             size="icon"
             onClick={onFocusTarget}
             disabled={!hasValidTarget}
-            className="h-8 w-8 text-slate-200 hover:text-rose-400 hover:bg-white/10 disabled:opacity-30 cursor-pointer"
+            className="h-8 w-8 text-[var(--kvc-text-on-overlay-muted)] hover:text-[var(--kvc-crit-ink)] hover:bg-[var(--kvc-surface-2)]/40 disabled:opacity-30 cursor-pointer"
             aria-label="Tâm mục tiêu"
           >
-            <Crosshair className="h-4 w-4 text-rose-500" />
+            <Crosshair className="h-4 w-4 text-[var(--kvc-crit-ink)]" />
           </Button>
         </TooltipTrigger>
         <TooltipContent side="left">

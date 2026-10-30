@@ -41,10 +41,10 @@ flowchart TD
     LORA_SRC --> HAL_OUT
     HAL_OUT --> VALIDATOR
     VALIDATOR -- "Gói hợp lệ (CRC OK)" --> PARSER
-    VALIDATOR -- "Sai CRC / Sai Header" --> DROP["Tăng rx_drop_count & Hủy gói"]
+    VALIDATOR -- "Sai CRC / Sai Header" --> DROP["Tăng rx_invalid_count (nội bộ, chỉ log Serial) & Hủy gói"]
     PARSER --> JSON_PACK
     JSON_PACK --> WS_SRV
-    WS_SRV -- "Wi-Fi Trễ < 2ms" --> BACKEND
+    WS_SRV -- "Wi-Fi 2.4 GHz (độ trễ chưa đo)" --> BACKEND
     BACKEND --> FRONTEND
 ```
 
@@ -130,15 +130,25 @@ flowchart TD
 
 * **Trực quan trên Serial Monitor (ESP32):**
   ```text
-  --- KIEM THU THUAT TOAN CRC-16 & ENVELOPE JSON ---
-  [CRC-UNIT-TEST] Tinh CRC tren 30 byte mau...
-  [CRC-UNIT-TEST] Computed CRC: 0xA1B2 | Expected: 0xA1B2 -> PASSED!
-  [CRC-FAIL-TEST] Dao bit byte[10] -> Computed CRC: 0x47F1 != 0xA1B2 -> REJECTED (PASS)
-  [HEX-CONVERT] Chuoi Hex 64 ky tu xuat ra:
-  aa55012a78e10100f28292091c6e3b406400c800c800015f0f7e00000000a1b2
-  [JSON-ENVELOPE] Kiem tra schema JSON IF-03:
-  {"transport_version":1,"gateway_session_id":1,"gateway_sequence":1,"rx_monotonic_ms":1045,"rf_payload_hex":"aa55...a1b2","rssi_dbm":-76,"snr_db":8.5,"rx_drop_count":0}
+  [GIAI ĐOẠN 2] TỰ KIỂM THỬ THUẬT TOÁN CRC-16 & JSON
+  [TEST 1 - STRUCT SIZE] Kich thuoc RfTelemetryPacket32: 32 bytes
+                         -> KHOA CHAT BO NHO (PACKED) THANH CONG! [PASS]
+  [TEST 2 - CRC VALID]   Computed CRC: 0xE260 | Expected: 0xE260
+                         -> THAM DINH CRC GOI TIN CHUAN: PASSED! [PASS]
+  [TEST 2B - GOLDEN GV-02] CRC 0xE260 (expect 0xE260) MATCH | Hex MATCH
+                         -> GOLDEN VECTOR KHOP C/PYTHON! [PASS]
+  [TEST 3 - CRC REJECT]  Thu nghiem dao 1 bit tai byte[10] ->
+                         PHAT HIEN SAI CRC & TU CHOI GOI LOI! [PASS]
+  [TEST 4 - HEX ENCODE]  Chuoi Hex 64 ky tu xuat ra:
+         aa55012ae8030000baba6b06d4b3923f96004001f000015c0f000000000060e2
+                         Do dai: 64 ky tu -> DUNG CHUAN 64 KY TU! [PASS]
+  [TEST 5 - JSON ENVELOPE] Mau goi tin JSON phat qua WebSocket:
+         {"transport_version":1,"gateway_session_id":<id>,"gateway_sequence":1,
+          "rx_monotonic_ms":<ms>,"rf_payload_hex":"aa55...60e2","rssi_dbm":-76,
+          "snr_db":8.5,"rx_drop_count":0}
   ```
+
+> **Golden vector dùng chung:** khối log trên là **GV-02** của [IF-02](../interfaces/IF_MCU_LORA_RF.md) mục 3 (`CRC 0xE260`). GV-02 thay GV-01 (`0x304E`) sau khi KVC bỏ phép đo pin: byte 25 đổi từ `battery_raw` sang `status_reserved = 0`. Layout vẫn 32 byte, offset không đổi. Nếu log ra `0x304E` hoặc dòng `[RX-LORA]` còn in `Pin:` → board đang chạy firmware **trước** thay đổi ABI. `gateway_session_id` được sinh lúc boot từ `esp_random()` trộn MAC eFuse và in ở dòng `[SESSION] gateway_session_id = ...`; không còn hằng số `1`. Vector `aa55012a78e10100...a1b2` là fixture lịch sử có CRC sai, không dùng làm kỳ vọng.
 
 * **Dấu hiệu nghiệm thu:** Chuỗi Hex xuất ra đúng 64 ký tự; gói tin bị nhiễu bit bị từ chối ngay lập tức, không lọt lên mạng.
 
@@ -164,19 +174,19 @@ flowchart TD
 
 * **Trực quan trên Serial Monitor (ESP32):**
   ```text
-  [TX-WS #001] NGUOI (Person) | Conf: 95% | Siêu âm: 250 cm | Lat: 16.073852, Lon: 108.149921 | RSSI: -76 dBm
-  [TX-WS #002] NGUOI (Person) | Conf: 95% | Siêu âm: 250 cm | Lat: 16.073852, Lon: 108.149921 | RSSI: -77 dBm
-  [TX-WS #003] TAU (Boat)     | Conf: 92% | Siêu âm: 230 cm | Lat: 16.075100, Lon: 108.151200 | RSSI: -75 dBm
-  [TX-WS #004] SA BAN LOCAL   | Conf: 89% | X: +150 cm, Y: +320 cm | Siêu âm: 245 cm     | RSSI: -76 dBm
+  [SESSION] gateway_session_id = <id> (MAC <48-bit>)
+  [TX-WS #001] NGUOI (Person) | Conf: 95% | LiDAR: 250 cm | Lat: 16.073852, Lon: 108.149921 | RSSI: -76 dBm
+  [TX-WS #002] TAU (Boat)     | Conf: 92% | LiDAR: 230 cm | Lat: 16.075100, Lon: 108.151200 | RSSI: -77 dBm
+  [TX-WS #003] SA BAN LOCAL   | Conf: 89% | X: +150 cm, Y: +320 cm | LiDAR: 245 cm       | RSSI: -76 dBm
   ```
+  > Chuỗi `[TX-WS ...]` in theo `main.cpp:564-575`; chu kỳ Self-Mock là `SELF_MOCK_INTERVAL_MS = 1000` (1 giây, `main.cpp:234`).
 
 * **Trực quan trên Terminal Backend Python (`esp32_ingress.py`):**
   ```text
-  [INGRESS_REAL] Da ket noi toi Gateway ESP32 tai ws://192.168.4.1:8080/telemetry
-  [INGRESS_REAL] RX #001 | Seq=1 | Target: PERSON (95.0%) | Pos: (16.073852, 108.149921) | Siêu âm: 2.50m
-  [SQLITE_WAL] Ghi ban ghi Telemetry vao SES-REAL-001.db (ID: 1, Frame: WGS84)
-  [HUB] Phat tiep tuc toi Web Dashboard qua kenh Telemetry Hub
+  Connecting to ESP32 Gateway at ws://192.168.4.1:8080/telemetry...
+  Connected to ESP32 Gateway at ws://192.168.4.1:8080/telemetry.
   ```
+  > Đây là hai dòng log thật của `esp32_ingress.py` (`logger.info` tại dòng 323/328). Hub publish `LINK_STATUS` + `TELEMETRY_UPDATE`/`TARGET_UPDATE` (`inject_envelope`, dòng 252-261); backend hiện **chưa** in log dạng `[INGRESS_REAL]`/`[SQLITE_WAL]` cho từng frame.
 
 * **Trực quan trên Web Dashboard (Giao diện Bản đồ tác chiến):**
   ```text
@@ -197,7 +207,7 @@ flowchart TD
   │ │ • Đối tượng: Người dưới nước (95%)     │         │                           │ │
   │ │ • Cự ly Siêu âm: 2.50 m (An toàn > 2.0m)│         │ ┌───────────────────────┐ │ │
   │ │ • Sóng LoRa SX1278: -76 dBm (SÓNG TỐT) │         │ │ 🗺️ Lớp Vệ tinh / 2D  │ │ │
-  │ │ • Điện áp pin UAV: 12.5V (90%)         │         │ └───────────────────────┘ │ │
+  │ │ • Điện áp pin: N/A (đã bỏ đo pin)      │         │ └───────────────────────┘ │ │
   │ └────────────────────────────────────────┘         └───────────────────────────┘ │
   └──────────────────────────────────────────────────────────────────────────────────┘
   ```
@@ -260,27 +270,23 @@ flowchart TD
    - Tần số: `433.0 MHz` | Băng thông: `125 kHz` | Spreading Factor: `SF7` | Coding Rate: `4/5` | Sync Word: `0x12`.
 3. Bật ngắt ngoài `DIO0` (RxDone) hoặc kiểm tra FIFO liên tục (`OP_MODE_RX_CONTINUOUS`).
 4. Bật mạch phát trên UAV (hoặc mạch phát thử nghiệm của Duy Phong) phát gói 32 byte.
-5. Khi nhận được gói, ESP32 đọc 32 bytes, đọc RSSI/SNR thật từ chip và đưa vào hàm `dispatchTelemetry()` đã kiểm thử từ Pha A.
+5. Khi nhận được gói, ESP32 đọc 32 bytes, đọc RSSI/SNR thật từ chip, kiểm CRC-16 rồi đóng envelope bằng `buildJsonEnvelope()` và phát qua `webSocket.broadcastTXT()` (cùng đường với Self-Mock ở Pha A).
 
 #### B. Thể hiện trực quan kết quả đạt chuẩn:
 
 * **Trực quan trên Serial Monitor (ESP32):**
   ```text
-  [LORA-RX] Phat hien song vo tuyen 433MHz tu UAV!
-  [LORA-RX] Do dai goi tin: 32 bytes | CRC Phan cung LoRa: VALID
-  [RF-METRICS] RSSI Do duoc: -68 dBm | SNR: +10.2 dB
-  [DECODER] Sync Header: 0xAA 0x55 OK | CRC-16 Software: 0xE421 == 0xE421 (MATCH)
-  [TARGET] Phat hien: Class 1 (Person) | Lat: 16.073910, Lon: 108.150040 | Siêu âm: 2.45m
-  [TX-WS #045] Da dong goi JSON va ban sang Laptop qua WebSocket!
+  [RX-LORA #045] Seq:42  | -68dBm SNR:+10.2 | Alt:245 cm [ALT_VALID] | R:+0.0 P:-0.0 | GPS:16.07391,108.15004 | AI:PERSON(92%) | Pin:12.6V
+  [HEARTBEAT] UpTime: 00:12:34 | IP: 192.168.4.1 | Clients: 1 | InvalidFrames: 0 | BufDrops: 0
   ```
+  > Định dạng lấy từ `main.cpp:1094-1099` và `main.cpp:1184-1187`. Firmware hiện **không** in các tag `[LORA-RX]`, `[RF-METRICS]`, `[DECODER]`, `[TARGET]`; log nhận gói là một dòng `[RX-LORA #...]` gộp. Frame sai CRC in `[RX-LORA-ERR] ... (Tong frame loi: N)`.
 
 * **Trực quan trên Terminal Backend Python (`esp32_ingress.py`):**
   ```text
-  [INGRESS_REAL] NHẬN GÓI TIN THẬT TỪ SÓNG VÔ TUYẾN LORA SX1278!
-  [METRICS] RSSI = -68 dBm (Sóng Rất Tốt) | SNR = +10.2 dB | Gateway Seq = 45
-  [PAYLOAD] 32 Bytes Hex: aa55012d98...e421
-  [TARGET] Bàn giao mục tiêu cứu nạn: Vĩ độ 16.073910° N, Kinh độ 108.150040° E
+  Connecting to ESP32 Gateway at ws://192.168.4.1:8080/telemetry...
+  Connected to ESP32 Gateway at ws://192.168.4.1:8080/telemetry.
   ```
+  > Backend hiện chỉ log lúc kết nối/lỗi/handshake (`esp32_ingress.py:323-361`); frame hợp lệ được đẩy vào Hub mà không in `[INGRESS_REAL]`/`[METRICS]`/`[PAYLOAD]`. Muốn đối chiếu payload phải xem SQLite (`rf_payload_hex`) hoặc bật log riêng.
 
 * **Trực quan trên Web Dashboard (GCS):**
   - Cột sóng hiển thị màu xanh lá đậm: **`SÓNG TỐT (-68 dBm | +10.2 dB)`**.
@@ -295,10 +301,10 @@ flowchart TD
 #### A. Các bước thực hiện & Kịch bản thử nghiệm:
 1. **Kịch bản mất Wi-Fi Laptop:**
    - Đang nhận dữ liệu, thử tắt Wi-Fi trên laptop trong 15 giây.
-   - ESP32 phát hiện mất kết nối client nhưng **vẫn tiếp tục thu sóng LoRa và đệm vào Ring Buffer trong RAM**.
-   - Bật lại Wi-Fi laptop $\to$ WebSocket tự kết nối lại trong vòng 2 giây, dữ liệu được dồn về tức thì.
+   - **Hiện trạng firmware:** ESP32 vẫn thu sóng LoRa và in ra Serial nhưng **không đệm** frame nào; kết nối lại thì chỉ có frame mới đi tiếp. Cơ chế FIFO 64 message là **thiết kế mục tiêu chưa triển khai**.
+   - Bật lại Wi-Fi laptop $\to$ WebSocket tự kết nối lại; kỳ vọng dữ liệu mất trong lúc ngắt **không** được dồn về. Muốn dồn dữ liệu phải triển khai FIFO và đo lại.
 2. **Kịch bản nhiễu sóng / Sai CRC:**
-   - Khi có sóng lạ cùng tần số hoặc gói tin bị méo do vật cản $\to$ ESP32 phát hiện sai CRC-16, tăng biến `rx_drop_count`, loại bỏ gói lỗi, không để dữ liệu rác làm hỏng cơ sở dữ liệu Backend.
+   - Khi có sóng lạ cùng tần số hoặc gói tin bị méo do vật cản $\to$ ESP32 phát hiện sai CRC-16, tăng biến **`rx_invalid_count`** (không phải `rx_drop_count`), loại bỏ gói lỗi, không để dữ liệu rác làm hỏng cơ sở dữ liệu Backend. `rx_drop_count` trong envelope v1 chỉ dành cho message **hợp lệ** bị loại vì buffer đầy, và firmware hiện tại luôn gửi `0`.
 
 #### B. Thể hiện trực quan kết quả đạt chuẩn:
 

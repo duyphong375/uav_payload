@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+﻿import React, { useState } from 'react'
 import {
   Database,
   Globe,
@@ -36,7 +36,8 @@ export const SettingsPage: React.FC = () => {
     selectedScenarioId,
     setSelectedScenarioId,
     switchSourceMode,
-    reconnect,
+    wsUrl,
+    setWsUrl,
   } = useMission()
 
   const {
@@ -47,15 +48,33 @@ export const SettingsPage: React.FC = () => {
     sidebar_collapsed,
   } = state
 
-  const [customWsUrl, setCustomWsUrl] = useState(APP_CONFIG.WS_URL)
+  const [customWsUrl, setCustomWsUrl] = useState(() => wsUrl)
   const [saveSuccess, setSaveSuccess] = useState(false)
+  const [wsError, setWsError] = useState<string | null>(null)
 
   const handleSaveNetwork = (e: React.FormEvent) => {
     e.preventDefault()
+    const result = setWsUrl(customWsUrl)
+    if (!result.ok) {
+      setWsError(result.error ?? 'Không áp dụng được địa chỉ WebSocket.')
+      setSaveSuccess(false)
+      toast.error(result.error ?? 'Không áp dụng được địa chỉ WebSocket.')
+      return
+    }
+    setWsError(null)
+    setCustomWsUrl(customWsUrl.trim())
     setSaveSuccess(true)
     setTimeout(() => setSaveSuccess(false), 2000)
-    toast.success('Đã lưu địa chỉ WebSocket và gửi lệnh kết nối lại!')
-    reconnect()
+    toast.success('Đã áp dụng địa chỉ WebSocket mới.')
+  }
+
+  const handleRestoreWsDefault = () => {
+    const result = setWsUrl(APP_CONFIG.WS_URL)
+    if (result.ok) {
+      setCustomWsUrl(APP_CONFIG.WS_URL)
+      setWsError(null)
+      toast.info('Đã khôi phục địa chỉ WebSocket mặc định.')
+    }
   }
 
   const handleResetDefaults = () => {
@@ -93,7 +112,7 @@ export const SettingsPage: React.FC = () => {
           <CardHeader className="py-3 px-4 border-b border-border/60 bg-muted/20">
             <CardTitle className="text-xs font-semibold text-foreground uppercase tracking-wider flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Monitor className="h-4 w-4 text-cyan-500" />
+                <Monitor className="h-4 w-4 text-[var(--kvc-accent-ink)]" />
                 <span>Chủ đề & Bố cục hiển thị</span>
                 <InfoTip text="Tùy biến theme giao diện Sáng/Tối, vệt quỹ đạo bay lịch sử và tự động cuộn bản đồ theo tâm UAV." />
               </div>
@@ -108,7 +127,7 @@ export const SettingsPage: React.FC = () => {
                   Chọn chế độ Sáng (Light), Tối (Dark) hoặc theo Hệ điều hành
                 </span>
               </div>
-              <div className="flex items-center gap-1 border border-border rounded-lg p-0.5 bg-muted/30">
+              <div className="flex items-center gap-1 border border-border rounded-kvc-control p-0.5 bg-muted/30">
                 <Button
                   variant={theme === 'light' ? 'secondary' : 'ghost'}
                   size="sm"
@@ -232,10 +251,10 @@ export const SettingsPage: React.FC = () => {
                 <span className="font-semibold text-foreground">Chế độ nguồn dữ liệu</span>
                 <Badge
                   variant="outline"
-                  className={`font-mono text-[10px] ${
+                  className={`font-mono text-[11px] ${
                     source_mode === 'MOCK'
-                      ? 'border-purple-500/40 text-purple-600 dark:text-purple-300 bg-purple-500/10'
-                      : 'border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10'
+                      ? 'border-[var(--kvc-mock-line)] text-[var(--kvc-mock-ink)] bg-[var(--kvc-mock-bg)]'
+                      : 'border-[var(--kvc-ok-line)] text-[var(--kvc-ok-ink)] bg-[var(--kvc-ok-bg)]'
                   }`}
                 >
                   {source_mode}
@@ -245,7 +264,7 @@ export const SettingsPage: React.FC = () => {
                 <Button
                   variant={source_mode === 'MOCK' ? 'default' : 'outline'}
                   size="sm"
-                  className={`text-xs h-8 ${source_mode === 'MOCK' ? 'bg-purple-600 hover:bg-purple-700 text-white' : ''}`}
+                  className={`text-xs h-8 ${source_mode === 'MOCK' ? 'bg-[var(--kvc-mock-fill)] text-[var(--kvc-text-on-fill)]' : ''}`}
                   onClick={() => switchSourceMode('MOCK')}
                 >
                   MOCK (Mô phỏng độc lập)
@@ -253,7 +272,7 @@ export const SettingsPage: React.FC = () => {
                 <Button
                   variant={source_mode === 'REAL' ? 'default' : 'outline'}
                   size="sm"
-                  className={`text-xs h-8 ${source_mode === 'REAL' ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}`}
+                  className={`text-xs h-8 ${source_mode === 'REAL' ? 'bg-[var(--kvc-ok-fill)] hover:bg-[var(--kvc-ok-fill)] text-[var(--kvc-text-on-fill)]' : ''}`}
                   onClick={() => switchSourceMode('REAL')}
                 >
                   REAL (Phần cứng thực tế)
@@ -268,7 +287,7 @@ export const SettingsPage: React.FC = () => {
 
             {/* Chọn Kịch bản MOCK (Chỉ khi MOCK) */}
             {source_mode === 'MOCK' && (
-              <div className="flex flex-col gap-2.5 p-3 rounded-lg border border-purple-500/20 bg-purple-500/5">
+              <div className="flex flex-col gap-2.5 p-3 rounded-kvc-control border border-[var(--kvc-mock-line)] bg-[var(--kvc-mock-bg)]">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-foreground">
                     Chọn kịch bản mô phỏng ({MOCK_SCENARIOS.length} kịch bản)
@@ -304,7 +323,7 @@ export const SettingsPage: React.FC = () => {
                           <Badge
                             key={t}
                             variant="outline"
-                            className="text-[9px] py-0 px-1 border-purple-500/30 text-purple-600 dark:text-purple-300 font-mono"
+                            className="text-[11px] py-0 px-1 border-[var(--kvc-mock-line)] text-[var(--kvc-mock-ink)] font-mono"
                           >
                             {t}
                           </Badge>
@@ -349,17 +368,32 @@ export const SettingsPage: React.FC = () => {
                 className="h-8 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 <RefreshCw className="h-3.5 w-3.5" />
-                <span>Áp dụng & Kết nối lại</span>
+                <span>Áp dụng</span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleRestoreWsDefault}
+                className="h-8 text-xs gap-1.5 shrink-0 border-border"
+                title="Khôi phục địa chỉ mặc định từ cấu hình build"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Mặc định</span>
               </Button>
             </form>
-            {saveSuccess && (
-              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium">
-                Đã gửi yêu cầu kết nối lại tới địa chỉ mới!
+            {wsError && (
+              <span className="text-[11px] text-destructive font-medium">{wsError}</span>
+            )}
+            {saveSuccess && !wsError && (
+              <span className="text-[11px] text-[var(--kvc-ok-ink)] font-medium">
+                Đã áp dụng địa chỉ WebSocket mới.
               </span>
             )}
             <p className="text-[11px] text-muted-foreground">
-              Địa chỉ mặc định theo cấu hình hệ thống: <code className="font-mono text-foreground font-semibold">{APP_CONFIG.WS_URL}</code>.
-              Trong chế độ REAL, trạm sẽ kết nối tới backend này để nhận dữ liệu UART telemetry và video RTSP.
+              Địa chỉ đang dùng: <code className="font-mono text-foreground font-semibold">{wsUrl}</code>.
+              Mặc định theo cấu hình build: <code className="font-mono">{APP_CONFIG.WS_URL}</code>.
+              Áp dụng địa chỉ mới sẽ kết nối lại ở chế độ REAL.
             </p>
           </CardContent>
         </Card>

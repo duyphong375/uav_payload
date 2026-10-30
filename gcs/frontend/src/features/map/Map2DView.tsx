@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+﻿import React, { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { ChevronDown, ChevronUp, LocateFixed, WifiOff } from 'lucide-react'
@@ -490,7 +490,7 @@ export const Map2DView: React.FC<Map2DViewProps> = ({
 
       {/* Nút nhỏ nổi: "Có vị trí mới" khi UAV ở ngoài vùng xem hiện tại của người dùng (Quy tắc chống nhấp nháy Mục 7) */}
       {newPositionOutsideView && (
-        <div className="absolute top-3 right-3 z-[400] pointer-events-auto">
+        <div className="absolute top-3 right-3 z-[var(--kvc-z-panel)] pointer-events-auto">
           <Button
             size="sm"
             variant="default"
@@ -506,39 +506,39 @@ export const Map2DView: React.FC<Map2DViewProps> = ({
 
       {/* Cảnh báo Mất Fix / Giữ vị trí cuối dạng thanh thu để tăng diện tích hiển thị bản đồ */}
       {!hasGpsFix && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[405] pointer-events-auto">
+        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[var(--kvc-z-banner)] pointer-events-auto">
           {isGnssAlertCollapsed ? (
             <button
               type="button"
               onClick={() => setIsGnssAlertCollapsed(false)}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-950/85 backdrop-blur-md border border-amber-500/50 shadow-xl text-amber-300 hover:text-amber-200 hover:bg-slate-900/90 transition-all text-xs cursor-pointer animate-in fade-in"
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--kvc-overlay)] border border-[var(--kvc-warn-line)] shadow-sm text-[var(--kvc-warn-ink)] hover:text-[var(--kvc-warn-ink)] hover:bg-[var(--kvc-surface-2)] transition-all text-xs cursor-pointer animate-in fade-in"
               title="Nhấp để xem chi tiết cảnh báo mất khóa GNSS"
               aria-label="Xem chi tiết cảnh báo mất khóa GNSS"
             >
-              <WifiOff className="h-3.5 w-3.5 text-amber-400 animate-pulse" />
+              <WifiOff className="h-3.5 w-3.5 text-[var(--kvc-warn-ink)] " />
               <span className="font-semibold">Mất Khóa Vệ Tinh (GNSS)</span>
-              <span className="text-[10px] text-amber-400/80 hidden sm:inline">• Giữ vị trí cuối</span>
-              <ChevronDown className="h-3 w-3 text-amber-400 ml-0.5" />
+              <span className="text-[11px] text-[var(--kvc-warn-ink)]/80 hidden sm:inline">• Giữ vị trí cuối</span>
+              <ChevronDown className="h-3 w-3 text-[var(--kvc-warn-ink)] ml-0.5" />
             </button>
           ) : (
-            <div className="max-w-sm bg-slate-950/95 backdrop-blur-md border border-amber-500/50 p-3 rounded-2xl shadow-2xl text-center relative animate-in fade-in zoom-in-95 text-slate-100">
+            <div className="kvc-on-overlay max-w-sm bg-[var(--kvc-overlay)] border border-[var(--kvc-warn-line)] p-3 rounded-kvc-panel shadow-sm text-center relative animate-in fade-in zoom-in-95 text-[var(--kvc-text-on-overlay)]">
               <button
                 type="button"
                 onClick={() => setIsGnssAlertCollapsed(true)}
-                className="absolute top-2 right-2 text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/10 cursor-pointer"
+                className="absolute top-2 right-2 text-[var(--kvc-text-on-overlay-muted)] hover:text-[var(--kvc-text-on-overlay)] p-1 rounded-kvc-control hover:bg-[var(--kvc-surface-2)]/40 cursor-pointer"
                 title="Thu nhỏ cảnh báo để xem bản đồ"
                 aria-label="Thu nhỏ cảnh báo GNSS"
               >
                 <ChevronUp className="h-4 w-4" />
               </button>
-              <WifiOff className="h-5 w-5 text-amber-500 mx-auto mb-1.5" />
-              <h4 className="text-xs font-semibold text-white mb-1">Mất Khóa Vệ Tinh (GNSS)</h4>
-              <p className="text-[11px] text-slate-300 mb-1.5">
+              <WifiOff className="h-5 w-5 text-[var(--kvc-warn-ink)] mx-auto mb-1.5" />
+              <h4 className="text-xs font-semibold text-[var(--kvc-text-on-overlay)] mb-1">Mất Khóa Vệ Tinh (GNSS)</h4>
+              <p className="text-[11px] text-[var(--kvc-text-on-overlay-muted)] mb-1.5">
                 {cameraPosition.last_updated_iso
                   ? `Vị trí cuối nhận: ${formatCoordinates(cameraPosition.latitude, cameraPosition.longitude)} (${formatTimeAgo(cameraPosition.last_updated_iso)})`
                   : 'Chưa nhận được gói tin tọa độ hợp lệ từ tải nhiệm vụ.'}
               </p>
-              <div className="text-[10px] text-amber-400 font-medium">
+              <div className="text-[11px] text-[var(--kvc-warn-ink)] font-medium">
                 Vị trí marker làm mờ để tránh nhầm lẫn với dữ liệu trực tiếp.
               </div>
             </div>
@@ -554,7 +554,7 @@ export const Map2DView: React.FC<Map2DViewProps> = ({
 
       {/* Banner thông báo tile offline nếu không có mạng */}
       {tileError && (
-        <div className="absolute bottom-20 left-3 z-[400] bg-card/85 backdrop-blur border border-border px-2.5 py-1 rounded-md text-[10px] text-muted-foreground shadow-xs pointer-events-none">
+        <div className="absolute bottom-20 left-3 z-[var(--kvc-z-map-overlay)] bg-[var(--kvc-surface)]/95 border border-[var(--kvc-line)] px-2.5 py-1 rounded-kvc-control text-[11px] text-muted-foreground shadow-xs pointer-events-none">
           Bản đồ nền Internet không phản hồi (Chế độ xem độc lập nội bộ)
         </div>
       )}

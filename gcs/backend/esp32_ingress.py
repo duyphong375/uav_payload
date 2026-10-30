@@ -12,7 +12,40 @@ from typing import Any
 
 import websockets
 
+try:
+    from .track_registry import get_track_registry
+except (ImportError, ValueError):
+    from track_registry import get_track_registry
+
 logger = logging.getLogger("kvc.esp32_ingress")
+
+
+def _resolve_track_id(
+    *,
+    now_ms: int,
+    class_id: int,
+    frame: str,
+    x_cm: float | None = None,
+    y_cm: float | None = None,
+    lat: float | None = None,
+    lon: float | None = None,
+    position_valid: bool = True,
+) -> int:
+    """Stable GCS-side track id (IF-02 carries no track identifier).
+
+    Replaces the old `seq_num`-derived id that changed on every packet and made
+    the UI spawn a new marker for the same victim each second.
+    """
+    return get_track_registry().resolve(
+        now_ms=now_ms,
+        class_id=class_id,
+        frame=frame,
+        x_cm=x_cm,
+        y_cm=y_cm,
+        lat=lat,
+        lon=lon,
+        position_valid=position_valid,
+    )
 
 # IF-02 ABI hien hanh: goi RF 32 byte Little-Endian.
 # Khoa o day de parser va test cung mot nguon; doi layout phai sua IF-02 truoc.
@@ -20,10 +53,11 @@ RF_PAYLOAD_SIZE = 32
 RF_PAYLOAD_FORMAT = "<2sBBIIIhhHBBBB4sH"
 RF_CRC_COVERAGE = 30
 
-# Golden vector GV-01 (IF-02 muc 3), sinh tu kvc_telemetry.h tren MCU va
+# Golden vector GV-02 (IF-02 muc 3), sinh tu kvc_telemetry.h tren MCU va
 # doi chieu bang runPhase2SelfTest() tren Gateway. Dung chung C/Python.
-GOLDEN_GV01_HEX = "aa55012ae8030000baba6b06d4b3923f96004001f000015c0f7e000000004e30"
-GOLDEN_GV01_CRC16 = 0x304E
+# GV-02 thay GV-01 sau khi KVC bo phep do pin (byte 25 status_reserved = 0).
+GOLDEN_GV02_HEX = "aa55012ae8030000baba6b06d4b3923f96004001f000015c0f000000000060e2"
+GOLDEN_GV02_CRC16 = 0xE260
 
 
 def crc16_ccitt_false(data: bytes) -> int:
@@ -65,7 +99,7 @@ def parse_rf_payload(rf_payload_hex: str) -> dict[str, Any]:
         lat_scaled, lon_scaled,
         x_local_cm, y_local_cm,
         lidar_cm, class_id, confidence,
-        sensor_flags, battery_raw, reserved, crc16,
+        sensor_flags, _status_reserved, reserved, crc16,
     ) = struct.unpack(fmt, raw_bytes)
 
     gps_valid = bool(sensor_flags & 0x01)
@@ -80,14 +114,10 @@ def parse_rf_payload(rf_payload_hex: str) -> dict[str, Any]:
     # "boat" để không phá dữ liệu cũ trong DB/replay.
     class_name = "person" if class_id == 1 else "lifebuoy" if class_id == 2 else "unknown"
 
-    # Firmware currently sends zero to mean "not measured" (no battery ADC).
-    # Preserve unknown as null instead of presenting it as an empty battery.
-    if battery_raw == 0:
-        battery_pct = None
-    else:
-        # 10.5V (0%) to 12.6V (100%), 0.1V/bit
-        battery_v = battery_raw * 0.1
-        battery_pct = int(min(100, max(0, (battery_v - 10.5) / (12.6 - 10.5) * 100)))
+    # KVC da bo phep do pin o phia tai: byte 25 (status_reserved) khong con mang
+    # nghia dien ap. Backend khong suy ra % tu byte nay nua; battery_pct luon
+    # null cho du lieu REAL. Giu field trong schema de tuong thich frontend/DB.
+    battery_pct = None
 
     has_target = ai_detected and (class_id in (1, 2))
 
@@ -103,7 +133,12 @@ def parse_rf_payload(rf_payload_hex: str) -> dict[str, Any]:
 
         if not has_wgs84_position and not has_local_position:
             target_data = {
-                "track_id": seq_num or 1,
+                "track_id": _resolve_track_id(
+                    now_ms=timestamp_ms,
+                    class_id=class_id,
+                    frame="NONE",
+                    position_valid=False,
+                ),
                 "class_id": class_id,
                 "class_name": class_name,
                 "confidence": min(100, max(0, confidence)),
@@ -117,7 +152,15 @@ def parse_rf_payload(rf_payload_hex: str) -> dict[str, Any]:
                 "origin_id": None,
             }
         elif has_wgs84_position:
-            target_id = x_local_cm if (1 <= x_local_cm <= 10) else (seq_num or 1)
+            target_id = _resolve_track_id(
+                now_ms=timestamp_ms,
+                class_id=class_id,
+                frame="WGS84",
+                x_cm=float(x_local_cm),
+                y_cm=float(y_local_cm),
+                lat=lat_scaled / 1e7,
+                lon=lon_scaled / 1e7,
+            )
             target_data = {
                 "track_id": target_id,
                 "class_id": class_id,
@@ -134,7 +177,13 @@ def parse_rf_payload(rf_payload_hex: str) -> dict[str, Any]:
             }
         else:
             target_data = {
-                "track_id": seq_num or 1,
+                "track_id": _resolve_track_id(
+                    now_ms=timestamp_ms,
+                    class_id=class_id,
+                    frame="LOCAL_GRID",
+                    x_cm=float(x_local_cm),
+                    y_cm=float(y_local_cm),
+                ),
                 "class_id": class_id,
                 "class_name": class_name,
                 "confidence": min(100, max(0, confidence)),

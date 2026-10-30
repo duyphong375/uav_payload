@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+﻿import React, { useEffect, useState } from 'react'
 import {
   AlertTriangle,
   ArrowRight,
@@ -47,7 +47,7 @@ export const OverviewPage: React.FC = () => {
 
   const handleStartDemoScenario = () => {
     switchSourceMode('MOCK')
-    setSelectedScenarioId('NORMAL_GPS_DETECT')
+    setSelectedScenarioId('NORMAL_GPS_TARGET')
     toast.success('Đã kích hoạt kịch bản diễn tập cứu nạn: Phát hiện người trôi dạt & bám bắt GPS.')
   }
 
@@ -57,7 +57,7 @@ export const OverviewPage: React.FC = () => {
       <div className="shrink-0 flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-border/60">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="px-2 py-0.5 rounded bg-primary/15 text-primary font-mono text-[10px] uppercase tracking-widest font-bold border border-primary/25">
+            <span className="px-2 py-0.5 rounded bg-primary/15 text-primary font-mono text-[11px] uppercase tracking-widest font-bold border border-primary/25">
               KVC TACTICAL FEED
             </span>
             <span className="font-mono text-xs text-muted-foreground">
@@ -82,16 +82,16 @@ export const OverviewPage: React.FC = () => {
         <div className="flex items-center gap-2 flex-wrap">
           {/* Subsystem Health Badge - Cập nhật trung thực tình trạng kết nối vật lý */}
           <div
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl bg-card border shadow-2xs ${
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-kvc-panel bg-card border shadow-2xs ${
               esp32Status.status === 'LIVE'
-                ? 'border-emerald-500/40'
+                ? 'border-[var(--kvc-ok-line)]'
                 : esp32Status.status === 'LOST_SIGNAL'
-                ? 'border-red-500/40 bg-red-500/5'
+                ? 'border-[var(--kvc-crit-line)] bg-[var(--kvc-crit)]/5'
                 : esp32Status.status === 'WAITING'
-                ? 'border-rose-500/40 bg-rose-500/5'
+                ? 'border-[var(--kvc-crit-line)] bg-[var(--kvc-crit)]/5'
                 : esp32Status.status === 'BACKEND_DOWN'
-                ? 'border-red-500/40 bg-red-500/10'
-                : 'border-purple-500/30'
+                ? 'border-[var(--kvc-crit-line)] bg-[var(--kvc-crit-bg)]'
+                : 'border-[var(--kvc-mock-line)]'
             }`}
           >
             <span className="relative flex h-2.5 w-2.5">
@@ -101,27 +101,27 @@ export const OverviewPage: React.FC = () => {
               <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${esp32Status.dotColorClass}`} />
             </span>
             <div className="flex flex-col">
-              <span className="text-[9px] font-mono uppercase text-muted-foreground">
+              <span className="text-[11px] font-mono uppercase text-muted-foreground">
                 {source_mode === 'REAL' ? 'Liên kết Gateway ESP32' : 'Trạng thái kết nối tải'}
               </span>
               <span
                 className={`font-mono text-xs font-bold ${
                   esp32Status.status === 'LIVE'
-                    ? 'text-emerald-600 dark:text-emerald-400'
+                    ? 'text-[var(--kvc-ok-ink)]'
                     : esp32Status.status === 'LOST_SIGNAL' || esp32Status.status === 'BACKEND_DOWN' || esp32Status.status === 'WAITING'
-                    ? 'text-rose-600 dark:text-rose-400'
-                    : 'text-purple-600 dark:text-purple-400'
+                    ? 'text-[var(--kvc-crit-ink)]'
+                    : 'text-[var(--kvc-mock-ink)]'
                 }`}
               >
                 {source_mode === 'REAL' ? esp32Status.label : 'MÔ PHỎNG (8/8 SUBSYSTEMS)'}
               </span>
             </div>
             {esp32Status.status === 'LIVE' ? (
-              <CheckCircle2 className="h-4 w-4 text-emerald-500 ml-1" />
+              <CheckCircle2 className="h-4 w-4 text-[var(--kvc-ok-ink)] ml-1" />
             ) : esp32Status.status === 'LOST_SIGNAL' || esp32Status.status === 'BACKEND_DOWN' || esp32Status.status === 'WAITING' ? (
-              <AlertTriangle className="h-4 w-4 text-rose-500 ml-1" />
+              <AlertTriangle className="h-4 w-4 text-[var(--kvc-crit-ink)] ml-1" />
             ) : (
-              <CheckCircle2 className="h-4 w-4 text-purple-500 ml-1" />
+              <CheckCircle2 className="h-4 w-4 text-[var(--kvc-mock-ink)] ml-1" />
             )}
           </div>
 
@@ -130,7 +130,7 @@ export const OverviewPage: React.FC = () => {
             variant="outline"
             size="sm"
             onClick={handleStartDemoScenario}
-            className="h-8 text-xs gap-1.5 border-purple-500/40 text-purple-600 dark:text-purple-400 hover:bg-purple-500/10 shadow-2xs"
+            className="h-8 text-xs gap-1.5 border-[var(--kvc-mock-line)] text-[var(--kvc-mock-ink)] hover:bg-[var(--kvc-mock-bg)] shadow-2xs"
             title="Kích hoạt nhanh kịch bản diễn tập cứu nạn trong 1 nhấp"
           >
             <Play className="h-3 w-3 fill-current" />
@@ -140,9 +140,9 @@ export const OverviewPage: React.FC = () => {
             variant="outline"
             size="sm"
             onClick={() => navigate('/alerts')}
-            className="h-8 text-xs gap-1.5 border-border hover:border-amber-500/40"
+            className="h-8 text-xs gap-1.5 border-border hover:border-[var(--kvc-warn-line)]"
           >
-            <AlertTriangle className={`h-3.5 w-3.5 ${activeAlerts.length > 0 ? 'text-amber-500' : 'text-muted-foreground'}`} />
+            <AlertTriangle className={`h-3.5 w-3.5 ${activeAlerts.length > 0 ? 'text-[var(--kvc-warn-ink)]' : 'text-muted-foreground'}`} />
             <span>Cảnh báo ({activeAlerts.length})</span>
           </Button>
           <Button
@@ -167,10 +167,10 @@ export const OverviewPage: React.FC = () => {
       <RecentDetectionsTable />
 
       {/* 5. Telemetry Ticker Footer Bar (Single Line Console Status) */}
-      <div className="shrink-0 w-full rounded-xl bg-card border border-border p-2.5 sm:p-3 overflow-hidden shadow-2xs">
+      <div className="shrink-0 w-full rounded-kvc-panel bg-card border border-border p-2.5 sm:p-3 overflow-hidden shadow-2xs">
         <div className="flex flex-wrap items-center justify-between gap-y-2 gap-x-4 font-mono text-[11px] text-muted-foreground">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-[var(--kvc-ok)] " />
             <span className="text-foreground font-bold uppercase tracking-wider">KVC LIVE CONSOLE:</span>
             <span className="text-primary font-bold">PHIÊN #{session_id || (source_mode === 'MOCK' ? 'MOCK-SESSION' : 'CHƯA CÓ PHIÊN')}</span>
             <InfoTip text="Băng thông tin tóm lược luồng dữ liệu thời gian thực: Mã phiên bay, kênh RF LoRa 433MHz, cổng Gateway ESP32-C3 và trạng thái kết nối tổng thể." />
@@ -185,7 +185,7 @@ export const OverviewPage: React.FC = () => {
           </div>
           <div className="flex items-center gap-1.5">
             <span className="text-muted-foreground">LIÊN KẾT:</span>
-            <span className={`font-bold ${esp32Status.status === 'LIVE' ? 'text-emerald-500' : 'text-amber-500'}`}>
+            <span className={`font-bold ${esp32Status.status === 'LIVE' ? 'text-[var(--kvc-ok-ink)]' : 'text-[var(--kvc-warn-ink)]'}`}>
               {esp32Status.shortLabel}
             </span>
           </div>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react'
+﻿import React, { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle,
   Compass,
@@ -13,6 +13,7 @@ import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useMission } from '@/state/MissionProvider'
+import { isAgeStale, staleLabel } from '@/lib/stale'
 
 export interface LocalRadarPanelProps {
   onSwitchToMap?: () => void
@@ -26,7 +27,7 @@ export const LocalRadarPanel: React.FC<LocalRadarPanelProps> = ({
   hideHeader = false,
 }) => {
   const { state } = useMission()
-  const { target, is_stale, ws_connected } = state
+  const { target, is_stale, ws_connected, source_mode } = state
 
   const isLocalGrid = target?.coordinate_frame === 'LOCAL_GRID'
   const hasLocalCoord =
@@ -110,51 +111,47 @@ export const LocalRadarPanel: React.FC<LocalRadarPanelProps> = ({
 
   // Tình trạng dữ liệu cũ
   const targetAgeMs = target?.age_ms
-  const isDataStale =
-    !ws_connected ||
-    is_stale ||
-    targetAgeMs === undefined ||
-    targetAgeMs > 3000
+  const isDataStale = !ws_connected || isAgeStale(targetAgeMs, is_stale)
 
   const radarSvgBody = (
-    <div className={`relative w-full h-full min-h-[300px] flex-1 flex flex-col items-center justify-center bg-slate-950 p-2 overflow-hidden ${hideHeader ? className : ''}`}>
+    <div className={`relative w-full h-full min-h-[300px] flex-1 flex flex-col items-center justify-center bg-[var(--kvc-surface)] p-2 overflow-hidden ${hideHeader ? className : ''}`}>
       {hideHeader && <span className="sr-only">Hệ Local Radar Cục Bộ (Local Grid)</span>}
 
       {/* Cụm điều khiển Zoom nổi khi hideHeader */}
       {hideHeader && (
-        <div className="absolute top-14 right-3 z-30 flex items-center gap-1.5 p-1 rounded-xl bg-slate-900/85 backdrop-blur-md border border-white/20 shadow-xl text-white">
+        <div className="absolute top-14 right-3 z-[var(--kvc-z-panel)] flex items-center gap-1.5 p-1 rounded-kvc-panel bg-[var(--kvc-surface-2)] border border-[var(--kvc-line-strong)] shadow-xs text-[var(--kvc-text)]">
           <StatusBadge
             label={
-              !ws_connected
+              !ws_connected && source_mode !== 'MOCK'
                 ? 'MẤT KẾT NỐI'
                 : hasLocalCoord
                 ? isDataStale
-                  ? 'DỮ LIỆU CŨ (>3s)'
+                  ? staleLabel()
                   : 'KHÓA MỤC TIÊU'
                 : isLocalGrid
                 ? 'TÌM KIẾM MỤC TIÊU'
                 : 'WGS-84 ACTIVE'
             }
             variant={
-              !ws_connected
-                ? 'red'
+              !ws_connected && source_mode !== 'MOCK'
+                ? 'crit'
                 : hasLocalCoord
                 ? isDataStale
-                  ? 'amber'
-                  : 'emerald'
+                  ? 'warn'
+                  : 'ok'
                 : isLocalGrid
-                ? 'cyan'
-                : 'slate'
+                ? 'accent'
+                : 'neutral'
             }
           />
-          <div className="flex items-center bg-white/10 p-0.5 rounded-lg border border-white/10">
+          <div className="flex items-center bg-[var(--kvc-surface-2)]/40 p-0.5 rounded-kvc-control border border-[var(--kvc-line)]">
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={handleZoomIn}
-                  className="h-6 w-6 text-slate-300 hover:text-white"
+                  className="h-6 w-6 text-[var(--kvc-text-muted)] hover:text-[var(--kvc-text)]"
                   aria-label="Phóng to local"
                   disabled={maxRadiusCm <= 50}
                 >
@@ -166,7 +163,7 @@ export const LocalRadarPanel: React.FC<LocalRadarPanelProps> = ({
               </TooltipContent>
             </Tooltip>
 
-            <span className="text-[10px] font-mono px-1.5 text-white font-semibold min-w-[48px] text-center">
+            <span className="text-[11px] font-mono px-1.5 text-[var(--kvc-text)] font-semibold min-w-[48px] text-center">
               {maxRadiusCm}cm
             </span>
 
@@ -176,7 +173,7 @@ export const LocalRadarPanel: React.FC<LocalRadarPanelProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={handleZoomOut}
-                  className="h-6 w-6 text-slate-300 hover:text-white"
+                  className="h-6 w-6 text-[var(--kvc-text-muted)] hover:text-[var(--kvc-text)]"
                   aria-label="Thu nhỏ local"
                   disabled={maxRadiusCm >= 600}
                 >
@@ -194,14 +191,14 @@ export const LocalRadarPanel: React.FC<LocalRadarPanelProps> = ({
                   variant="ghost"
                   size="icon"
                   onClick={handleResetZoom}
-                  className="h-6 w-6 text-slate-300 hover:text-white"
-                  aria-label="Đặt lại cự ly 400cm"
+                  className="h-6 w-6 text-[var(--kvc-text-muted)] hover:text-[var(--kvc-text)]"
+                  aria-label="Đặt lại cự ly 200cm"
                 >
                   <RotateCcw className="h-3 w-3" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>
-                <p className="text-xs">Đặt lại thang đo chuẩn 400cm</p>
+                <p className="text-xs">Đặt lại thang đo chuẩn 200cm</p>
               </TooltipContent>
             </Tooltip>
           </div>
@@ -305,28 +302,25 @@ export const LocalRadarPanel: React.FC<LocalRadarPanelProps> = ({
               strokeOpacity="0.7"
             />
 
-            {/* Nhãn các hướng local */}
-            {/* Hướng Bắc local (+Y) */}
-            <text x={CENTER} y={PADDING - 8} fill="#38bdf8" fontSize="11" fontWeight="bold" textAnchor="middle">
-              +Y (BẮC SA BÀN)
+            {/* Nhãn các hướng local — đặt lệch khỏi đường trục để không đè
+                lên nét kẻ; màu lấy từ token nên đọc được ở cả hai theme. */}
+            <text x={CENTER} y={PADDING - 8} className="fill-[var(--kvc-accent-ink)]" fontSize="11" fontWeight="bold" textAnchor="middle">
+              +Y (BẮC LOCAL)
             </text>
-            {/* Hướng Nam local (-Y) */}
-            <text x={CENTER} y={SVG_SIZE - PADDING + 16} fill="#64748b" fontSize="10" textAnchor="middle">
+            <text x={CENTER} y={SVG_SIZE - PADDING + 16} className="fill-[var(--kvc-text-muted)]" fontSize="11" textAnchor="middle">
               -Y (NAM)
             </text>
-            {/* Hướng Đông local (+X) */}
-            <text x={SVG_SIZE - PADDING + 4} y={CENTER + 3} fill="#38bdf8" fontSize="10" fontWeight="bold">
+            <text x={SVG_SIZE - PADDING} y={CENTER - 8} className="fill-[var(--kvc-accent-ink)]" fontSize="11" fontWeight="bold" textAnchor="end">
               +X (ĐÔNG)
             </text>
-            {/* Hướng Tây local (-X) */}
-            <text x={PADDING - 6} y={CENTER + 3} fill="#64748b" fontSize="10" textAnchor="end">
+            <text x={PADDING} y={CENTER - 8} className="fill-[var(--kvc-text-muted)]" fontSize="11" textAnchor="start">
               -X (TÂY)
             </text>
 
             {/* Gốc O(0,0) Mốc chuẩn */}
-            <circle cx={CENTER} cy={CENTER} r="4" fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" />
-            <text x={CENTER + 6} y={CENTER + 13} fill="#94a3b8" fontSize="9" fontFamily="monospace">
-              O(0,0) Mốc #{target?.origin_id ?? 1}
+            <circle cx={CENTER} cy={CENTER} r="4" className="fill-[var(--kvc-accent)]" stroke="white" strokeWidth="1.5" />
+            <text x={CENTER + 10} y={CENTER + 16} className="fill-[var(--kvc-text-muted)]" fontSize="11" fontFamily="monospace">
+              O(0,0) Mốc #{target?.origin_id ?? 'N/A'}
             </text>
 
             {/* Vệt quét radar mô phỏng (quét góc theo tia ngắm) */}
@@ -410,7 +404,7 @@ export const LocalRadarPanel: React.FC<LocalRadarPanelProps> = ({
                     fontFamily="monospace"
                     fontWeight="bold"
                   >
-                    #{target.track_id ?? '101'}{' '}
+                    #{target.track_id ?? 'N/A'}{' '}
                     {target.class_name === 'person'
                       ? 'Người'
                       : target.class_name === 'lifebuoy' || target.class_name === 'boat'
@@ -436,7 +430,7 @@ export const LocalRadarPanel: React.FC<LocalRadarPanelProps> = ({
             {!isLocalGrid && target?.latitude != null && (
               <g transform={`translate(${CENTER}, ${CENTER})`}>
                 <circle cx="0" cy="0" r="18" fill="#0284c7" fillOpacity="0.2" stroke="#38bdf8" strokeWidth="1" />
-                <Compass className="h-6 w-6 text-cyan-400 -translate-x-3 -translate-y-3" />
+                <Compass className="h-6 w-6 text-[var(--kvc-accent-ink)] -translate-x-3 -translate-y-3" />
               </g>
             )}
           </svg>
@@ -444,8 +438,8 @@ export const LocalRadarPanel: React.FC<LocalRadarPanelProps> = ({
           {/* HUY HIỆU THÔNG BÁO HỆ WGS-84 (NHỎ GỌN TRÊN ĐẦU, KHÔNG CHẮN KHUNG NHÌN) */}
           {!isLocalGrid && (
             <div className="absolute top-2 left-2 z-20 pointer-events-auto">
-              <div className="bg-slate-900/90 border border-cyan-500/50 backdrop-blur px-2.5 py-1 rounded-md text-[11px] text-cyan-300 font-medium flex items-center gap-1.5 shadow-lg">
-                <Compass className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+              <div className="bg-[var(--kvc-surface-2)] border border-[var(--kvc-accent-line)] px-2.5 py-1 rounded-md text-[11px] text-[var(--kvc-accent-ink)] font-medium flex items-center gap-1.5 shadow-lg">
+                <Compass className="h-3.5 w-3.5 text-[var(--kvc-accent-ink)] shrink-0" />
                 <span>
                   Hệ quy chiếu toàn cầu (WGS-84) đang kích hoạt: {target?.latitude != null ? `${target.latitude.toFixed(6)}° N, ${target.longitude?.toFixed(6)}° E` : 'Chờ tọa độ'}
                 </span>
@@ -453,7 +447,7 @@ export const LocalRadarPanel: React.FC<LocalRadarPanelProps> = ({
                   <button
                     type="button"
                     onClick={onSwitchToMap}
-                    className="ml-1 text-cyan-400 underline hover:text-white cursor-pointer font-bold"
+                    className="ml-1 text-[var(--kvc-accent-ink)] underline hover:text-[var(--kvc-text)] cursor-pointer font-bold"
                     aria-label="Xem Bản Đồ WGS-84"
                   >
                     Xem Bản Đồ WGS-84 &rarr;
@@ -466,8 +460,8 @@ export const LocalRadarPanel: React.FC<LocalRadarPanelProps> = ({
           {/* CẢNH BÁO STALE KHI DỮ LIỆU CŨ QUÁ 3 GIÂY */}
           {isLocalGrid && isDataStale && (
             <div className="absolute top-2 left-2 z-20 pointer-events-auto">
-              <div className="bg-amber-500/20 border border-amber-500/60 backdrop-blur px-2.5 py-1 rounded-md text-[11px] text-amber-300 font-medium flex items-center gap-1.5 shadow-lg">
-                <AlertTriangle className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+              <div className="bg-[var(--kvc-warn-bg)] border border-[var(--kvc-warn-line)] px-2.5 py-1 rounded-md text-[11px] text-[var(--kvc-warn-ink)] font-medium flex items-center gap-1.5 shadow-lg">
+                <AlertTriangle className="h-3.5 w-3.5 text-[var(--kvc-warn-ink)] shrink-0" />
                 <span>
                   DỮ LIỆU CŨ ({targetAgeMs === undefined ? 'N/A' : `${Math.round(targetAgeMs)} ms`}): Vị trí mục tiêu bị làm mờ, giữ nguyên tọa độ cuối.
                 </span>
@@ -476,56 +470,54 @@ export const LocalRadarPanel: React.FC<LocalRadarPanelProps> = ({
           )}
         </div>
 
-        {/* BẢNG ĐO THÔNG SỐ ĐÁY RADAR: CỐ ĐỊNH TẤT CẢ THAM SỐ KHÔNG ẨN */}
-        <div className="w-full mt-1 grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] font-mono text-slate-300 bg-slate-900/95 border border-slate-800 rounded-lg p-2 shrink-0">
+        {/* BẢNG ĐO THÔNG SỐ ĐÁY RADAR.
+            Chế độ toàn khung: khối nổi nhỏ ở góc trên-phải, ngay dưới cụm zoom,
+            vì góc dưới-trái là dock tác chiến và góc dưới-phải là controls.
+            Chế độ panel: bảng nằm trong luồng bố cục bình thường. */}
+        <div
+          className={
+            hideHeader
+              ? 'absolute top-[104px] right-3 z-[var(--kvc-z-panel)] w-[272px] grid grid-cols-1 gap-1 rounded-kvc-control border border-[var(--kvc-line)] bg-[var(--kvc-surface-2)] p-2 text-[11px] font-mono text-[var(--kvc-text-muted)] shadow-xs'
+              : 'mt-1 grid w-full shrink-0 grid-cols-2 gap-2 rounded-kvc-control border border-[var(--kvc-line)] bg-[var(--kvc-surface-2)] p-2 text-[11px] font-mono text-[var(--kvc-text-muted)] sm:grid-cols-3'
+          }
+        >
           <div className="flex flex-col">
-            <span className="text-[10px] text-slate-400 font-sans">TỌA ĐỘ WGS-84 (GPS):</span>
-            <span className={target?.latitude != null ? "text-cyan-400 font-bold truncate" : "text-slate-500 font-normal"}>
+            <span className="text-[11px] text-[var(--kvc-text-muted)] font-sans">TỌA ĐỘ WGS-84 (GPS):</span>
+            <span className={target?.latitude != null ? "text-[var(--kvc-accent-ink)] font-bold truncate" : "text-[var(--kvc-text-faint)] font-normal"}>
               {target?.latitude != null ? `${target.latitude.toFixed(6)}° N, ${target.longitude?.toFixed(6)}° E` : "N/A"}
             </span>
           </div>
 
           <div className="flex flex-col">
-            <span className="text-[10px] text-slate-400 font-sans">TỌA ĐỘ SA BÀN (LOCAL):</span>
-            <span className={hasLocalCoord ? "text-emerald-400 font-bold truncate" : "text-slate-500 font-normal"}>
+            <span className="text-[11px] text-[var(--kvc-text-muted)] font-sans">TỌA ĐỘ SA BÀN (LOCAL):</span>
+            <span className={hasLocalCoord ? "text-[var(--kvc-ok-ink)] font-bold truncate" : "text-[var(--kvc-text-faint)] font-normal"}>
               {hasLocalCoord ? `X: ${targetX > 0 ? `+${targetX}` : targetX} cm | Y: ${targetY > 0 ? `+${targetY}` : targetY} cm` : "Tọa độ Hệ Local: N/A"}
             </span>
           </div>
 
           <div className="flex flex-col sm:col-span-1 col-span-2">
-            <span className="text-[10px] text-slate-400 font-sans">CỰ LY & GÓC PHƯƠNG VỊ:</span>
-            <span className={hasLocalCoord ? "text-indigo-300 font-bold truncate" : "text-slate-500 font-normal"}>
+            <span className="text-[11px] text-[var(--kvc-text-muted)] font-sans">CỰ LY & GÓC PHƯƠNG VỊ:</span>
+            <span className={hasLocalCoord ? "text-[var(--kvc-accent-ink)] font-bold truncate" : "text-[var(--kvc-text-faint)] font-normal"}>
               {hasLocalCoord ? `R: ${polarDistanceCm.toFixed(1)} cm | Góc: ${polarAzimuthDeg.toFixed(1)}°` : "N/A"}
             </span>
           </div>
         </div>
 
-        {/* BẢNG ĐO THÔNG SỐ ĐÁY RADAR */}
-        <div className="w-full mt-1 flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono text-slate-300 bg-slate-900/90 border border-slate-800 rounded-lg px-3 py-1.5 shrink-0">
-          <div className="flex items-center gap-3">
-            <span className="text-slate-400 flex items-center gap-1">
-              <MapPin className="h-3 w-3 text-cyan-400" />
-              Gốc O(0,0): Cột mốc #{target?.origin_id ?? 1}
+        {/* Dòng chú giải thang đo: chỉ giữ thông tin KHÔNG lặp với bảng trên
+            (gốc toạ độ và kích thước ô lưới). X/Y/R/góc đã có ở bảng phía trên. */}
+        <div className={`w-full mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] font-mono text-[var(--kvc-text-muted)] bg-[var(--kvc-surface-2)] border border-[var(--kvc-line)] rounded-kvc-control px-3 py-1.5 shrink-0 ${
+          hideHeader ? 'sr-only' : ''
+        }`}>
+          <span className="flex items-center gap-1">
+            <MapPin className="h-3 w-3 text-[var(--kvc-accent-ink)]" />
+            Gốc O(0,0): Cột mốc #{target?.origin_id ?? 'N/A'}
+          </span>
+          <span>Thước đo: 1 ô = {maxRadiusCm / 4} cm</span>
+          {!hasLocalCoord && (
+            <span className={isLocalGrid ? 'text-[var(--kvc-warn-ink)]' : 'text-[var(--kvc-text-faint)]'}>
+              {isLocalGrid ? 'Đang chờ giải toạ độ local…' : 'Toạ độ Local: N/A (chế độ WGS-84)'}
             </span>
-            <span className="text-slate-400 hidden sm:inline">• Thước đo: 1 ô = {maxRadiusCm / 4} cm</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {hasLocalCoord ? (
-              <>
-                <span className="text-emerald-400 font-bold">
-                  X: {targetX > 0 ? `+${targetX}` : targetX} cm | Y: {targetY > 0 ? `+${targetY}` : targetY} cm
-                </span>
-                <span className="text-cyan-300 hidden md:inline">
-                  Cự ly R: {polarDistanceCm.toFixed(1)} cm | Góc: {polarAzimuthDeg.toFixed(1)}°
-                </span>
-              </>
-            ) : isLocalGrid ? (
-              <span className="text-amber-400">Đang chờ giải tọa độ local...</span>
-            ) : (
-              <span className="text-slate-500">Tọa độ Hệ Local: N/A (Chế độ WGS-84)</span>
-            )}
-          </div>
+          )}
         </div>
       </div>
     )
@@ -538,33 +530,33 @@ export const LocalRadarPanel: React.FC<LocalRadarPanelProps> = ({
     <Panel
       title="Hệ Local Radar Cục Bộ (Local Grid)"
       infoTip="Radar tọa độ cực phục vụ thử nghiệm hồ bơi hoặc sa bàn: hiển thị vị trí tương đối X, Y (cm), cự ly và góc lệch của mục tiêu so với gốc tọa độ O(0,0)."
-      icon={<Radio className="h-4 w-4 text-cyan-500" />}
+      icon={<Radio className="h-4 w-4 text-[var(--kvc-accent-ink)]" />}
       noPadding
       className={`h-full flex flex-col min-h-0 border-border bg-card shadow-xs select-none ${className}`}
       headerRight={
         <div className="flex items-center gap-1.5 flex-wrap">
           <StatusBadge
             label={
-              !ws_connected
+              !ws_connected && source_mode !== 'MOCK'
                 ? 'MẤT KẾT NỐI'
                 : hasLocalCoord
                 ? isDataStale
-                  ? 'DỮ LIỆU CŨ (>3s)'
+                  ? staleLabel()
                   : 'KHÓA MỤC TIÊU'
                 : isLocalGrid
                 ? 'TÌM KIẾM MỤC TIÊU'
                 : 'WGS-84 ACTIVE'
             }
             variant={
-              !ws_connected
-                ? 'red'
+              !ws_connected && source_mode !== 'MOCK'
+                ? 'crit'
                 : hasLocalCoord
                 ? isDataStale
-                  ? 'amber'
-                  : 'emerald'
+                  ? 'warn'
+                  : 'ok'
                 : isLocalGrid
-                ? 'cyan'
-                : 'slate'
+                ? 'accent'
+                : 'neutral'
             }
           />
           <div className="flex items-center bg-muted/60 p-0.5 rounded-md border border-border/50">
@@ -586,7 +578,7 @@ export const LocalRadarPanel: React.FC<LocalRadarPanelProps> = ({
               </TooltipContent>
             </Tooltip>
 
-            <span className="text-[10px] font-mono px-1.5 text-foreground font-semibold min-w-[50px] text-center">
+            <span className="text-[11px] font-mono px-1.5 text-foreground font-semibold min-w-[50px] text-center">
               {maxRadiusCm}cm
             </span>
 

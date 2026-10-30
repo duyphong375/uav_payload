@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import {
   Tooltip,
   TooltipContent,
@@ -27,8 +27,8 @@ export const InfoTip: React.FC<InfoTipProps> = ({
 }) => {
   const sizeClasses =
     size === 'md'
-      ? 'w-4.5 h-4.5 text-[11px]'
-      : 'w-4 h-4 text-[10px]'
+      ? 'w-5 h-5 text-[11px]'
+      : 'w-4.5 h-4.5 text-[11px]'
 
   return (
     <TooltipProvider delayDuration={100}>
@@ -37,7 +37,7 @@ export const InfoTip: React.FC<InfoTipProps> = ({
           <button
             type="button"
             aria-label={`Chú thích: ${text}`}
-            className={`inline-flex items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground font-mono font-bold leading-none cursor-help transition-all shadow-2xs select-none shrink-0 ${sizeClasses} ${className}`}
+            className={`inline-flex items-center justify-center rounded-full border border-[var(--kvc-accent-line)] bg-[var(--kvc-accent-bg)] text-[var(--kvc-accent-ink)] hover:bg-[var(--kvc-accent-fill)] hover:text-[var(--kvc-text-on-fill)] font-mono font-bold leading-none cursor-help transition-all select-none shrink-0 ${sizeClasses} ${className}`}
           >
             !
           </button>
@@ -45,10 +45,10 @@ export const InfoTip: React.FC<InfoTipProps> = ({
         <TooltipContent
           side={side}
           sideOffset={5}
-          className="max-w-xs text-xs font-normal leading-relaxed bg-popover text-popover-foreground border border-border/80 shadow-md p-2.5 rounded-lg z-50 text-left"
+          className="max-w-xs text-xs font-normal leading-relaxed bg-popover text-popover-foreground border border-border shadow-md p-2.5 rounded-lg z-50 text-left"
         >
           <div className="flex items-start gap-1.5">
-            <span className="font-bold text-primary font-mono shrink-0">[!]</span>
+            <span className="font-bold text-[var(--kvc-accent-ink)] font-mono shrink-0">[!]</span>
             <span>{text}</span>
           </div>
         </TooltipContent>

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+﻿import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AlertsPage } from '@/features/alerts/AlertsPage'
@@ -7,6 +7,7 @@ import { EventLogPage } from '@/features/history/EventLogPage'
 import { OverviewPage } from '@/features/overview/OverviewPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { MissionProvider } from '@/state/MissionProvider'
+import { APP_CONFIG } from '@/config/appConfig'
 import { AppRouterProvider } from './routes'
 import { ModeContextBar } from './ModeContextBar'
 
@@ -61,8 +62,8 @@ describe('KVC-GCS UI Redesign & Rescue Value Chain Verification', () => {
         </MissionProvider>
       </TooltipProvider>
     )
-    expect(screen.getByText('Nhật ký phiên & Bằng chứng cứu hộ')).toBeDefined()
-    expect(screen.getByText(/Lưu trữ chuỗi sự kiện hoạt động/i)).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Nhật ký phiên' })).toBeDefined()
+    expect(screen.getByText(/Bằng chứng sự kiện cứu nạn của phiên đang chạy/i)).toBeDefined()
     unmountHistory()
 
     // 4. Devices Page
@@ -115,6 +116,9 @@ describe('KVC-GCS UI Redesign & Rescue Value Chain Verification', () => {
     expect(demoButton).toBeDefined()
     fireEvent.click(demoButton)
 
+    // Kịch bản phải dùng id tồn tại trong MOCK_SCENARIOS, không ghi rác vào localStorage
+    expect(localStorage.getItem(APP_CONFIG.STORAGE_KEYS.MOCK_SCENARIO)).toBe('NORMAL_GPS_TARGET')
+
     // NHẤP 2: Sao chép tọa độ WGS-84 mục tiêu cứu nạn từ bảng danh sách
     const copyButtons = screen.getAllByRole('button', { name: /Sao chép WGS-84/i })
     expect(copyButtons.length).toBeGreaterThan(0)
@@ -149,7 +153,10 @@ describe('KVC-GCS UI Redesign & Rescue Value Chain Verification', () => {
     expect(container.textContent).not.toContain('20B @ 10Hz')
     expect(screen.queryByRole('button', { name: /Hiệu chuẩn Gimbal/i })).toBeNull()
     expect(screen.queryByRole('button', { name: /Eco Mode/i })).toBeNull()
+    // Module phụ chỉ hiện sau khi mở rộng danh sách phần cứng.
+    expect(container.textContent).toContain('AJ-SR04M')
+    const expandButton = screen.getByRole('button', { name: /^Xem đủ 8 khối$/i })
+    fireEvent.click(expandButton)
     expect(container.textContent).toContain('Sonix SN34F788')
-    expect(container.textContent).toContain('TF-Luna')
   })
 })

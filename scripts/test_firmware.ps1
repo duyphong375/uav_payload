@@ -16,7 +16,9 @@ Các bước (mỗi bước in PASS/FAIL kèm exit code):
      - test_kvc_gnss_neo_m10  : driver NMEA + file nguồn sensors/kvc_gnss_neo_m10.c
      - test_kvc_usound_decode : giải mã khung 4 byte AJ-SR04M + sensors/kvc_usound_decode.c
      - test_kvc_geo_math      : lượng giác số nguyên cho georef + src/kvc_geo_math.c
-  2. Gateway host test (g++): test_rf_decode.cpp + src/rf_decode.cpp
+  2. Gateway host tests (g++): test_rf_decode.cpp + src/rf_decode.cpp,
+     test_net_policy.cpp + src/net_policy.cpp,
+     test_session_id.cpp + src/session_id.cpp
   3. Gateway build (PlatformIO) — bỏ qua bằng -SkipBuild
   4. Python tests (pytest) — bỏ qua bằng -SkipPython
 
@@ -169,7 +171,7 @@ if ($null -eq $gcc) {
             '-o', (Join-Path $outDir 'test_kvc_georef.exe'))) `
         -OutputExe (Join-Path $outDir 'test_kvc_georef.exe')
 
-    # KVC-MCU-TELEMETRY-TEST-001: khoá ABI IF-02 + golden vector GV-01 ở host.
+    # KVC-MCU-TELEMETRY-TEST-001: khoá ABI IF-02 + golden vector GV-02 ở host.
     Invoke-TestBinary -Name 'MCU test_kvc_telemetry' -Compiler $gcc.Source `
         -Arguments ($common + @(
             (Join-Path $mcuTests 'test_kvc_telemetry.c'),
@@ -205,6 +207,15 @@ if ($null -eq $gpp) {
             (Join-Path $gwSrc 'net_policy.cpp'),
             '-o', (Join-Path $outDir 'test_net_policy.exe'))) `
         -OutputExe (Join-Path $outDir 'test_net_policy.exe')
+
+    # IF-03 muc 3: gateway_session_id phai doi moi lan boot (truoc day la hang
+    # so 1 nen hai phien boot bi tron khi replay).
+    Invoke-TestBinary -Name 'Gateway test_session_id' -Compiler $gpp.Source `
+        -Arguments ($gwCommon + @(
+            (Join-Path $gwTest 'test_session_id.cpp'),
+            (Join-Path $gwSrc 'session_id.cpp'),
+            '-o', (Join-Path $outDir 'test_session_id.exe'))) `
+        -OutputExe (Join-Path $outDir 'test_session_id.exe')
 }
 
 # --- 3. Gateway build ---

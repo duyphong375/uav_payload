@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import {
   AlertCircle,
   AlertTriangle,
@@ -22,22 +22,22 @@ export const ActiveAlertsQuickPanel: React.FC = () => {
   return (
     <Panel
       title="Cảnh báo cần xử lý"
-      infoTip="Danh sách cảnh báo kỹ thuật tải bay (pin yếu, mất kết nối LoRa, độ cao ngoài vùng an toàn) hỗ trợ xác nhận và xử lý nhanh."
-      icon={<AlertTriangle className="h-4 w-4 text-amber-500" />}
+      infoTip="Danh sách cảnh báo kỹ thuật tải bay (mất kết nối LoRa, độ cao ngoài vùng an toàn, cảm biến bất thường) hỗ trợ xác nhận và xử lý nhanh."
+      icon={<AlertTriangle className="h-4 w-4 text-[var(--kvc-warn-ink)]" />}
       className="h-auto shrink-0 shadow-xs"
       headerRight={
         <div className="flex items-center gap-1.5">
           {activeAlerts.length > 0 ? (
             <Badge
               variant="destructive"
-              className="text-[10px] px-1.5 py-0 font-mono"
+              className="text-[11px] px-1.5 py-0 font-mono"
             >
               {activeAlerts.length}
             </Badge>
           ) : (
             <Badge
               variant="outline"
-              className="text-[10px] px-1.5 py-0 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10"
+              className="text-[11px] px-1.5 py-0 border-[var(--kvc-ok-line)] text-[var(--kvc-ok-ink)] bg-[var(--kvc-ok-bg)]"
             >
               OK
             </Badge>
@@ -50,7 +50,7 @@ export const ActiveAlertsQuickPanel: React.FC = () => {
           <div className="py-4 text-center flex flex-col items-center justify-center gap-1.5 text-muted-foreground">
             {state.ws_connected && state.diagnostics.packets_received_total > 0 ? (
               <>
-                <ShieldCheck className="h-6 w-6 stroke-[1.5] text-emerald-500" />
+                <ShieldCheck className="h-6 w-6 stroke-[1.5] text-[var(--kvc-ok-ink)]" />
                 <span className="text-xs font-semibold text-foreground">
                   Hệ thống ổn định
                 </span>
@@ -77,18 +77,18 @@ export const ActiveAlertsQuickPanel: React.FC = () => {
               return (
                 <div
                   key={alert.id}
-                  className={`p-2.5 rounded-lg border text-xs flex flex-col gap-1.5 transition-colors ${
+                  className={`p-2.5 rounded-kvc-control border text-xs flex flex-col gap-1.5 transition-colors ${
                     isCritical
-                      ? 'bg-red-500/10 border-red-500/30'
-                      : 'bg-amber-500/10 border-amber-500/30'
+                      ? 'bg-[var(--kvc-crit-bg)] border-[var(--kvc-crit-line)]'
+                      : 'bg-[var(--kvc-warn-bg)] border-[var(--kvc-warn-line)]'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-start gap-2 min-w-0">
                       {isCritical ? (
-                        <AlertCircle className="h-4 w-4 mt-0.5 text-red-500 shrink-0" />
+                        <AlertCircle className="h-4 w-4 mt-0.5 text-[var(--kvc-crit-ink)] shrink-0" />
                       ) : (
-                        <AlertTriangle className="h-4 w-4 mt-0.5 text-amber-500 shrink-0" />
+                        <AlertTriangle className="h-4 w-4 mt-0.5 text-[var(--kvc-warn-ink)] shrink-0" />
                       )}
                       <div className="flex flex-col min-w-0">
                         <span className="font-bold text-foreground truncate leading-tight">
@@ -107,7 +107,7 @@ export const ActiveAlertsQuickPanel: React.FC = () => {
                     </span>
                     <div>
                       {alert.acknowledged ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold text-xs">
+                        <span className="inline-flex items-center gap-1 text-[var(--kvc-ok-ink)] font-semibold text-xs">
                           <CheckCircle2 className="h-3.5 w-3.5" /> Đã tiếp nhận (Đang theo dõi)
                         </span>
                       ) : (

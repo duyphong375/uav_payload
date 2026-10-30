@@ -1,9 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react'
+﻿import React, { useEffect, useMemo, useState } from 'react'
 import {
-  Clock,
   Download,
-  FileText,
-  Film,
   History,
   RotateCcw,
   Search,
@@ -20,394 +17,371 @@ import {
 } from '@/components/ui/select'
 import { TelemetryClient, type StoredSession } from '@/services/telemetryClient'
 import { useMission } from '@/state/MissionProvider'
-import type { AlertLevel, AlertSourceCategory } from '@/types/telemetry'
+import type { AlertLevel } from '@/types/telemetry'
+import {
+  LOG_ACTOR_LABEL,
+  logActor,
+  type LogActor,
+} from './actor'
 import { EventLogTable } from './EventLogTable'
-import { FlightDebriefingPlayer } from './FlightDebriefingPlayer'
 
-// Phiên mô phỏng mẫu dự phòng khi database chưa có phiên ghi
-const FALLBACK_SESSIONS: StoredSession[] = [
-  {
-    session_id: 'MOCK-DEMO-SAR-01',
-    file: 'data/sessions/MOCK-DEMO-SAR-01.db',
-    records: 600,
-    size_bytes: 20480,
-    last_persisted_at_iso: new Date(Date.now() - 3600000).toISOString(),
-  },
-]
+type ActorFilter = 'ALL' | LogActor
+
+const formatCount = (value: number) => new Intl.NumberFormat('vi-VN').format(value)
+
+const formatSize = (bytes: number) => {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const formatSavedAt = (iso: string | null) => {
+  if (!iso) return 'N/A'
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return 'N/A'
+  return date.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+/** Kích hoạt tải một chuỗi CSV mà không cần backend. */
+function downloadCsv(filename: string, rows: string[][]) {
+  const csvContent = rows.map((row) => row.join(',')).join('\r\n')
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.setAttribute('href', url)
+  link.setAttribute('download', filename)
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+const csvCell = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`
+
+/** Tên file có mốc thời gian, tính ngoài thân render để không gọi hàm không thuần. */
+const timestampedFilename = (stem: string) => `${stem}_${Date.now()}.csv`
 
 export const EventLogPage: React.FC = () => {
   const { state } = useMission()
-  const { event_logs, source_mode } = state
+  const { event_logs, source_mode, session_id, diagnostics } = state
 
-  // Danh sách phiên bay lưu trữ
-  const [sessions, setSessions] = useState<StoredSession[]>(FALLBACK_SESSIONS)
-  const [selectedSessionId, setSelectedSessionId] = useState<string>(FALLBACK_SESSIONS[0].session_id)
-  const [sessionSearch, setSessionSearch] = useState<string>('')
-  const [sessionFilterTag, setSessionFilterTag] = useState<'ALL' | 'VIDEO' | 'TELEMETRY'>('ALL')
+  // Metadata phiên đã lưu trên backend; rỗng khi backend chưa có phiên hoặc lỗi mạng.
+  const [sessions, setSessions] = useState<StoredSession[]>([])
+  const [sessionsLoading, setSessionsLoading] = useState(true)
 
-  // Tab khung bên phải: Video Debriefing hoặc Bảng kiểm toán sự kiện
-  const [activeRightTab, setActiveRightTab] = useState<'VIDEO_DEBRIEF' | 'AUDIT_LOGS'>('VIDEO_DEBRIEF')
-
-  // Bộ lọc nhật ký sự kiện kiểm toán
+  // Bộ lọc nhật ký của phiên đang chạy
+  const [actorFilter, setActorFilter] = useState<ActorFilter>('ALL')
   const [searchKeyword, setSearchKeyword] = useState('')
   const [levelFilter, setLevelFilter] = useState<'ALL' | AlertLevel>('ALL')
-  const [sourceFilter, setSourceFilter] = useState<'ALL' | AlertSourceCategory>('ALL')
+  const [sourceFilter, setSourceFilter] = useState<string>('ALL')
 
-  // Lấy danh sách phiên từ Backend SQLite
   useEffect(() => {
     let active = true
     void TelemetryClient.fetchSessions().then((res) => {
-      if (!active || !res) return
-      const committed = res.sessions.filter((s) => s.records > 0)
-      if (committed.length > 0) {
-        setSessions(committed)
-        setSelectedSessionId((cur) => cur || committed[0].session_id)
-      }
+      if (!active) return
+      setSessions(res ? res.sessions.filter((s) => s.records > 0) : [])
+      setSessionsLoading(false)
     })
     return () => {
       active = false
     }
   }, [])
 
-  // Phiên đang được chọn
-  const activeSession = useMemo(() => {
-    return sessions.find((s) => s.session_id === selectedSessionId) || sessions[0] || FALLBACK_SESSIONS[0]
-  }, [sessions, selectedSessionId])
+  const actorCounts = useMemo(() => {
+    let operator = 0
+    for (const log of event_logs) {
+      if (logActor(log) === 'OPERATOR') operator++
+    }
+    return { all: event_logs.length, operator, system: event_logs.length - operator }
+  }, [event_logs])
 
-  // Lọc danh sách phiên ở cột trái
-  const filteredSessions = useMemo(() => {
-    return sessions.filter((s) => {
-      const q = sessionSearch.trim().toLowerCase()
-      const matchSearch = !q || s.session_id.toLowerCase().includes(q) || (s.last_persisted_at_iso && s.last_persisted_at_iso.includes(q))
-      if (!matchSearch) return false
+  // Nguồn lấy từ chính dữ liệu đang có: union `source` không đóng nên không dựng danh sách cố định.
+  const availableSources = useMemo(
+    () => Array.from(new Set(event_logs.map((log) => log.source))).sort(),
+    [event_logs]
+  )
 
-      const hasVideo = s.session_id.startsWith('SES-REAL') || s.records > 500
-      if (sessionFilterTag === 'VIDEO' && !hasVideo) return false
-      if (sessionFilterTag === 'TELEMETRY' && hasVideo) return false
-
-      return true
-    })
-  }, [sessions, sessionSearch, sessionFilterTag])
-
-  // Lọc dữ liệu nhật ký sự kiện
   const filteredLogs = useMemo(() => {
+    const query = searchKeyword.trim().toLowerCase()
     return event_logs.filter((log) => {
-      if (levelFilter !== 'ALL' && log.level !== levelFilter) {
-        return false
-      }
-      if (sourceFilter !== 'ALL' && log.source !== sourceFilter) {
-        return false
-      }
-      if (searchKeyword.trim()) {
-        const q = searchKeyword.toLowerCase()
-        const matchCode = log.code.toLowerCase().includes(q)
-        const matchMsg = log.message.toLowerCase().includes(q)
-        const matchSource = log.source.toLowerCase().includes(q)
-        if (!matchCode && !matchMsg && !matchSource) {
-          return false
-        }
-      }
-      return true
+      if (actorFilter !== 'ALL' && logActor(log) !== actorFilter) return false
+      if (levelFilter !== 'ALL' && log.level !== levelFilter) return false
+      if (sourceFilter !== 'ALL' && log.source !== sourceFilter) return false
+      if (!query) return true
+      return (
+        log.code.toLowerCase().includes(query) ||
+        log.message.toLowerCase().includes(query) ||
+        log.source.toLowerCase().includes(query)
+      )
     })
-  }, [event_logs, levelFilter, sourceFilter, searchKeyword])
+  }, [event_logs, actorFilter, levelFilter, sourceFilter, searchKeyword])
 
-  const hasActiveLogFilter = searchKeyword.trim() !== '' || levelFilter !== 'ALL' || sourceFilter !== 'ALL'
+  const hasActiveFilter =
+    actorFilter !== 'ALL' ||
+    searchKeyword.trim() !== '' ||
+    levelFilter !== 'ALL' ||
+    sourceFilter !== 'ALL'
 
-  const handleResetLogFilter = () => {
+  const handleResetFilter = () => {
+    setActorFilter('ALL')
     setSearchKeyword('')
     setLevelFilter('ALL')
     setSourceFilter('ALL')
   }
 
-  // Xuất file CSV từ dữ liệu đã lọc
-  const handleExportCsv = () => {
+  // Xuất bằng chứng sự kiện của phiên đang chạy (đúng những dòng đang thấy trên bảng).
+  const handleExportLogsCsv = () => {
     if (filteredLogs.length === 0) return
 
-    const headers = ['Thời gian', 'Mức độ', 'Nguồn', 'Mã sự kiện', 'Nội dung', 'Phiên']
+    const headers = ['Thời gian', 'Mức độ', 'Tác nhân', 'Nguồn', 'Mã sự kiện', 'Nội dung', 'Phiên']
     const rows = filteredLogs.map((item) => [
-      `"${item.timestamp_iso}"`,
-      `"${item.level}"`,
-      `"${item.source}"`,
-      `"${item.code.replace(/"/g, '""')}"`,
-      `"${item.message.replace(/"/g, '""')}"`,
-      `"${item.session_id}"`,
+      csvCell(item.timestamp_iso),
+      csvCell(item.level),
+      csvCell(LOG_ACTOR_LABEL[logActor(item)]),
+      csvCell(item.source),
+      csvCell(item.code),
+      csvCell(item.message),
+      csvCell(item.session_id),
     ])
 
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n')
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.setAttribute('href', url)
-    link.setAttribute('download', `kvc_rescue_evidence_${activeSession.session_id}_${Date.now()}.csv`)
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    downloadCsv(
+      timestampedFilename(`kvc_rescue_evidence_${session_id || 'CHUA-XAC-DINH'}`),
+      [headers, ...rows]
+    )
+  }
+
+  // Xuất metadata của một phiên lưu trữ. Không kèm log của phiên đang chạy.
+  const handleExportSessionMetadataCsv = (session: StoredSession) => {
+    const headers = [
+      'Loại dữ liệu',
+      'Mã phiên',
+      'Thời điểm lưu (ISO)',
+      'Số gói',
+      'Dung lượng (byte)',
+      'Tệp lưu trữ',
+    ]
+    const rows = [
+      [
+        csvCell('METADATA PHIÊN — KHÔNG PHẢI NHẬT KÝ SỰ KIỆN'),
+        csvCell(session.session_id),
+        csvCell(session.last_persisted_at_iso ?? 'N/A'),
+        csvCell(session.records),
+        csvCell(session.size_bytes),
+        csvCell(session.file),
+      ],
+    ]
+
+    downloadCsv(
+      timestampedFilename(`kvc_session_metadata_${session.session_id}`),
+      [headers, ...rows]
+    )
   }
 
   return (
-    <div className="flex-1 flex flex-col p-2.5 sm:p-4 gap-3 overflow-hidden w-full select-none">
-      {/* 1. Header Trang Thống Nhất */}
+    <div className="kvc-serif flex-1 flex flex-col p-2.5 sm:p-4 gap-3 overflow-hidden w-full select-none">
       <PageHeader
         breadcrumb="Dữ liệu · Nhật ký phiên"
-        title="Nhật ký phiên & Bằng chứng cứu hộ"
-        infoTip="Trung tâm quản lý phiên bay & Hộp đen: Xem lại Video camera quang học đồng bộ telemetry, quản lý các chuyến bay đã ghi và xuất file CSV bằng chứng cứu nạn SAR."
-        subtitle={`Lưu trữ chuỗi sự kiện hoạt động, mốc thời gian phát hiện mục tiêu và xuất file bằng chứng cứu nạn [${source_mode}].`}
-        badge={
-          <Badge variant="outline" className="text-xs font-mono">
-            {sessions.length} phiên đã lưu
-          </Badge>
-        }
+        title="Nhật ký phiên"
+        infoTip="Bằng chứng sự kiện của phiên đang chạy và danh sách metadata các phiên đã lưu trên backend. Không có chế độ phát lại."
+        subtitle="Bằng chứng sự kiện cứu nạn của phiên đang chạy."
         actions={
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportCsv}
-              disabled={filteredLogs.length === 0}
-              className="h-8 text-xs gap-1.5 border-border shadow-2xs hover:border-primary/50 cursor-pointer"
-            >
-              <Download className="h-3.5 w-3.5 text-primary" />
-              <span>Xuất CSV bằng chứng ({filteredLogs.length})</span>
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportLogsCsv}
+            disabled={filteredLogs.length === 0}
+            className="h-8 text-xs gap-1.5 border-border shadow-2xs hover:border-primary/50 cursor-pointer"
+          >
+            <Download className="h-3.5 w-3.5 text-primary" />
+            <span>Xuất CSV ({filteredLogs.length})</span>
+          </Button>
         }
       />
 
-      {/* 2. BỐ CỤC 2 CỘT CHUYÊN NGHIỆP (SPLIT VIEW LAYOUT - MỤC 4.1) */}
-      <div className="flex-1 flex flex-col lg:flex-row gap-3 min-h-0 overflow-hidden">
-        {/* CỘT TRÁI (SESSION EXPLORER - 35% CHIỀU RỘNG): Danh sách toàn bộ các phiên bay */}
-        <div className="w-full lg:w-[35%] xl:w-[32%] flex flex-col gap-2.5 p-3 rounded-xl border border-border bg-card shadow-xs overflow-hidden shrink-0">
-          <div className="flex items-center justify-between pb-1 border-b border-border/50">
-            <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
-              <History className="h-4 w-4 text-primary" />
-              Danh sách phiên bay hộp đen
+      {/* KHỐI 1 — Nhật ký phiên đang chạy */}
+      <section className="flex-1 flex flex-col gap-2 min-h-0 p-3 rounded-kvc-panel border border-border bg-card shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-1.5 border-b border-border/50">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-foreground">
+            <History className="h-4 w-4 text-primary" />
+            Nhật ký phiên đang chạy
+          </div>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+            <span>
+              Phiên: <span className="font-mono text-foreground">{session_id || 'N/A'}</span>
             </span>
-            <Badge variant="outline" className="text-[10px] font-mono">
-              {filteredSessions.length} / {sessions.length}
-            </Badge>
+            <span aria-hidden="true">·</span>
+            <span>
+              Nguồn: <span className="font-mono text-foreground">{source_mode}</span>
+            </span>
+            <span aria-hidden="true">·</span>
+            <span>
+              Gói đã nhận:{' '}
+              <span className="font-mono text-foreground">
+                {formatCount(diagnostics.packets_received_total)}
+              </span>
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-0.5 bg-muted/60 p-0.5 rounded-kvc-control border border-border/50">
+            {(
+              [
+                ['ALL', 'Tất cả', actorCounts.all],
+                ['OPERATOR', LOG_ACTOR_LABEL.OPERATOR, actorCounts.operator],
+                ['SYSTEM', LOG_ACTOR_LABEL.SYSTEM, actorCounts.system],
+              ] as Array<[ActorFilter, string, number]>
+            ).map(([value, label, count]) => (
+              <Button
+                key={value}
+                variant={actorFilter === value ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setActorFilter(value)}
+                aria-pressed={actorFilter === value}
+                className="h-7 px-2.5 text-xs font-semibold cursor-pointer"
+              >
+                <span>{label}</span>
+                <span className="font-mono text-[11px] opacity-80">{formatCount(count)}</span>
+              </Button>
+            ))}
           </div>
 
-          {/* Ô tìm kiếm phiên */}
-          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-input bg-background text-xs">
-            <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <div className="flex items-center gap-2 flex-1 min-w-[180px] px-2 py-1 rounded-kvc-control border border-input bg-background text-xs">
+            <Search className="h-3 w-3 text-muted-foreground shrink-0" />
             <input
               type="text"
-              placeholder="Tìm theo mã SES-xxx hoặc ngày..."
-              value={sessionSearch}
-              onChange={(e) => setSessionSearch(e.target.value)}
-              className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-none font-mono"
+              placeholder="Tìm mã, nội dung…"
+              value={searchKeyword}
+              onChange={(e) => setSearchKeyword(e.target.value)}
+              className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
+              aria-label="Tìm mã hoặc nội dung sự kiện"
             />
           </div>
 
-          {/* Bộ lọc tag: Tất cả / Có Video / Chỉ Telemetry */}
-          <div className="flex items-center gap-1 bg-muted/60 p-0.5 rounded-lg border border-border/50 text-[10px]">
-            <Button
-              variant={sessionFilterTag === 'ALL' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setSessionFilterTag('ALL')}
-              className="h-6 px-2 text-[10px] font-medium flex-1 cursor-pointer"
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground text-[11px]">Mức độ</span>
+            <Select
+              value={levelFilter}
+              onValueChange={(value) => setLevelFilter(value as 'ALL' | AlertLevel)}
             >
-              Tất cả
-            </Button>
-            <Button
-              variant={sessionFilterTag === 'VIDEO' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setSessionFilterTag('VIDEO')}
-              className="h-6 px-2 text-[10px] font-medium flex-1 cursor-pointer"
-            >
-              🎬 Có Video
-            </Button>
-            <Button
-              variant={sessionFilterTag === 'TELEMETRY' ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setSessionFilterTag('TELEMETRY')}
-              className="h-6 px-2 text-[10px] font-medium flex-1 cursor-pointer"
-            >
-              📡 Chỉ Telemetry
-            </Button>
+              <SelectTrigger className="h-7 w-[100px] text-xs" aria-label="Lọc theo mức độ">
+                <SelectValue placeholder="Tất cả" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Tất cả</SelectItem>
+                <SelectItem value="INFO">INFO</SelectItem>
+                <SelectItem value="WARN">WARN</SelectItem>
+                <SelectItem value="CRITICAL">CRITICAL</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Danh sách thẻ phiên cuộn mượt mà */}
-          <div className="flex-1 overflow-y-auto pr-0.5 flex flex-col gap-2 min-h-0">
-            {filteredSessions.length === 0 ? (
-              <div className="flex flex-col items-center justify-center p-6 text-center text-muted-foreground text-xs">
-                <History className="h-8 w-8 mb-2 opacity-40" />
-                <span>Không tìm thấy phiên bay phù hợp.</span>
-              </div>
-            ) : (
-              filteredSessions.map((s) => {
-                const isSelected = s.session_id === selectedSessionId
-                const hasVideo = s.session_id.startsWith('SES-REAL') || s.records > 500
-                const durationMin = Math.max(1, Math.round(s.records / 60))
-                const dateStr = s.last_persisted_at_iso
-                  ? new Date(s.last_persisted_at_iso).toLocaleString('vi-VN', {
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })
-                  : 'Vừa hoàn tất'
+          <div className="flex items-center gap-1.5">
+            <span className="text-muted-foreground text-[11px]">Nguồn</span>
+            <Select
+              value={sourceFilter}
+              onValueChange={(value) => setSourceFilter(value)}
+            >
+              <SelectTrigger className="h-7 w-[120px] text-xs" aria-label="Lọc theo nguồn">
+                <SelectValue placeholder="Tất cả" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">Tất cả</SelectItem>
+                {availableSources.map((source) => (
+                  <SelectItem key={source} value={source}>
+                    {source}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-                return (
-                  <div
-                    key={s.session_id}
-                    onClick={() => setSelectedSessionId(s.session_id)}
-                    className={`p-2.5 rounded-xl border text-xs cursor-pointer transition-all duration-150 flex flex-col gap-1.5 ${
-                      isSelected
-                        ? 'border-primary bg-primary/10 shadow-xs ring-1 ring-primary/40'
-                        : 'border-border/70 bg-card hover:bg-muted/40 hover:border-border'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="font-mono font-bold text-foreground truncate">
-                        {s.session_id}
-                      </span>
-                      <Badge
-                        variant="outline"
-                        className={`text-[9px] px-1.5 py-0 font-medium ${
-                          hasVideo
-                            ? 'border-cyan-500/40 text-cyan-600 dark:text-cyan-400 bg-cyan-500/10'
-                            : 'border-slate-500/40 text-slate-600 dark:text-slate-400 bg-slate-500/10'
-                        }`}
+          {hasActiveFilter && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleResetFilter}
+              className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <RotateCcw className="h-3 w-3" />
+              <span>Đặt lại</span>
+            </Button>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto min-h-0">
+          <EventLogTable entries={filteredLogs} />
+        </div>
+      </section>
+
+      {/* KHỐI 2 — Phiên đã lưu: chỉ metadata */}
+      <section className="shrink-0 max-h-[30%] flex flex-col gap-2 p-3 rounded-kvc-panel border border-border bg-card shadow-xs min-h-0">
+        <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-border/50">
+          <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+            <History className="h-4 w-4 text-primary" />
+            Phiên đã lưu
+          </span>
+          <Badge variant="outline" className="text-[11px] font-mono">
+            {sessionsLoading ? 'Đang đọc…' : `${sessions.length} phiên`}
+          </Badge>
+        </div>
+
+        {sessions.length === 0 ? (
+          <p className="text-xs text-muted-foreground py-2">
+            {sessionsLoading ? 'Đang đọc danh sách phiên…' : 'Chưa có phiên nào được ghi'}
+          </p>
+        ) : (
+          <div className="overflow-auto min-h-0">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-muted-foreground border-b border-border/60">
+                  <th className="py-1.5 pr-2 font-semibold">Mã phiên</th>
+                  <th className="py-1.5 pr-2 font-semibold">Thời điểm lưu</th>
+                  <th className="py-1.5 pr-2 font-semibold text-right">Gói</th>
+                  <th className="py-1.5 pr-2 font-semibold text-right">Dung lượng</th>
+                  <th className="py-1.5 font-semibold text-right">Metadata</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sessions.map((session) => (
+                  <tr key={session.session_id} className="border-b border-border/40 last:border-0">
+                    <td className="py-1.5 pr-2 font-mono text-foreground">{session.session_id}</td>
+                    <td className="py-1.5 pr-2 text-foreground">{formatSavedAt(session.last_persisted_at_iso)}</td>
+                    <td className="py-1.5 pr-2 text-right font-mono tabular-nums text-foreground">
+                      {formatCount(session.records)}
+                    </td>
+                    <td className="py-1.5 pr-2 text-right font-mono tabular-nums text-foreground">
+                      {formatSize(session.size_bytes)}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleExportSessionMetadataCsv(session)}
+                        className="h-6 px-2 text-[11px] gap-1 cursor-pointer"
+                        aria-label={`Xuất metadata phiên ${session.session_id}`}
                       >
-                        {hasVideo ? '🎬 Có Video' : '📡 Chỉ Telemetry'}
-                      </Badge>
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {dateStr}
-                      </span>
-                      <span className="font-mono">
-                        ~{durationMin} phút ({s.records} gói)
-                      </span>
-                    </div>
-                  </div>
-                )
-              })
-            )}
+                        <Download className="h-3 w-3" />
+                        <span>CSV</span>
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
+        )}
 
-        {/* KHUNG PHẢI (SESSION PLAYBACK & DEBRIEFING - 65% CHIỀU RỘNG): Xem lại Video & Telemetry hoặc Kiểm toán sự kiện */}
-        <div className="flex-1 flex flex-col gap-2.5 p-3 rounded-xl border border-border bg-card shadow-xs min-h-0 overflow-y-auto">
-          {/* Tabs chuyển đổi giữa [Xem lại Video & Telemetry] và [Bảng Nhật ký sự kiện] */}
-          <div className="flex items-center justify-between border-b border-border/60 pb-2">
-            <div className="flex items-center gap-1.5 bg-muted/60 p-0.5 rounded-lg border border-border/50 text-xs">
-              <Button
-                variant={activeRightTab === 'VIDEO_DEBRIEF' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setActiveRightTab('VIDEO_DEBRIEF')}
-                className="h-7 px-3 text-xs gap-1.5 font-semibold cursor-pointer"
-              >
-                <Film className="h-3.5 w-3.5" />
-                <span>🎬 Xem lại Video & Telemetry (Hộp đen)</span>
-              </Button>
-              <Button
-                variant={activeRightTab === 'AUDIT_LOGS' ? 'default' : 'ghost'}
-                size="sm"
-                onClick={() => setActiveRightTab('AUDIT_LOGS')}
-                className="h-7 px-3 text-xs gap-1.5 font-semibold cursor-pointer"
-              >
-                <FileText className="h-3.5 w-3.5" />
-                <span>📋 Nhật ký sự kiện kiểm toán ({filteredLogs.length})</span>
-              </Button>
-            </div>
-
-            <span className="text-xs font-mono text-muted-foreground hidden sm:inline">
-              Phiên: <strong>{activeSession.session_id}</strong>
-            </span>
-          </div>
-
-          {/* TAB 1: FLIGHT VIDEO PLAYER & SYNCED TELEMETRY (MỤC 4.2 - 4.5) */}
-          {activeRightTab === 'VIDEO_DEBRIEF' && (
-            <FlightDebriefingPlayer
-              session={activeSession}
-              onExportCsv={handleExportCsv}
-            />
-          )}
-
-          {/* TAB 2: BẢNG NHẬT KÝ SỰ KIỆN KIỂM TOÁN (MỤC 4.6) */}
-          {activeRightTab === 'AUDIT_LOGS' && (
-            <div className="flex-1 flex flex-col gap-2.5 min-h-0">
-              {/* Thanh Tìm Kiếm và Bộ Lọc Sự Kiện */}
-              <div className="flex flex-wrap items-center gap-2 p-2 rounded-lg border border-border bg-background text-xs">
-                {/* Ô Tìm Kiếm */}
-                <div className="flex items-center gap-2 flex-1 min-w-[180px] px-2 py-1 rounded-md border border-input bg-card">
-                  <Search className="h-3 w-3 text-muted-foreground shrink-0" />
-                  <input
-                    type="text"
-                    placeholder="Tìm mã, nội dung sự kiện..."
-                    value={searchKeyword}
-                    onChange={(e) => setSearchKeyword(e.target.value)}
-                    className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
-                  />
-                </div>
-
-                {/* Lọc Mức Độ */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-muted-foreground font-medium text-[11px]">Mức độ:</span>
-                  <Select
-                    value={levelFilter}
-                    onValueChange={(val) => setLevelFilter(val as 'ALL' | AlertLevel)}
-                  >
-                    <SelectTrigger className="h-7 w-[100px] text-xs">
-                      <SelectValue placeholder="Tất cả" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">Tất cả</SelectItem>
-                      <SelectItem value="INFO">INFO</SelectItem>
-                      <SelectItem value="WARN">WARN</SelectItem>
-                      <SelectItem value="CRITICAL">CRITICAL</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Lọc Nguồn */}
-                <div className="flex items-center gap-1.5">
-                  <span className="text-muted-foreground font-medium text-[11px]">Nguồn:</span>
-                  <Select
-                    value={sourceFilter}
-                    onValueChange={(val) => setSourceFilter(val as 'ALL' | AlertSourceCategory)}
-                  >
-                    <SelectTrigger className="h-7 w-[110px] text-xs">
-                      <SelectValue placeholder="Tất cả" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ALL">Tất cả</SelectItem>
-                      <SelectItem value="COMMUNICATION">Liên lạc</SelectItem>
-                      <SelectItem value="PAYLOAD_AI">AI Tải</SelectItem>
-                      <SelectItem value="NAVIGATION">Định vị</SelectItem>
-                      <SelectItem value="SYSTEM">Hệ thống</SelectItem>
-                      <SelectItem value="SAR_MISSION">Cứu hộ SAR</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Nút Đặt Lại */}
-                {hasActiveLogFilter && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleResetLogFilter}
-                    className="h-7 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
-                  >
-                    <RotateCcw className="h-3 w-3" />
-                    <span>Đặt lại</span>
-                  </Button>
-                )}
-              </div>
-
-              {/* Bảng Sự Kiện */}
-              <div className="flex-1 overflow-y-auto min-h-0">
-                <EventLogTable entries={filteredLogs} />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+        <p className="text-[11px] text-muted-foreground border-t border-border/50 pt-1.5">
+          Không có dữ liệu telemetry lưu trữ cho các phiên này. Dữ liệu chỉ có thể xem khi phiên đang chạy;
+          tệp CSV ở đây chỉ chứa metadata, không phải nhật ký sự kiện.
+        </p>
+      </section>
     </div>
   )
 }

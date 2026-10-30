@@ -53,11 +53,17 @@
 #include <cstddef>
 #include <cstring>
 
+// esp_random(): entropy phần cứng dùng một lần lúc boot để sinh
+// `gateway_session_id`. Header này tách khỏi esp_system.h ở IDF mới nên phải
+// include tường minh.
+#include <esp_random.h>
+
 // KVC-F1: lớp giải mã RF (struct IF-02, CRC-16, hex) đã tách sang module thuần
 // C++ để biên dịch và kiểm thử được trên host (firmware/gateway_esp32/host_tests).
 // Không khai báo lại struct/CRC trong file này.
 #include "net_policy.h"
 #include "rf_decode.h"
+#include "session_id.h"
 
 using kvc::RfTelemetryPacket32;
 using kvc::bytesToHexString;
@@ -247,17 +253,25 @@ static const uint32_t HEARTBEAT_INTERVAL_MS = 5000;
 // ESP32
 static uint8_t connectedClientCount = 0;
 
-// Mã định danh phiên làm việc của Gateway (Tăng lên 1 mỗi khi ESP32 khởi động
-// lại)
-static uint32_t gatewaySessionId = 1;
+// Mã định danh phiên làm việc của Gateway. IF-03 mục 3 yêu cầu giá trị này
+// THAY ĐỔI mỗi lần ESP32 khởi động lại. Giá trị được sinh trong setup() từ
+// entropy phần cứng (esp_random) trộn với MAC eFuse; xem session_id.h. Không
+// gán hằng số ở đây vì hai phiên boot sẽ bị backend trộn làm một.
+static uint32_t gatewaySessionId = kvc::kGatewaySessionIdMin;
 
 // Bộ đếm số lượng gói tin JSON do ESP32 phát đi qua WebSocket (tăng dần 1,
 // 2, 3...)
 static uint32_t gatewaySequence = 0;
 
-// Bộ đếm số lượng gói tin bị vứt bỏ do sai lệch mã kiểm tra CRC-16 hoặc sai
-// Sync Header
-static uint32_t rxDropCount = 0;
+// Số message HỢP LỆ bị vứt bỏ vì buffer FIFO đầy kể từ lúc boot (IF-03 mục 3).
+// Firmware hiện phát trực tiếp cho các client đang nối, CHƯA có FIFO 64, nên
+// giá trị này luôn 0. Đây là nghĩa hợp đồng của trường `rx_drop_count`.
+static uint32_t rxBufferDropCount = 0;
+
+// Số frame RF KHÔNG hợp lệ (sai độ dài, sai CRC-16, không đủ buffer hex) kể từ
+// lúc boot. Đây KHÔNG phải `rx_drop_count`: frame lỗi chưa từng là message hợp
+// lệ. Chỉ chẩn đoán nội bộ, in ra Serial, không nằm trong JSON envelope v1.
+static uint32_t rxInvalidCount = 0;
 
 // Trạng thái phần cứng module LoRa Ra-02 (SX1278) sau khi khởi tạo SPI
 static bool loraHardwareReady = false;
@@ -292,7 +306,8 @@ String buildJsonEnvelope(const char *hexPayload, int16_t rssiDbm, float snrDb) {
   doc["rf_payload_hex"] = hexPayload; // Chuỗi 64 ký tự Hex của gói 32-byte
   doc["rssi_dbm"] = rssiDbm;          // Cường độ tín hiệu sóng LoRa
   doc["snr_db"] = snrDb;              // Tỷ số tín hiệu trên tạp âm LoRa
-  doc["rx_drop_count"] = rxDropCount; // Số lượng gói tin đã bị loại bỏ do lỗi
+  doc["rx_drop_count"] = rxBufferDropCount; // Message hợp lệ bị loại do buffer
+                                            // FIFO đầy (IF-03 mục 3)
 
   // Chuyển đối tượng JSON thành chuỗi ký tự String
   String output;
@@ -345,7 +360,7 @@ void runPhase2SelfTest() {
   samplePkt.class_id = 1;            // 1 = Người (person)
   samplePkt.confidence = 92;         // 92% tin cậy
   samplePkt.sensor_flags = 0x0F;     // GPS | LiDAR | IMU | AI
-  samplePkt.battery_raw = 126;       // 12.6V (100% pin)
+  samplePkt.status_reserved = 0;     // Byte 25 dự phòng (đã bỏ đo pin)
 
   // Tính toán mã CRC-16 trên 30 byte đầu tiên
   uint16_t expectedCrc = calculateCrc16((const uint8_t *)&samplePkt, 30);
@@ -364,22 +379,23 @@ void runPhase2SelfTest() {
     Serial.println("                       -> [FAIL] THAM DINH CRC THAT BAI!");
   }
 
-  // TEST 2B: DOI CHIEU GOLDEN VECTOR GV-01 (IF-02 muc 3) — dung chung C/Python
+  // TEST 2B: DOI CHIEU GOLDEN VECTOR GV-02 (IF-02 muc 3) — dung chung C/Python
   // Vector nay duoc sinh tu kvc_telemetry.h (MCU) va parse lai bang
   // struct.unpack("<2sBBIIIhhHBBBB4sH") trong gcs/backend/esp32_ingress.py.
-  // Logic so khop nam trong rf_decode.cpp (kvc::matchesGoldenGv01) de host test
+  // GV-02 thay GV-01 sau khi bo phep do pin: byte 25 status_reserved = 0.
+  // Logic so khop nam trong rf_decode.cpp (kvc::matchesGoldenGv02) de host test
   // và firmware dùng đúng một nguồn.
   {
-    static const char kGoldenGv01Hex[] =
-        "aa55012ae8030000baba6b06d4b3923f96004001f000015c0f7e000000004e30";
+    static const char kGoldenGv02Hex[] =
+        "aa55012ae8030000baba6b06d4b3923f96004001f000015c0f000000000060e2";
     char gvHex[sizeof(samplePkt) * 2 + 1] = {0};
     bool gvHexOk = bytesToHexString((const uint8_t *)&samplePkt,
                                     sizeof(samplePkt), gvHex, sizeof(gvHex));
-    bool gvStructOk = kvc::matchesGoldenGv01(&samplePkt);
-    bool gvHexMatch = gvHexOk && (strcmp(gvHex, kGoldenGv01Hex) == 0);
-    Serial.printf("[TEST 2B - GOLDEN GV-01] CRC 0x%04X (expect 0x%04X) %s | "
+    bool gvStructOk = kvc::matchesGoldenGv02(&samplePkt);
+    bool gvHexMatch = gvHexOk && (strcmp(gvHex, kGoldenGv02Hex) == 0);
+    Serial.printf("[TEST 2B - GOLDEN GV-02] CRC 0x%04X (expect 0x%04X) %s | "
                   "Hex %s\n",
-                  expectedCrc, kvc::kGoldenGv01Crc16,
+                  expectedCrc, kvc::kGoldenGv02Crc16,
                   gvStructOk ? "MATCH" : "MISMATCH",
                   gvHexMatch ? "MATCH" : "MISMATCH");
     if (!gvHexMatch && gvHexOk) {
@@ -476,7 +492,7 @@ void generateAndSendSelfMockTelemetry() {
     pkt.target_y_local = 0;
     pkt.lidar_dist_cm = 250; // 250 cm (2.50 m)
     pkt.sensor_flags = 0x0F; // GPS=1 | LiDAR=1 | IMU=1 | AI=1
-    pkt.battery_raw = 125;   // 12.5V (90% pin)
+    pkt.status_reserved = 0; // Byte 25 dự phòng (đã bỏ đo pin)
     rssiDbm = -76;
     snrDb = 8.5;
     break;
@@ -494,7 +510,7 @@ void generateAndSendSelfMockTelemetry() {
     pkt.target_y_local = 0;
     pkt.lidar_dist_cm = 230; // 230 cm (2.30 m)
     pkt.sensor_flags = 0x0F; // GPS=1 | LiDAR=1 | IMU=1 | AI=1
-    pkt.battery_raw = 124;   // 12.4V (86% pin)
+    pkt.status_reserved = 0; // Byte 25 dự phòng (đã bỏ đo pin)
     rssiDbm = -75;
     snrDb = 9.0;
     break;
@@ -512,7 +528,7 @@ void generateAndSendSelfMockTelemetry() {
     pkt.target_y_local = 320; // Y = +320 cm
     pkt.lidar_dist_cm = 245;  // 245 cm (2.45 m)
     pkt.sensor_flags = 0x0E;  // GPS=0 | LiDAR=1 | IMU=1 | AI=1 (Cờ 0x0E)
-    pkt.battery_raw = 123;    // 12.3V (81% pin)
+    pkt.status_reserved = 0;  // Byte 25 dự phòng (đã bỏ đo pin)
     rssiDbm = -76;
     snrDb = 8.0;
     break;
@@ -910,6 +926,17 @@ void setup() {
   Serial.println("   Người thực hiện: Đoàn Thanh Trường Thịnh           ");
   Serial.println("=======================================================");
 
+  // Mã phiên phải khác nhau sau mỗi lần reboot (IF-03 mục 3). Lấy entropy
+  // phần cứng một lần, trộn với MAC eFuse 48-bit; in ra Serial để biên bản test
+  // đối chiếu được với `gateway_session_id` trong envelope.
+  const uint64_t efuseMac = ESP.getEfuseMac();
+  gatewaySessionId = kvc::deriveGatewaySessionId(
+      esp_random(), (uint32_t)(efuseMac & 0xFFFFFFFFULL),
+      (uint32_t)((efuseMac >> 32) & 0xFFFFULL));
+  Serial.printf("[SESSION] gateway_session_id = %u (MAC %04X%08X)\n",
+                gatewaySessionId, (unsigned)((efuseMac >> 32) & 0xFFFFULL),
+                (unsigned)(efuseMac & 0xFFFFFFFFULL));
+
   // BƯỚC 1: CHẠY BÀI SÁT HẠCH TỰ ĐỘNG GIAI ĐOẠN 2 (SELF-TEST UNIT)
   runPhase2SelfTest();
 
@@ -938,9 +965,14 @@ void setup() {
 
   SPI.begin(LORA_PIN_SCK, LORA_PIN_MISO, LORA_PIN_MOSI, LORA_PIN_NSS);
   if (initLoRaHardware()) {
+    Serial.printf("[LORA] RegVersion (0x42) = 0x%02X (chuan SX1278: 0x12)\n",
+                  readSx1278Version());
     Serial.println("[LORA] >>> PHAT HIEN VA KHOI TAO PHAN CUNG LORA RA-02 "
                    "THANH CONG! [OK]");
   } else {
+    Serial.printf("[LORA-WARN] RegVersion (0x42) = 0x%02X (chuan SX1278: "
+                  "0x12)\n",
+                  readSx1278Version());
     Serial.println("[LORA-WARN] Chua phat hien phan cung LoRa Ra-02 (hoac day "
                    "cam chua noi).");
     Serial.println(
@@ -983,13 +1015,13 @@ void loop() {
     if (packetSize > 0) {
       // 1. Kiểm tra kích thước gói chuẩn 32 bytes (KvcTelemetryPacket32)
       if (packetSize != (int)sizeof(RfTelemetryPacket32)) {
-        rxDropCount++;
+        rxInvalidCount++;
         while (LoRa.available()) {
           LoRa.read(); // Xả sạch bộ đệm gói tin rác/nhiễu
         }
         Serial.printf("[RX-LORA-ERR] Tu choi goi bat thuong %d bytes (Khac "
-                      "chuan 32B)! (Tong drop: %u)\n",
-                      packetSize, rxDropCount);
+                      "chuan 32B)! (Tong frame loi: %u)\n",
+                      packetSize, rxInvalidCount);
       } else {
         uint8_t rxBuffer[sizeof(RfTelemetryPacket32)];
         int bytesRead = 0;
@@ -1010,7 +1042,7 @@ void loop() {
           char hexPayload[sizeof(RfTelemetryPacket32) * 2 + 1];
           if (!bytesToHexString(rxBuffer, bytesRead, hexPayload,
                                 sizeof(hexPayload))) {
-            rxDropCount++;
+            rxInvalidCount++;
             Serial.println(
                 "[RX-LORA-ERR] Khong du bo dem de ma hoa payload Hex.");
           } else {
@@ -1061,17 +1093,17 @@ void loop() {
             }
 
             Serial.printf("[RX-LORA #%03u] Seq:%-3u | %ddBm SNR:%+.1f | "
-                          "Alt:%3u cm [%s] | %s | %s | %s | Pin:%.1fV\n",
+                          "Alt:%3u cm [%s] | %s | %s | %s\n",
                           gatewaySequence, rxPkt->seq_num, rssiDbm, snrDb,
                           rxPkt->alt_dist_cm,
                           altValid ? "ALT_VALID" : "ALT_INVALID", imuStr,
-                          gnssStr, aiStr, (float)rxPkt->battery_raw / 10.0f);
+                          gnssStr, aiStr);
           }
         } else {
-          rxDropCount++;
+          rxInvalidCount++;
           Serial.printf("[RX-LORA-ERR] Tu choi goi %d bytes do sai ma CRC-16! "
-                        "(Tong drop: %u)\n",
-                        bytesRead, rxDropCount);
+                        "(Tong frame loi: %u)\n",
+                        bytesRead, rxInvalidCount);
         }
       }
     }
@@ -1151,9 +1183,9 @@ void loop() {
     int activeClients = webSocket.connectedClients();
 
     Serial.printf("[HEARTBEAT] UpTime: %02u:%02u:%02u | IP: %s | Clients: %d | "
-                  "Drops: %u\n",
+                  "InvalidFrames: %u | BufDrops: %u\n",
                   hours, minutes, seconds, ipStr.c_str(), activeClients,
-                  rxDropCount);
+                  rxInvalidCount, rxBufferDropCount);
   }
 
   // Nghỉ 2ms mỗi chu kỳ để giải phóng nhân CPU, hạ nhiệt độ chip và ổn định

@@ -1,4 +1,4 @@
-import { APP_CONFIG } from '@/config/appConfig'
+﻿import { APP_CONFIG } from '@/config/appConfig'
 import type {
   AlertItem,
   AlertLevel,
@@ -155,14 +155,14 @@ function resolveAlertMetadata(code: string, message: string): {
     return {
       source_category: 'TELEMETRY',
       impact: 'Độ trễ cao hoặc mất liên lạc telemetry với tải nhiệm vụ.',
-      remediation: 'Kiểm tra khoảng cách LoRa/RF, hướng ăng-ten và nguồn pin phát.',
+      remediation: 'Kiểm tra khoảng cách LoRa/RF, hướng ăng-ten và nguồn cấp thiết bị phát.',
     }
   }
   if (upper.includes('BATTERY') || upper.includes('LIDAR') || upper.includes('IMU') || upper.includes('PIN')) {
     return {
       source_category: 'SENSORS',
-      impact: 'Cảm biến cận đất, góc nghiêng hoặc nguồn pin báo nguy hiểm.',
-      remediation: 'Kiểm tra mức điện áp tải, bề mặt phản xạ LiDAR và cảm biến IMU.',
+      impact: 'Cảm biến cận đất, góc nghiêng hoặc trạng thái nguồn tải báo bất thường.',
+      remediation: 'Kiểm tra bề mặt phản xạ siêu âm, cảm biến IMU và nguồn cấp tải.',
     }
   }
   if (upper.includes('LOGGER') || upper.includes('STORAGE') || upper.includes('SD')) {
@@ -432,7 +432,21 @@ export function missionReducer(state: MissionState, action: MissionAction): Miss
               timestamp_ms: historyTimestamp,
               track_id: target.track_id,
             }
-            targetHistory = [...baseState.target_history, point].slice(-APP_CONFIG.MAX_TARGET_HISTORY)
+            // Giữ lịch sử theo từng track: track khác không bị track mới đè khỏi cửa sổ.
+            const sameTrack = baseState.target_history.filter((h) => h.track_id === point.track_id)
+            const otherTracks = baseState.target_history.filter((h) => h.track_id !== point.track_id)
+            const perTrackCap = Math.max(
+              1,
+              Math.floor(APP_CONFIG.MAX_TARGET_HISTORY / 2)
+            )
+            targetHistory = [...otherTracks, ...sameTrack, point].slice(
+              -APP_CONFIG.MAX_TARGET_HISTORY
+            )
+            if (sameTrack.length >= perTrackCap) {
+              // Cắt bớt điểm cũ nhất của chính track này, giữ nguyên track khác.
+              const trimmed = [...sameTrack, point].slice(-perTrackCap)
+              targetHistory = [...otherTracks, ...trimmed].slice(-APP_CONFIG.MAX_TARGET_HISTORY)
+            }
           }
         }
       }

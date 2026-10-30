@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+﻿import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { MissionContext, type MissionContextValue } from '@/state/MissionProvider'
@@ -53,6 +53,8 @@ const renderWithContext = (state: MissionState, onSwitchToMap?: () => void) => {
     setSelectedScenarioId: vi.fn(),
     switchSourceMode: vi.fn(),
     reconnect: vi.fn(),
+    wsUrl: 'ws://127.0.0.1:8000/ws/telemetry',
+    setWsUrl: vi.fn(() => ({ ok: true })),
   }
 
   return render(
@@ -70,7 +72,7 @@ describe('LocalRadarPanel - hệ local Radar thực nghiệm cục bộ (LOCAL_G
     renderWithContext(mockState)
 
     expect(screen.getByText('Hệ Local Radar Cục Bộ (Local Grid)')).toBeDefined()
-    expect(screen.getByText('+Y (BẮC SA BÀN)')).toBeDefined()
+    expect(screen.getByText('+Y (BẮC LOCAL)')).toBeDefined()
     expect(screen.getByText('+X (ĐÔNG)')).toBeDefined()
     expect(screen.getByText(/O\(0,0\) Mốc #1/i)).toBeDefined()
     expect(screen.getByText('KHÓA MỤC TIÊU')).toBeDefined()

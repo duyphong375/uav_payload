@@ -3,7 +3,7 @@
 - **Mã giao diện:** `IF-03`
 - **Hai đầu kết nối:** ESP32-C3 Gateway Trạm Đất (kit/board TBD; **Đoàn Thanh Trường Thịnh** - Wi-Fi SoftAP & WebSocket Server) ↔ Dịch vụ Backend Python trên Laptop GCS (**Đoàn Thanh Trường Thịnh** - WebSocket Client Ingress)
 - **Trạng thái:** `SOURCE-VERIFIED` — cả firmware Gateway (`main.cpp`) và module Ingress (`esp32_ingress.py`) đều đã có code và `pytest` hiện hành pass. Chưa có `HARDWARE-VERIFIED`: chưa capture frame LoRa thật hoặc chạy ESP32 trên bo trong task này.
-- **Liên kết ABI:** payload RF bên trong envelope là frame 32 byte theo [IF-02](IF_MCU_LORA_RF.md) mục 2 và golden vector GV-01 mục 3. Backend không đổi endian/field/layout.
+- **Liên kết ABI:** payload RF bên trong envelope là frame 32 byte theo [IF-02](IF_MCU_LORA_RF.md) mục 2 và golden vector GV-02 mục 3; ABI này đã được HUMAN duyệt ngày 29/10/2026. Backend không đổi endian/field/layout.
 
 ---
 
@@ -60,7 +60,7 @@ Gateway ESP32 tự chọn chế độ mạng theo **thứ tự ưu tiên cố đ
 
 ### Ưu tiên 2 — SoftAP dự phòng (tự động)
 
-- Kích hoạt khi **không có credential** hoặc **hết 10 giây** chưa nối được STA.
+- Kích hoạt khi **không có credential** hoặc **hết 15 giây** (`KVC_STA_BOOT_BUDGET_MS = 15000` trong `main.cpp`) chưa nối được STA.
 - **SSID:** `KVC_GROUND_STATION`
 - **Mật khẩu (Password):** `kvc123456` (WPA2-PSK, thông số vận hành nội bộ)
 - **Địa chỉ IP ESP32:** `192.168.4.1`
@@ -74,9 +74,9 @@ Gateway ESP32 tự chọn chế độ mạng theo **thứ tự ưu tiên cố đ
 
 ## 3. Transport envelope WebSocket v1
 
-Mỗi message JSON UTF-8 chuyển tiếp một RF payload 32 byte còn nguyên vẹn. ESP32 loại bỏ các payload không qua được kiểm tra CRC-16 trước khi tạo message. `rf_payload_hex` giữ đúng thứ tự 32 byte nhận được. Phía Backend Python tiếp nhận và giải mã qua module `gcs/backend/esp32_ingress.py`, có bộ test `test_esp32_ingress.py` (chạy trong task `KVC-FIX-ABI-20261025-001`: **14 passed**).
+Mỗi message JSON UTF-8 chuyển tiếp một RF payload 32 byte còn nguyên vẹn. ESP32 loại bỏ các payload không qua được kiểm tra CRC-16 trước khi tạo message. `rf_payload_hex` giữ đúng thứ tự 32 byte nhận được. Số frame bị loại vì sai độ dài/sai CRC **không** cộng vào `rx_drop_count` (xem bảng trường bên dưới); chúng chỉ hiện ở Serial. Phía Backend Python tiếp nhận và giải mã qua module `gcs/backend/esp32_ingress.py`, có bộ test `test_esp32_ingress.py` (chạy trong task `KVC-FIX-ABI-20261025-001`: **14 passed**).
 
-> **Golden vector dùng chung:** `rf_payload_hex` trong ví dụ dưới là vector toàn-zero của IF-02 và đã kiểm CRC-16/CCITT-FALSE = `0x8F79` (lưu LE `79 8f`). Vector đầy đủ có dữ liệu là **GV-01** ở [IF-02](IF_MCU_LORA_RF.md) mục 3: `aa55012ae8030000baba6b06d4b3923f96004001f000015c0f7e000000004e30` (CRC `0x304E`).
+> **Golden vector dùng chung:** `rf_payload_hex` trong ví dụ dưới là vector toàn-zero của IF-02 và đã kiểm CRC-16/CCITT-FALSE = `0x8F79` (lưu LE `79 8f`). Vector đầy đủ có dữ liệu là **GV-02** ở [IF-02](IF_MCU_LORA_RF.md) mục 3: `aa55012ae8030000baba6b06d4b3923f96004001f000015c0f000000000060e2` (CRC `0xE260`). GV-02 thay GV-01 sau khi KVC bỏ phép đo pin (byte 25 `status_reserved` = 0).
 
 > **Cảnh báo lịch sử:** ví dụ `aa55012a78e10100...a1b2` từng nằm trong `docs/architecture/GATEWAY_DESIGN.md` và `KE_HOACH_TEST_VA_TIEN_DO_GATEWAY_ESP32.md` có CRC **sai** (`0x91F5` tính lại ≠ `0xB2A1` khai báo). Không dùng vector đó làm fixture.
 
@@ -96,12 +96,12 @@ Mỗi message JSON UTF-8 chuyển tiếp một RF payload 32 byte còn nguyên v
 | Trường | Kiểu / quy tắc |
 | --- | --- |
 | `transport_version` | Integer; hiện bằng `1`. |
-| `gateway_session_id` | `uint32`; thay đổi khi ESP32 khởi động lại. |
+| `gateway_session_id` | `uint32`; thay đổi khi ESP32 khởi động lại. Firmware sinh từ entropy phần cứng (`esp_random()`) trộn MAC eFuse và bảo đảm giá trị `>= 2`, nên hai phiên boot không trùng nhau. Giá trị được in ra Serial lúc boot: `[SESSION] gateway_session_id = ...`. |
 | `gateway_sequence` | `uint32`; tăng theo message, wrap modulo `2^32`. |
 | `rx_monotonic_ms` | `uint32`; thời gian monotonic kể từ lúc ESP32 boot, không phải UTC. |
 | `rf_payload_hex` | 64 ký tự hex thường, đúng 32 byte đã qua kiểm tra CRC-16; không sửa field/endian. |
 | `rssi_dbm`, `snr_db` | Số đo nhận từ SX1278 theo đơn vị dBm và dB. |
-| `rx_drop_count` | `uint32`; số message hợp lệ bị loại ở ESP32 do buffer đầy kể từ boot. |
+| `rx_drop_count` | `uint32`; số message **hợp lệ** bị loại ở ESP32 do buffer đầy kể từ boot. Firmware hiện hành phát trực tiếp, **chưa có FIFO 64**, nên trường này luôn `0`. Frame RF **không hợp lệ** (sai độ dài, sai CRC-16) **không** cộng vào trường này; chúng được đếm riêng ở `rx_invalid_count` và chỉ in ra Serial (`[RX-LORA-ERR]`, `[HEARTBEAT] InvalidFrames: N`), không có trong envelope v1. |
 
 Heartbeat riêng không thuộc envelope v1 đã mô tả. Link stale/disconnect được suy ra ở backend theo thời gian nhận message hợp lệ; muốn thêm loại message trạng thái cần schema/version được duyệt.
 

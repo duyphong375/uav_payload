@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import {
   AlertCircle,
   AlertTriangle,
@@ -28,7 +28,7 @@ export const AlertItemCard: React.FC<AlertItemCardProps> = ({ alert }) => {
         return (
           <Badge
             variant="destructive"
-            className="text-[10px] px-2 py-0.5 font-medium"
+            className="text-[11px] px-2 py-0.5 font-medium"
           >
             Đang tồn tại
           </Badge>
@@ -37,7 +37,7 @@ export const AlertItemCard: React.FC<AlertItemCardProps> = ({ alert }) => {
         return (
           <Badge
             variant="outline"
-            className="text-[10px] px-2 py-0.5 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 font-medium"
+            className="text-[11px] px-2 py-0.5 border-[var(--kvc-ok-line)] text-[var(--kvc-ok-ink)] bg-[var(--kvc-ok-bg)] font-medium"
           >
             Đã phục hồi
           </Badge>
@@ -46,7 +46,7 @@ export const AlertItemCard: React.FC<AlertItemCardProps> = ({ alert }) => {
         return (
           <Badge
             variant="outline"
-            className="text-[10px] px-2 py-0.5 border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10 font-medium"
+            className="text-[11px] px-2 py-0.5 border-[var(--kvc-warn-line)] text-[var(--kvc-warn-ink)] bg-[var(--kvc-warn-bg)] font-medium"
           >
             Chưa xác định
           </Badge>
@@ -58,8 +58,8 @@ export const AlertItemCard: React.FC<AlertItemCardProps> = ({ alert }) => {
     <Card
       className={`border transition-shadow hover:shadow-xs ${
         isCritical
-          ? 'border-red-500/30 bg-red-500/5'
-          : 'border-amber-500/30 bg-amber-500/5'
+          ? 'border-[var(--kvc-crit-line)] bg-[var(--kvc-crit)]/5'
+          : 'border-[var(--kvc-warn-line)] bg-[var(--kvc-warn)]/5'
       }`}
     >
       <CardContent className="p-3.5 flex flex-col gap-2.5">
@@ -67,9 +67,9 @@ export const AlertItemCard: React.FC<AlertItemCardProps> = ({ alert }) => {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div className="flex items-start gap-2.5 min-w-0">
             {isCritical ? (
-              <AlertCircle className="h-5 w-5 mt-0.5 text-red-500 shrink-0" />
+              <AlertCircle className="h-5 w-5 mt-0.5 text-[var(--kvc-crit-ink)] shrink-0" />
             ) : (
-              <AlertTriangle className="h-5 w-5 mt-0.5 text-amber-500 shrink-0" />
+              <AlertTriangle className="h-5 w-5 mt-0.5 text-[var(--kvc-warn-ink)] shrink-0" />
             )}
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
@@ -78,7 +78,7 @@ export const AlertItemCard: React.FC<AlertItemCardProps> = ({ alert }) => {
                 </span>
                 <Badge
                   variant="outline"
-                  className="text-[10px] py-0 px-1.5 font-mono text-muted-foreground"
+                  className="text-[11px] py-0 px-1.5 font-mono text-muted-foreground"
                 >
                   Nguồn: {alert.source_category}
                 </Badge>
@@ -93,7 +93,7 @@ export const AlertItemCard: React.FC<AlertItemCardProps> = ({ alert }) => {
           {/* Thao tác Tiếp nhận */}
           <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
             {alert.acknowledged ? (
-              <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium px-2 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20">
+              <div className="flex items-center gap-1.5 text-xs text-[var(--kvc-ok-ink)] font-medium px-2 py-1 rounded-md bg-[var(--kvc-ok-bg)] border border-[var(--kvc-ok-line)]">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 <span>Đã tiếp nhận</span>
               </div>
@@ -114,10 +114,10 @@ export const AlertItemCard: React.FC<AlertItemCardProps> = ({ alert }) => {
 
         {/* Hàng 2: Tác động (Impact) & Gợi ý kiểm tra (Remediation) */}
         {(alert.impact || alert.remediation) && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-2 rounded-lg bg-card/60 border border-border/60 text-xs">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 p-2 rounded-kvc-control bg-card/60 border border-border/60 text-xs">
             {alert.impact && (
               <div className="flex items-start gap-1.5 text-muted-foreground">
-                <HelpCircle className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                <HelpCircle className="h-3.5 w-3.5 text-[var(--kvc-warn-ink)] shrink-0 mt-0.5" />
                 <div>
                   <span className="font-semibold text-foreground">Tác động: </span>
                   <span>{alert.impact}</span>
@@ -126,7 +126,7 @@ export const AlertItemCard: React.FC<AlertItemCardProps> = ({ alert }) => {
             )}
             {alert.remediation && (
               <div className="flex items-start gap-1.5 text-muted-foreground">
-                <Wrench className="h-3.5 w-3.5 text-cyan-500 shrink-0 mt-0.5" />
+                <Wrench className="h-3.5 w-3.5 text-[var(--kvc-accent-ink)] shrink-0 mt-0.5" />
                 <div>
                   <span className="font-semibold text-foreground">Gợi ý kiểm tra: </span>
                   <span>{alert.remediation}</span>

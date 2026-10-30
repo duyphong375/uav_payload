@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Cấu hình hệ thống GCS Frontend KVC.
  * Toàn bộ biến VITE_* là build-time/runtime công khai trong bundle, không chứa credentials hoặc secrets.
  */
@@ -63,6 +63,7 @@ export const APP_CONFIG = {
     THEME: 'kvc_gcs_theme',
     LAYOUT: 'kvc_gcs_layout',
     MOCK_SCENARIO: 'kvc_gcs_mock_scenario',
+    WS_URL: 'kvc_gcs_ws_url',
     FOLLOW_CAMERA: 'kvc_gcs_follow_camera',
     SHOW_TRAILS: 'kvc_gcs_show_trails',
   },

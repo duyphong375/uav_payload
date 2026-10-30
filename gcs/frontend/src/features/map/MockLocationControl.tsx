@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+﻿import React, { useState } from 'react'
 import { Locate, RotateCcw, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -57,15 +57,15 @@ export const MockLocationControl: React.FC<MockLocationControlProps> = ({
             disabled={loading}
             className={`h-7 px-2 text-xs gap-1 border transition-all ${
               locState.isCustom
-                ? 'bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-500 shadow-xs'
+                ? 'bg-[var(--kvc-ok-fill)] hover:bg-[var(--kvc-ok-fill)] text-[var(--kvc-text-on-fill)] border-[var(--kvc-ok-line)] shadow-xs'
                 : 'text-muted-foreground hover:text-foreground border-border/70'
             }`}
             aria-label="Lấy định vị GPS thiết bị hiện tại cho MOCK"
           >
             {loading ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin text-cyan-400" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-[var(--kvc-accent-ink)]" />
             ) : (
-              <Locate className={`h-3.5 w-3.5 ${locState.isCustom ? 'text-white' : 'text-cyan-500'}`} />
+              <Locate className={`h-3.5 w-3.5 ${locState.isCustom ? 'text-[var(--kvc-text-on-overlay)]' : 'text-[var(--kvc-accent-ink)]'}`} />
             )}
             <span className="hidden sm:inline">
               {locState.isCustom ? 'GPS Thực Tế' : 'Lấy GPS Tôi'}
@@ -82,7 +82,7 @@ export const MockLocationControl: React.FC<MockLocationControlProps> = ({
               Lấy tọa độ GPS thực tế của thiết bị bạn (trình duyệt) để UAV trong chế độ MOCK bay quanh vị trí của bạn.
             </p>
           )}
-          {errorMessage && <p className="text-amber-400 mt-1">{errorMessage}</p>}
+          {errorMessage && <p className="text-[var(--kvc-warn-ink)] mt-1">{errorMessage}</p>}
         </TooltipContent>
       </Tooltip>
 

@@ -70,19 +70,19 @@ bool bytesToHexString(const uint8_t *data, size_t length, char *output,
   return true;
 }
 
-bool matchesGoldenGv01(const RfTelemetryPacket32 *pkt) {
+bool matchesGoldenGv02(const RfTelemetryPacket32 *pkt) {
   if (pkt == nullptr) {
     return false;
   }
 
-  return pkt->crc16 == kGoldenGv01Crc16 && pkt->sync[0] == kRfSync0 &&
+  return pkt->crc16 == kGoldenGv02Crc16 && pkt->sync[0] == kRfSync0 &&
          pkt->sync[1] == kRfSync1 && pkt->msg_id == kMsgIdTelemetry &&
          pkt->seq_num == 42U && pkt->timestamp_ms == 1000UL &&
          pkt->target_lat == 107723450L && pkt->target_lon == 1066578900L &&
          pkt->target_x_local == 150 && pkt->target_y_local == 320 &&
          pkt->alt_dist_cm == 240U && pkt->class_id == 1U &&
          pkt->confidence == 92U && pkt->sensor_flags == 0x0FU &&
-         pkt->battery_raw == 126U;
+         pkt->status_reserved == 0U;
 }
 
 } // namespace kvc

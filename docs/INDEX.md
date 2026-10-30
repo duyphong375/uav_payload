@@ -27,6 +27,7 @@ Một tài liệu `ACTIVE` + `DESIGN` nghĩa là nội dung đang có hiệu l�
 | SYS-003 | Đặc tả thiết kế GCS | `architecture/KVC_GCS_DESIGN_SPEC.md` | ACTIVE | DESIGN | — | 2026-10-15 | `gcs/backend/`, `gcs/frontend/` |
 | SYS-004 | Kế hoạch GCS (lịch sử) | `architecture/KVC_GCS_PLAN.md` | SUPERSEDED | DESIGN | — | 2026-10-15 | — |
 | SYS-005 | Thiết kế gateway | `architecture/GATEWAY_DESIGN.md` | ACTIVE | DESIGN | Thịnh | 2026-10-25 | `firmware/gateway_esp32/` |
+| SYS-006 | Design contract GCS (token, deny-list) | `architecture/KVC_GCS_DESIGN_CONTRACT.md` | ACTIVE | DESIGN | Kilo | 2026-10-29 | `gcs/frontend/src/styles/tokens.css`, `gcs/frontend/src/features/` |
 
 ## Phần cứng
 
@@ -45,8 +46,8 @@ ID giao diện là **bất biến**. Đổi tên file phải giữ ID trong tiê
 |---|---|---|---|---|---|---|---|
 | IF-00 | MCU ↔ cảm biến | `interfaces/IF_MCU_SENSORS.md` | ACTIVE | DESIGN | Phong | 2026-10-25 | `inc/kvc_imu_gy87.h`, `inc/kvc_usound_ajsr04m.h`, `inc/kvc_gnss_neo_m10.h` |
 | IF-01 | FPGA ↔ MCU UART | `interfaces/IF_FPGA_MCU_UART.md` | ACTIVE | DESIGN | Vững | 2026-10-25 | `src/sensors/kvc_fpga_bbox.c` |
-| IF-02 | MCU ↔ LoRa RF 32 byte | `interfaces/IF_MCU_LORA_RF.md` | ACTIVE | DESIGN | Thịnh | 2026-10-25 | `inc/kvc_telemetry.h`, `firmware/gateway_esp32/src/main.cpp` |
-| IF-03 | ESP32 ↔ GCS WebSocket | `interfaces/IF_ESP32_GCS_WS.md` | ACTIVE | DESIGN | Thịnh | 2026-10-25 | `gcs/backend/esp32_ingress.py` |
+| IF-02 | MCU ↔ LoRa RF 32 byte | `interfaces/IF_MCU_LORA_RF.md` | ACTIVE | APPROVED ABI (HUMAN 29/10/2026) / SOURCE-VERIFIED | Thịnh | 2026-10-29 | `inc/kvc_telemetry.h`, `firmware/gateway_esp32/src/main.cpp` |
+| IF-03 | ESP32 ↔ GCS WebSocket | `interfaces/IF_ESP32_GCS_WS.md` | ACTIVE | SOURCE-VERIFIED (ABI payload IF-02 đã duyệt 29/10/2026) | Thịnh | 2026-10-29 | `gcs/backend/esp32_ingress.py` |
 | IF-04 | GCS REST/WebSocket route | `interfaces/IF_GCS_DATA_CONTRACT.md` | ACTIVE | SOURCE-VERIFIED | Phong | 2026-10-25 | `gcs/backend/main.py` |
 | IF-04-SEM | GCS semantics dữ liệu | `interfaces/KVC_GCS_DATA_CONTRACT.md` | ACTIVE | DESIGN | Phong | 2026-10-25 | `gcs/backend/schemas.py`, `gcs/backend/state.py` |
 | IF-CAM | Camera ↔ FPGA | `interfaces/IF_CAMERA_FPGA.md` | DRAFT | DESIGN | Kiên | 2026-10-19 | — (chưa có RTL) |
@@ -78,6 +79,8 @@ khác vai trò, không gộp. Cả hai đều thuộc họ IF-04.
 | ID | Tài liệu | Đường dẫn | Trạng thái | Bằng chứng | Owner | Kiểm tra gần nhất | Code liên quan |
 |---|---|---|---|---|---|---|---|
 | PLAN-001 | Phân công MCU Payload + Gateway ESP32 | `planning/KVC_PHAN_CONG_2_NGUOI.md` | ACTIVE | SOURCE-VERIFIED (hiện trạng đo trên kit 26/10/2026) | Phong + Thịnh | 2026-10-26 | `firmware/mcu_payload/`, `firmware/gateway_esp32/` |
+| PLAN-002 | Kế hoạch triển khai GCS Dashboard | `architecture/KVC_GCS_IMPLEMENTATION_PLAN_20261029.md` | ACTIVE | DESIGN | Kilo | 2026-10-29 | `gcs/frontend/`, `gcs/backend/esp32_ingress.py` |
+| PLAN-003 | P0 hotfix GCS Dashboard (29/10) | `architecture/KVC_GCS_P0_Hotfix_Plan_20261029.md` | ACTIVE | DESIGN | Kilo | 2026-10-29 | `gcs/frontend/src/` |
 
 ## Planned — chưa triển khai
 

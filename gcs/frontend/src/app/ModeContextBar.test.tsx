@@ -1,13 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+﻿import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { MissionProvider, useMission } from '@/state/MissionProvider'
+import { MissionProvider } from '@/state/MissionProvider'
 import { ModeContextBar } from './ModeContextBar'
-
-function ReplayHarness() {
-  const { switchSourceMode } = useMission()
-  return <><button onClick={() => switchSourceMode('REPLAY')}>Test REPLAY</button><ModeContextBar /></>
-}
 
 describe('ModeContextBar - Thanh điều khiển ngữ cảnh MOCK/REAL', () => {
   it('hiển thị Chế độ Mô phỏng và danh sách kịch bản khi ở MOCK', () => {
@@ -37,18 +32,5 @@ describe('ModeContextBar - Thanh điều khiển ngữ cảnh MOCK/REAL', () => 
     fireEvent.change(select, { target: { value: 'NORMAL_NO_TARGET' } })
 
     expect(select.value).toBe('NORMAL_NO_TARGET')
-  })
-
-  it('hiển thị REPLAY riêng, không gắn nhãn Live hoặc điều khiển kịch bản', () => {
-    render(
-      <TooltipProvider>
-        <MissionProvider><ReplayHarness /></MissionProvider>
-      </TooltipProvider>
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'Test REPLAY' }))
-    expect(screen.getByText(/Phát lại nhật ký/i)).toBeDefined()
-    expect(screen.queryByText(/Trực tiếp từ thiết bị/i)).toBeNull()
-    expect(screen.queryByLabelText(/Chọn kịch bản mô phỏng/i)).toBeNull()
-    expect(screen.getByText('MẤT REPLAY WS')).toBeDefined()
   })
 })

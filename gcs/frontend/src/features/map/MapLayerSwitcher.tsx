@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import {
   Tooltip,
   TooltipContent,
@@ -24,7 +24,7 @@ export const MapLayerSwitcher: React.FC<MapLayerSwitcherProps> = ({
   className = '',
 }) => {
   const is2D = mode === '2D'
-  const positionClass = className || 'bottom-24 right-3 z-[390]'
+  const positionClass = className || 'bottom-24 right-3 z-[var(--kvc-z-dock)]'
 
   return (
     <div className={`absolute select-none ${positionClass}`}>
@@ -41,10 +41,10 @@ export const MapLayerSwitcher: React.FC<MapLayerSwitcherProps> = ({
           >
             {/* Khung thumbnail hình vuông bo góc chuẩn Google Maps (44x44px) */}
             <div
-              className={`relative w-11 h-11 sm:w-12 sm:h-12 rounded-lg overflow-hidden shadow-md transition-all duration-200 ${
+              className={`relative w-11 h-11 sm:w-12 sm:h-12 rounded-kvc-control overflow-hidden shadow-md transition-all duration-200 ${
                 is2D
-                  ? 'border-2 border-cyan-500 shadow-cyan-500/25 group-hover:border-cyan-400 group-hover:shadow-lg'
-                  : 'border-2 border-slate-300 dark:border-slate-600 shadow-black/20 group-hover:border-cyan-400 group-hover:shadow-lg'
+                  ? 'border-2 border-[var(--kvc-accent)] group-hover:border-[var(--kvc-accent-line)] group-hover:shadow-lg'
+                  : 'border-2 border-[var(--kvc-line-strong)] group-hover:border-[var(--kvc-accent-line)] group-hover:shadow-lg'
               }`}
             >
               {is2D ? (
@@ -120,13 +120,10 @@ export const MapLayerSwitcher: React.FC<MapLayerSwitcherProps> = ({
               )}
             </div>
 
-            {/* Nhãn văn bản bên dưới: "Vệ tinh" hoặc "Bản đồ" */}
+            {/* Nhãn văn bản bên dưới: "Vệ tinh" hoặc "Bản đồ".
+                Đặt trên nền bản đồ (có thể sáng hoặc tối) nên dùng chip nền đục. */}
             <span
-              className={`mt-1 text-[11px] font-semibold tracking-tight px-1 rounded-xs transition-colors drop-shadow-sm ${
-                is2D
-                  ? 'text-cyan-600 dark:text-cyan-400 group-hover:text-cyan-500'
-                  : 'text-slate-800 dark:text-slate-200 group-hover:text-cyan-500 dark:group-hover:text-cyan-400'
-              }`}
+              className="mt-1 rounded-kvc-control bg-[var(--kvc-surface)]/95 px-1.5 py-0.5 text-[11px] font-semibold tracking-tight text-[var(--kvc-accent-ink)] shadow-sm transition-colors group-hover:text-[var(--kvc-accent-ink)]"
             >
               {is2D ? 'Vệ tinh' : 'Bản đồ'}
             </span>

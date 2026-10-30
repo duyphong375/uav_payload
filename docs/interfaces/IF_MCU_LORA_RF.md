@@ -2,8 +2,10 @@
 
 - **Mã giao diện:** `IF-02`
 - **Hai đầu kết nối:** MCU Sonix SN34F788 trên UAV (**Nguyễn Tá Duy Phong** - Đầu phát TX) ↔ ESP32-C3 Gateway Trạm Đất (kit/board TBD; **Đoàn Thanh Trường Thịnh** - Đầu thu RX)
-- **Trạng thái:** `SOURCE-VERIFIED ABI` — layout 32-byte là contract duy nhất còn tồn tại trong repo và khớp ở cả ba đầu (MCU header, Gateway struct, parser Python). **Chưa** có bằng chứng `HARDWARE-VERIFIED` (chưa capture frame thật giữa MCU Sonix ↔ ESP32).
-- **Ghi chú ABI 20-byte:** task `KVC-FIX-ABI-20261025-001` đã truy toàn bộ lịch sử Git và working tree. **Không tìm thấy** bất kỳ định nghĩa, parser hay golden vector 20-byte nào trong repo; ghi nhận "telemetry 20 byte" chỉ là câu mô tả lịch sử trong `AGENTS.md`/`docs/KVC_AI_WORKFLOW.md` và không thể khôi phục layout. Vì vậy **không** dựng lại ABI 20-byte và không thiết kế field mới; 32-byte dưới đây là contract hiện hành cho tới khi có ABI mới được duyệt.
+- **Trạng thái:** `APPROVED ABI / SOURCE-VERIFIED` — ABI RF v1 32 byte đã được **HUMAN duyệt ngày 29/10/2026** cho cả hai owner: Nguyễn Tá Duy Phong (MCU) và Đoàn Thanh Trường Thịnh (Gateway). Layout khớp ở cả ba đầu (MCU header, Gateway struct, parser Python). **Chưa** có bằng chứng `HARDWARE-VERIFIED` (chưa capture frame thật giữa MCU Sonix ↔ ESP32); duyệt ABI không thay thế phép đo.
+- **Bản ghi duyệt:** Chủ dự án xác nhận HUMAN APPROVAL ngày 29/10/2026 thay mặt hai owner phân hệ MCU và Gateway, trong phiên Kilo (owner ghi tài liệu: Kilo; model/provider: DeepSeek). Duyệt phạm vi: chiều dài 32 byte, thứ tự trường/offset tại mục 2, Little-Endian, CRC-16/CCITT-FALSE trên byte 0–29, golden vector.
+- **Sửa đổi 29/10/2026 (bỏ đo pin):** byte 25 đổi từ `battery_raw` sang `status_reserved` (luôn `0`); độ dài, offset và vị trí CRC **không đổi**. Golden vector chuyển GV-01 → **GV-02** (`CRC 0xE260`). Đây là thay đổi ngữ nghĩa trường, được chủ dự án duyệt cùng ngày trong phiên Kilo; vẫn không phải HARDWARE-VERIFIED.
+- **Ghi chú ABI 20-byte:** task `KVC-FIX-ABI-20261025-001` đã truy toàn bộ lịch sử Git và working tree. **Không tìm thấy** bất kỳ định nghĩa, parser hay golden vector 20-byte nào trong repo; ghi nhận "telemetry 20 byte" chỉ là câu mô tả lịch sử trong `AGENTS.md`/`docs/KVC_AI_WORKFLOW.md` và không thể khôi phục layout. Vì vậy **không** dựng lại ABI 20-byte; 32-byte dưới đây là ABI đã duyệt. Mọi thay đổi layout/CRC/field phải có human approval mới và phải cập nhật đồng bộ ba đầu cùng golden vectors.
 
 ---
 
@@ -15,7 +17,7 @@ Hệ thống sử dụng 02 module **LoRa Ra-02 (chip Semtech SX1278)** giao ti�
 | :--- | :---: | :--- |
 | **Tần số trung tâm (Frequency)** | **433.0 MHz** | Băng tần ISM không cần xin phép, phù hợp module Ra-02 |
 | **Băng thông (Bandwidth - BW)** | **125 kHz** | Cân bằng giữa độ nhạy thu và tốc độ truyền |
-| **Hệ số trải phổ (Spreading Factor - SF)** | **SF7** | Thời gian truyền trên không (Airtime) khoảng 67 ms cho gói 32 byte |
+| **Hệ số trải phổ (Spreading Factor - SF)** | **SF7** | Thời gian truyền trên không (Airtime) khoảng 71,9 ms cho gói 32 byte (tính theo tham số ở [thiết kế hệ thống](../../architecture/KVC_ThietKeHeThong.md) mục IV.3; chưa đo trên thanh ghi thực) |
 | **Tỷ lệ mã sửa sai (Coding Rate - CR)** | **4/5** | Chuẩn cấu hình hoạt động |
 | **Độ dài Preamble** | **8 symbols** | Preamble tiêu chuẩn cho SX1278 |
 | **Sync Word** | **`0x12`** | Phân biệt mạng nội bộ KVC (tránh xung đột mạng LoRaWAN 0x34) |
@@ -29,7 +31,7 @@ Hệ thống sử dụng 02 module **LoRa Ra-02 (chip Semtech SX1278)** giao ti�
 > **LƯU Ý LỊCH SỬ:** Ghi nhận cũ trong `AGENTS.md`/workflow nói "source dùng telemetry 20 byte". Task
 > `KVC-FIX-ABI-20261025-001` đã kiểm toàn bộ lịch sử Git (mọi commit, branch, dangling object) và xác nhận **không có**
 > struct/parser/golden vector 20-byte nào trong repo — câu đó chỉ là ghi nhận khảo sát, không phải layout có thể truy
-> xuất. Vì vậy 32 byte dưới đây là contract duy nhất đang được implement ở cả ba đầu, không phải "đề xuất thay thế".
+> xuất. **ABI 32 byte dưới đây đã được HUMAN duyệt ngày 29/10/2026** và là contract duy nhất ở cả ba đầu.
 > Toàn bộ số nguyên đa byte lưu theo chuẩn **Little-Endian**.
 
 ```text
@@ -68,7 +70,7 @@ Hệ thống sử dụng 02 module **LoRa Ra-02 (chip Semtech SX1278)** giao ti�
 | **22** | 1 byte | Class ID | `uint8` | `1`: `person` (người), `2`: `lifebuoy` (phao) |
 | **23** | 1 byte | Confidence | `uint8` | Độ tin cậy nhận diện (0–100%) |
 | **24** | 1 byte | Sensor Status Flags | `uint8` | Bit 0: GNSS 3D Fix hợp lệ<br>Bit 1: Cự ly siêu âm hợp lệ (ALT_VALID)<br>Bit 2: IMU hợp lệ<br>Bit 3: FPGA BBox có mục tiêu<br>Bit 4–7: Dự phòng |
-| **25** | 1 byte | Battery / Status | `uint8` | Điện áp pin UAV (0,1 V / bit, vd: 126 = 12.6V) |
+| **25** | 1 byte | Status Reserved | `uint8` | **Dự phòng — không còn mang nghĩa điện áp pin.** Trước đây là `battery_raw` (0,1 V/bit); KVC đã bỏ phép đo pin nên firmware luôn ghi `0` và phía nhận bỏ qua. Giữ nguyên offset 25 để không đổi layout/CRC. |
 | **26–29** | 4 byte | Dự phòng mở rộng / Góc IMU | `uint8[4]` | Khi cờ IMU hợp lệ (Bit 2): Byte 26–27 là Roll (int16 LE, 0.1°), Byte 28–29 là Pitch (int16 LE, 0.1°); hoặc đệm mở rộng độ cao áp kế |
 | **30–31** | 2 byte | CRC-16 Checksum | `uint16` | **CRC-16/CCITT-FALSE** (Poly `0x1021`, Init `0xFFFF`) tính từ byte 0 đến byte 29 |
 
@@ -81,8 +83,8 @@ Vector dưới đây được sinh **từ chính `KvcTelemetryPacket32`** trong 
 parser Python `struct.unpack("<2sBBIIIhhHBBBB4sH")` trong `gcs/backend/esp32_ingress.py`.
 
 ```text
-GV-01  Telemetry WGS-84, person, flags 0x0F, pin 12.6 V
-  aa55012ae8030000baba6b06d4b3923f96004001f000015c0f7e000000004e30
+GV-02  Telemetry WGS-84, person, flags 0x0F, byte 25 reserved = 0 (bỏ đo pin)
+  aa55012ae8030000baba6b06d4b3923f96004001f000015c0f000000000060e2
 ```
 
 | Trường | Giá trị | Ghi chú |
@@ -93,9 +95,13 @@ GV-01  Telemetry WGS-84, person, flags 0x0F, pin 12.6 V
 | target_x_local / target_y_local | `150` / `320` | LE int16, cm |
 | alt_dist_cm | `240` | LE uint16, cm |
 | class_id / confidence | `1` / `92` | person |
-| sensor_flags / battery_raw | `0x0F` / `126` | GPS\|ALT\|IMU\|AI |
+| sensor_flags / status_reserved | `0x0F` / `0` | GPS\|ALT\|IMU\|AI; byte 25 dự phòng |
 | reserved | `00 00 00 00` | không có IMU trong vector này |
-| crc16 | `0x304E` | byte cuối `4e 30` — CRC tính trên 30 byte đầu, lưu **low-byte trước** |
+| crc16 | `0xE260` | byte cuối `60 e2` — CRC tính trên 30 byte đầu, lưu **low-byte trước** |
+
+> **GV-02 thay GV-01.** GV-01 cũ (`...0f7e000000004e30`, CRC `0x304E`) mã hoá byte 25 = `126` (12.6 V).
+> Sau khi KVC bỏ phép đo pin, byte 25 luôn là `0`, nên vector và CRC đổi. GV-01 chỉ còn giá trị lịch sử;
+> mọi test C/C++/Python dùng **GV-02**.
 
 Vector thứ hai (toàn bộ payload bằng 0 ngoài header) xuất hiện ở
 [IF-03](IF_ESP32_GCS_WS.md) và cũng đã được kiểm: CRC-16/CCITT-FALSE trên 30 byte đầu = `0x8F79`, khớp hai byte cuối.

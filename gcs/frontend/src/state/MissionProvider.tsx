@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useEffect, useReducer, useRef, useState } from 'react'
+﻿import React, { createContext, useContext, useEffect, useReducer, useRef, useState } from 'react'
 import { APP_CONFIG } from '@/config/appConfig'
+import { MOCK_SCENARIOS } from '@/mocks/scenarios'
 import { mockSourceInstance } from '@/mocks/mockSource'
 import { telemetryClientInstance, type ApplicationPacket } from '@/services/telemetryClient'
 import { INITIAL_MISSION_STATE, missionReducer, type MissionAction } from './missionReducer'
@@ -12,6 +13,8 @@ export interface MissionContextValue {
   setSelectedScenarioId: (id: string) => void
   switchSourceMode: (mode: SourceMode) => void
   reconnect: () => void
+  wsUrl: string
+  setWsUrl: (url: string) => { ok: boolean; error?: string }
 }
 
 export const MissionContext = createContext<MissionContextValue | null>(null)
@@ -74,8 +77,41 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return localStorage.getItem(APP_CONFIG.STORAGE_KEYS.MOCK_SCENARIO) || 'NORMAL_GPS_TARGET'
   })
 
+  const [wsUrl, setWsUrlState] = useState<string>(() => {
+    if (typeof window === 'undefined') return APP_CONFIG.WS_URL
+    return localStorage.getItem(APP_CONFIG.STORAGE_KEYS.WS_URL) || APP_CONFIG.WS_URL
+  })
+
+  // Áp URL đã lưu trước khi luồng dữ liệu connect.
+  useEffect(() => {
+    telemetryClientInstance.setUrl(wsUrl)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const setWsUrl = (url: string): { ok: boolean; error?: string } => {
+    const trimmed = url.trim()
+    if (!trimmed) return { ok: false, error: 'Địa chỉ WebSocket không được để trống.' }
+    let parsed: URL
+    try {
+      parsed = new URL(trimmed)
+    } catch {
+      return { ok: false, error: 'Địa chỉ WebSocket không hợp lệ (không phân tích được URL).' }
+    }
+    if (parsed.protocol !== 'ws:' && parsed.protocol !== 'wss:') {
+      return { ok: false, error: 'Địa chỉ phải bắt đầu bằng ws:// hoặc wss://.' }
+    }
+    telemetryClientInstance.setUrl(trimmed)
+    localStorage.setItem(APP_CONFIG.STORAGE_KEYS.WS_URL, trimmed)
+    setWsUrlState(trimmed)
+    return { ok: true }
+  }
+
   // Đổi kịch bản MOCK
   const setSelectedScenarioId = (id: string) => {
+    if (!MOCK_SCENARIOS.some((s) => s.id === id)) {
+      console.warn(`[MissionProvider] Bỏ qua scenario không tồn tại: ${id}`)
+      return
+    }
     setSelectedScenarioIdState(id)
     localStorage.setItem(APP_CONFIG.STORAGE_KEYS.MOCK_SCENARIO, id)
     mockSourceInstance.setScenario(id)
@@ -166,6 +202,8 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setSelectedScenarioId,
         switchSourceMode,
         reconnect,
+        wsUrl,
+        setWsUrl,
       }}
     >
       {children}

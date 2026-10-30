@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+﻿import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RawTelemetryPacket } from '@/types/telemetry'
 import { APP_CONFIG } from '@/config/appConfig'
@@ -41,6 +41,7 @@ vi.mock('@/services/telemetryClient', () => ({
     connect: mocks.realConnect,
     disconnect: mocks.realDisconnect,
     reconnect: mocks.realReconnect,
+    setUrl: vi.fn(),
   },
 }))
 
@@ -167,7 +168,7 @@ describe('MissionProvider source ownership', () => {
     expect(mocks.mockStart).toHaveBeenCalledTimes(1)
   })
 
-  it('REPLAY dùng WebSocket riêng, không chạy local mock và giữ metadata virtual clock', async () => {
+  it('REPLAY packet vẫn được parse dù UI không còn chế độ này', async () => {
     render(<MissionProvider><Probe /></MissionProvider>)
     expect(mocks.mockStart).toHaveBeenCalledTimes(1)
 

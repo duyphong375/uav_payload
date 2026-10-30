@@ -1,21 +1,47 @@
-import React, { useState } from 'react'
+﻿import React, { Suspense, lazy, useState } from 'react'
 import {
   Sheet,
   SheetContent,
+  SheetDescription,
+  SheetTitle,
 } from '@/components/ui/sheet'
 import { Toaster } from '@/components/ui/sonner'
-import { AlertsPage } from '@/features/alerts/AlertsPage'
-import { DevicesPage } from '@/features/devices/DevicesPage'
-import { EventLogPage } from '@/features/history/EventLogPage'
-import { MissionPage } from '@/features/mission/MissionPage'
-import { OverviewPage } from '@/features/overview/OverviewPage'
-import { SettingsPage } from '@/features/settings/SettingsPage'
 import { useMission } from '@/state/MissionProvider'
 import { PositionSummary } from '@/features/mission/PositionSummary'
 import { AppHeader } from './AppHeader'
 import { AppSidebar } from './AppSidebar'
 import { ModeContextBar } from './ModeContextBar'
 import { useAppRouter } from './routes'
+
+// Chia tải route: mỗi trang là một chunk riêng, chỉ tải khi người dùng mở.
+const MissionPage = lazy(() =>
+  import('@/features/mission/MissionPage').then((m) => ({ default: m.MissionPage }))
+)
+const OverviewPage = lazy(() =>
+  import('@/features/overview/OverviewPage').then((m) => ({ default: m.OverviewPage }))
+)
+const AlertsPage = lazy(() =>
+  import('@/features/alerts/AlertsPage').then((m) => ({ default: m.AlertsPage }))
+)
+const EventLogPage = lazy(() =>
+  import('@/features/history/EventLogPage').then((m) => ({ default: m.EventLogPage }))
+)
+const DevicesPage = lazy(() =>
+  import('@/features/devices/DevicesPage').then((m) => ({ default: m.DevicesPage }))
+)
+const SettingsPage = lazy(() =>
+  import('@/features/settings/SettingsPage').then((m) => ({ default: m.SettingsPage }))
+)
+
+const PageFallback: React.FC = () => (
+  <div
+    className="flex-1 flex items-center justify-center p-8 text-xs font-mono text-muted-foreground"
+    role="status"
+    aria-live="polite"
+  >
+    Đang tải trang…
+  </div>
+)
 
 export const AppShell: React.FC = () => {
   const { currentPath } = useAppRouter()
@@ -53,7 +79,6 @@ export const AppShell: React.FC = () => {
         return <MissionPage />
     }
   }
-
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground font-sans antialiased select-none">
       {/* 1. Sidebar trên Desktop - cố định 220px (16 khi collapsed) */}
@@ -67,6 +92,10 @@ export const AppShell: React.FC = () => {
       {/* 2. Drawer Sidebar cho Mobile / Màn hình nhỏ */}
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
         <SheetContent side="left" className="p-0 w-[220px] bg-card border-border">
+          <SheetTitle className="sr-only">Điều hướng chính</SheetTitle>
+          <SheetDescription className="sr-only">
+            Danh sách trang: Tổng quan, Tác chiến, Cảnh báo, Nhật ký, Thiết bị, Cài đặt.
+          </SheetDescription>
           <AppSidebar
             collapsed={false}
             onToggleCollapse={() => setMobileMenuOpen(false)}
@@ -92,7 +121,7 @@ export const AppShell: React.FC = () => {
               currentPath === '/mission' ? 'max-w-none' : 'max-w-[1440px]'
             }`}
           >
-            {renderCurrentPage()}
+            <Suspense fallback={<PageFallback />}>{renderCurrentPage()}</Suspense>
           </div>
         </main>
 

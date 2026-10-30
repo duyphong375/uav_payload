@@ -53,6 +53,6 @@ Tài liệu này quản lý tập trung toàn bộ các giao diện kết nối 
 ## 3. Quy tắc quản lý và khóa giao thức (Protocol Governance)
 
 1. **Nguyên tắc "Single Source of Truth":** Thư mục này là nơi lưu giữ duy nhất quy chuẩn kỹ thuật của từng giao diện. Không tạo các bản sao đặc tả rải rác trong thư mục code.
-2. **Khóa ABI trước khi ghép nối:** Trước khi cắm dây thử nghiệm giữa hai khối bất kỳ (ví dụ FPGA ↔ MCU hoặc MCU ↔ ESP32), hai thành viên phụ trách hai đầu phải cùng đối chiếu với file đặc tả tương ứng tại đây và xác nhận khớp cấu trúc byte, thứ tự byte (Endianness) và thuật toán CRC.
+2. **Khóa ABI trước khi ghép nối:** Trước khi cắm dây thử nghiệm giữa hai khối bất kỳ (ví dụ FPGA ↔ MCU hoặc MCU ↔ ESP32), hai thành viên phụ trách hai đầu phải cùng đối chiếu với file đặc tả tương ứng tại đây và xác nhận khớp cấu trúc byte, thứ tự byte (Endianness) và thuật toán CRC. IF-02 (RF 32 byte) đã được HUMAN duyệt ABI ngày 29/10/2026 nhưng capture frame thật vẫn là điều kiện nghiệm thu bắt buộc.
 3. **Quy định thay đổi:** Nghiêm cấm đơn phương thay đổi baudrate, pinout, packet layout hoặc CRC trong code nếu chưa cập nhật và được duyệt tại tài liệu giao diện tương ứng.
 4. **Đối chiếu sơ đồ chân Master:** Toàn bộ phân bổ chân, số thứ tự pin và header bo mạch của các giao diện trên phải đối chiếu với [KVC_MASTER_PINOUT_WIRING.md](../hardware/wiring/KVC_MASTER_PINOUT_WIRING.md) trước khi cấp nguồn hoặc đấu nối phần cứng.

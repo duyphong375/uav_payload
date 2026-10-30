@@ -4,6 +4,11 @@
  * phân biệt rõ ràng giữa tọa độ hệ local (cm) và GPS toàn cầu (WGS-84).
  */
 
+/**
+ * 'REPLAY' được giữ lại trong union dù giao diện đã bỏ chế độ phát lại (PLAN-KVC-HISTORY-001).
+ * Lý do: backend vẫn có thể gửi packet replay (REST /api/replay/*); transport và reducer
+ * phải parse được packet đó để không crash. UI không còn lối vào chế độ này.
+ */
 export type SourceMode = 'REAL' | 'MOCK' | 'REPLAY'
 
 export type OriginalSourceMode = 'REAL' | 'MOCK' | 'REPLAY' | 'UNKNOWN'

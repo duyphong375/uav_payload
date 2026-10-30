@@ -107,7 +107,8 @@ Lưu ý: mỗi test driver phải link kèm đúng **một** file nguồn tươn
 
 Không đổi baud, packet layout, CRC, IRQ, pinout hay giao thức phần cứng ngoài các
 hợp đồng trong `docs/interfaces/`. Packet LoRa hiện hành là 32 byte
-(`KvcTelemetryPacket32`, IF-02). Telemetry 20 byte là kiến trúc lịch sử.
+(`KvcTelemetryPacket32`, IF-02), ABI đã được HUMAN duyệt ngày 29/10/2026 nhưng
+chưa HARDWARE-VERIFIED. Telemetry 20 byte là kiến trúc lịch sử.
 
 ## Bản quyền và nguồn
 

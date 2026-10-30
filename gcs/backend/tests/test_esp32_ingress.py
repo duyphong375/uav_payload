@@ -6,8 +6,8 @@ from fastapi.testclient import TestClient
 
 from gcs.backend.config import Settings
 from gcs.backend.esp32_ingress import (
-    GOLDEN_GV01_CRC16,
-    GOLDEN_GV01_HEX,
+    GOLDEN_GV02_CRC16,
+    GOLDEN_GV02_HEX,
     RF_CRC_COVERAGE,
     RF_PAYLOAD_FORMAT,
     RF_PAYLOAD_SIZE,
@@ -26,18 +26,18 @@ def test_abi_constants_match_if02_layout():
     assert RF_PAYLOAD_FORMAT == "<2sBBIIIhhHBBBB4sH"
 
 
-def test_golden_vector_gv01_crc_and_fields():
-    """GV-01 pin chung C/Python: CRC tính lại phải khớp byte 30..31."""
-    raw = bytes.fromhex(GOLDEN_GV01_HEX)
+def test_golden_vector_gv02_crc_and_fields():
+    """GV-02 pin chung C/Python: CRC tính lại phải khớp byte 30..31."""
+    raw = bytes.fromhex(GOLDEN_GV02_HEX)
     assert len(raw) == 32
     assert raw[0:2] == b"\xaa\x55"
-    assert crc16_ccitt_false(raw[:RF_CRC_COVERAGE]) == GOLDEN_GV01_CRC16
-    assert int.from_bytes(raw[RF_CRC_COVERAGE:], "little") == GOLDEN_GV01_CRC16
+    assert crc16_ccitt_false(raw[:RF_CRC_COVERAGE]) == GOLDEN_GV02_CRC16
+    assert int.from_bytes(raw[RF_CRC_COVERAGE:], "little") == GOLDEN_GV02_CRC16
 
-    parsed = parse_rf_payload(GOLDEN_GV01_HEX)
+    parsed = parse_rf_payload(GOLDEN_GV02_HEX)
     assert parsed["sync_valid"] is True
     assert parsed["crc_valid"] is True
-    assert parsed["crc16"] == GOLDEN_GV01_CRC16
+    assert parsed["crc16"] == GOLDEN_GV02_CRC16
     assert parsed["msg_id"] == 1
     assert parsed["seq_num"] == 42
     assert parsed["device_measurement_time_ms"] == 1000
@@ -50,7 +50,7 @@ def test_golden_vector_gv01_crc_and_fields():
 
 
 def test_golden_vector_crc_detects_single_bit_flip():
-    raw = bytearray(bytes.fromhex(GOLDEN_GV01_HEX))
+    raw = bytearray(bytes.fromhex(GOLDEN_GV02_HEX))
     raw[10] ^= 0x01
     sync_valid, crc_valid = validate_rf_payload(bytes(raw))
     assert sync_valid is True
@@ -61,7 +61,7 @@ def test_golden_vector_crc_detects_single_bit_flip():
 
 
 def test_golden_vector_crc_detects_bad_sync():
-    raw = bytearray(bytes.fromhex(GOLDEN_GV01_HEX))
+    raw = bytearray(bytes.fromhex(GOLDEN_GV02_HEX))
     raw[0] = 0x00
     sync_valid, crc_valid = validate_rf_payload(bytes(raw))
     assert sync_valid is False
@@ -79,19 +79,20 @@ def test_parse_rf_payload_person():
     # Sync: aa 55, MsgID: 01, Seq: 2a (42), Monotonic: 1000 ms,
     # Lat: 107723450 (scaled), Lon: 1066578900 (scaled),
     # X: 150 cm, Y: 320 cm, LiDAR: 240 cm,
-    # Class: 1 (person), Conf: 92%, Flags: 0x0f (GPS|LiDAR|IMU|AI), Battery: 126 (12.6V),
+    # Class: 1 (person), Conf: 92%, Flags: 0x0f (GPS|LiDAR|IMU|AI),
+    # Status/Reserved: 0 (byte 25, đã bỏ đo pin),
     # Reserved: 00 00 00 00, CRC16: 00 00
     raw = struct.pack(
         RF_PAYLOAD_FORMAT, b"\xaa\x55", 1, 42, 1000,
         107723450, 1066578900,
         150, 320, 240, 1, 92,
-        0x0f, 126, b"\x00\x00\x00\x00", 0x1234,
+        0x0f, 0, b"\x00\x00\x00\x00", 0x1234,
     )
     hex_str = raw.hex()
     parsed = parse_rf_payload(hex_str)
     assert parsed["sync_valid"] is True
     assert parsed["seq_num"] == 42
-    assert parsed["telemetry"]["battery_pct"] == 100
+    assert parsed["telemetry"]["battery_pct"] is None
     assert parsed["telemetry"]["lidar_range_cm"] == 240
     assert parsed["has_target"] is True
     assert parsed["target"]["class_id"] == 1
@@ -260,7 +261,7 @@ def test_phase3_self_mock_scenarios():
     assert abs(p0["target"]["latitude"] - 16.073852) < 1e-6
     assert abs(p0["target"]["longitude"] - 108.149921) < 1e-6
     assert p0["telemetry"]["lidar_range_cm"] == 250
-    assert p0["telemetry"]["battery_pct"] == 95  # (12.5 - 10.5) / 2.1 * 100 = 95%
+    assert p0["telemetry"]["battery_pct"] is None  # đã bỏ đo pin ở tải
 
     # Scenario 1: Boat WGS-84 (Đà Nẵng)
     raw_lifebuoy = struct.pack(

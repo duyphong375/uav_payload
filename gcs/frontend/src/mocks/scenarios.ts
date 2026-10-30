@@ -1,4 +1,4 @@
-import type { RawTelemetryPacket } from '@/types/telemetry'
+﻿import type { RawTelemetryPacket } from '@/types/telemetry'
 
 export interface MockScenarioConfig {
   id: string
@@ -528,8 +528,8 @@ export const MOCK_SCENARIOS: MockScenarioConfig[] = [
 
   {
     id: 'SENSOR_DEGRADED',
-    name: '9. Cảm Biến Suy Hao (LiDAR & IMU Lỗi)',
-    description: 'Cáp LiDAR lỏng, góc nghiêng IMU vượt ngưỡng cho phép, hạ cờ pos_valid=false.',
+    name: '9. Cảm Biến Suy Hao (Siêu âm & IMU Lỗi)',
+    description: 'Cáp siêu âm lỏng, góc nghiêng IMU vượt ngưỡng cho phép, hạ cờ pos_valid=false.',
     tags: ['Sensor Error', 'Warning'],
     generatePacket: (tick) => ({
       schema_version: '1.0.0',
@@ -567,7 +567,7 @@ export const MOCK_SCENARIOS: MockScenarioConfig[] = [
       alert: {
         level: 'WARN',
         code: 'SENSOR_DEGRADED',
-        message: 'LiDAR ngoài tầm đo và IMU mất hiệu chuẩn. Không thể tính toán tọa độ local.',
+        message: 'Siêu âm ngoài tầm đo và IMU mất hiệu chuẩn. Không thể tính toán tọa độ local.',
       },
       hardware_link: { status: 'CONNECTED', port: 'COM4' },
       diagnostics: {

@@ -74,6 +74,10 @@ docs/hardware/sensors/**/*.pdf
 media/
 review/
 
+# Local redesign and experimental folders
+gcs-redesign/
+frontend_new/
+
 # AI agent rules and workflow tooling (kept local, not published)
 AGENTS.md
 .agents/

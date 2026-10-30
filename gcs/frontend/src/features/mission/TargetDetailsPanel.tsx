@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import {
   BookmarkPlus,
   CheckCircle2,
@@ -14,6 +14,7 @@ import { Panel } from '@/components/shared/Panel'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useMission } from '@/state/MissionProvider'
+import { isAgeStale } from '@/lib/stale'
 
 export const TargetDetailsPanel: React.FC<{ className?: string }> = ({ className = '' }) => {
   const { state, dispatch } = useMission()
@@ -22,10 +23,10 @@ export const TargetDetailsPanel: React.FC<{ className?: string }> = ({ className
   const getTargetIcon = (classNameStr?: string) => {
     switch (classNameStr) {
       case 'person':
-        return <User className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+        return <User className="h-4 w-4 text-[var(--kvc-ok-ink)]" />
       case 'boat':
       case 'lifebuoy':
-        return <LifeBuoy className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />
+        return <LifeBuoy className="h-4 w-4 text-[var(--kvc-accent-ink)]" />
       default:
         return <Target className="h-4 w-4 text-muted-foreground" />
     }
@@ -66,22 +67,23 @@ export const TargetDetailsPanel: React.FC<{ className?: string }> = ({ className
         toast.error('Tọa độ local cục bộ bị thiếu (null), không thể sao chép!')
         return
       }
-      text = `[KVC SAR TARGET] Track #${target.track_id ?? '101'} (${targetType}) | hệ local: X=${target.local_x_cm}cm, Y=${target.local_y_cm}cm | Hệ quy chiếu: LOCAL_GRID (Gốc O 0,0) | Độ tin cậy: ${confStr} (${confStatus}) | Nguồn: ${source_mode} | Thời điểm: ${timeStr}`
+      text = `[KVC SAR TARGET] Track #${target.track_id ?? 'N/A'} (${targetType}) | hệ local: X=${target.local_x_cm}cm, Y=${target.local_y_cm}cm | Hệ quy chiếu: LOCAL_GRID (Gốc O 0,0) | Độ tin cậy: ${confStr} (${confStatus}) | Nguồn: ${source_mode} | Thời điểm: ${timeStr}`
     } else {
       if (target.latitude === null || target.longitude === null) {
         toast.error('Tọa độ WGS-84 mục tiêu bị thiếu (null), không thể sao chép!')
         return
       }
-      text = `[KVC SAR TARGET] Track #${target.track_id ?? '101'} (${targetType}) | Vĩ độ: ${target.latitude.toFixed(6)}° N, Kinh độ: ${target.longitude.toFixed(6)}° E | Hệ quy chiếu: WGS-84 | Độ tin cậy: ${confStr} (${confStatus}) | Nguồn: ${source_mode} | Thời điểm: ${timeStr}`
+      text = `[KVC SAR TARGET] Track #${target.track_id ?? 'N/A'} (${targetType}) | Vĩ độ: ${target.latitude.toFixed(6)}° N, Kinh độ: ${target.longitude.toFixed(6)}° E | Hệ quy chiếu: WGS-84 | Độ tin cậy: ${confStr} (${confStatus}) | Nguồn: ${source_mode} | Thời điểm: ${timeStr}`
     }
 
-    if (is_stale || rx_age_ms > 3000) {
+    if (isAgeStale(rx_age_ms, is_stale)) {
       text += ` [CẢNH BÁO: Dữ liệu cũ ${rx_age_ms}ms]`
     }
 
     try {
       await navigator.clipboard.writeText(text)
-      toast.success(`Đã sao chép tọa độ mục tiêu bàn giao cứu nạn: ${text}`)
+      const frameLabel = target.coordinate_frame === 'LOCAL_GRID' ? 'LOCAL (cm)' : 'WGS-84'
+      toast.success(`Đã sao chép toạ độ ${frameLabel} mục tiêu bàn giao cứu nạn: ${text}`)
     } catch {
       toast.error('Không thể truy cập clipboard của trình duyệt!')
     }
@@ -101,10 +103,10 @@ export const TargetDetailsPanel: React.FC<{ className?: string }> = ({ className
         level: 'INFO',
         source: 'SAR_MISSION',
         code: 'SAR_MARK_EVENT',
-        message: `Đánh dấu sự kiện mục tiêu #${target.track_id ?? 101} [${target.class_name}] tại ${textCoord}`,
+        message: `Đánh dấu sự kiện mục tiêu #${target.track_id ?? 'N/A'} [${target.class_name}] tại ${textCoord}`,
       },
     })
-    toast.success(`Đã đánh dấu sự kiện mục tiêu #${target.track_id ?? 101} vào nhật ký phiên làm việc!`)
+    toast.success(`Đã đánh dấu sự kiện mục tiêu #${target.track_id ?? 'N/A'} vào nhật ký phiên làm việc!`)
   }
 
   const isLocalGrid = target?.coordinate_frame === 'LOCAL_GRID'
@@ -113,16 +115,16 @@ export const TargetDetailsPanel: React.FC<{ className?: string }> = ({ className
     <Panel
       title="Mục tiêu cứu nạn (Target)"
       infoTip="Chi tiết mục tiêu Người gặp nạn hoặc Tàu thuyền phát hiện bởi AI: độ tin cậy, cự ly, góc lệch, tọa độ WGS-84/Local và nút sao chép bàn giao cứu nạn (SAR Handover)."
-      icon={<Crosshair className="h-4 w-4 text-cyan-600 dark:text-cyan-400" />}
+      icon={<Crosshair className="h-4 w-4 text-[var(--kvc-accent-ink)]" />}
       className={`h-auto shrink-0 shadow-xs border-border ${className}`}
       headerRight={
         has_target && target ? (
           <div className="flex items-center gap-1.5">
             <Badge
               variant="outline"
-              className="text-xs px-2 py-0.5 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 font-mono font-bold"
+              className="text-xs px-2 py-0.5 border-[var(--kvc-ok-line)] text-[var(--kvc-ok-ink)] bg-[var(--kvc-ok-bg)] font-mono font-bold"
             >
-              TRACK #{target.track_id ?? '101'}
+              TRACK #{target.track_id ?? 'N/A'}
             </Badge>
             <Badge variant="outline" className="text-xs py-0.5 px-2 font-mono">
               {isLocalGrid ? 'LOCAL_GRID' : 'WGS-84'}
@@ -146,7 +148,7 @@ export const TargetDetailsPanel: React.FC<{ className?: string }> = ({ className
       ) : (
         <div className="flex flex-col gap-3 text-sm">
           {/* 1. Loại đối tượng & Độ tin cậy AI */}
-          <div className="flex items-center justify-between p-2.5 rounded-lg bg-muted/40 border border-border/70">
+          <div className="flex items-center justify-between p-2.5 rounded-kvc-control bg-muted/40 border border-border/70">
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="p-2 rounded-md bg-card border border-border/80 shrink-0">
                 {getTargetIcon(target.class_name)}
@@ -157,17 +159,17 @@ export const TargetDetailsPanel: React.FC<{ className?: string }> = ({ className
                 </span>
                 <span className="text-xs text-muted-foreground font-medium flex items-center gap-1">
                   {target.target_confirmed ? (
-                    <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                    <span className="text-[var(--kvc-ok-ink)] flex items-center gap-1">
                       <CheckCircle2 className="h-3.5 w-3.5" /> Xác nhận liên tục (≥3 frame)
                     </span>
                   ) : (
-                    <span className="text-amber-500">Phát hiện sơ bộ (&lt;3 frame)</span>
+                    <span className="text-[var(--kvc-warn-ink)]">Phát hiện sơ bộ (&lt;3 frame)</span>
                   )}
                 </span>
               </div>
             </div>
             <div className="flex flex-col items-end shrink-0 pl-2">
-              <span className="text-base sm:text-lg font-bold font-mono text-cyan-600 dark:text-cyan-400">
+              <span className="text-base sm:text-lg font-bold font-mono text-[var(--kvc-accent-ink)]">
                 {target.confidence !== null ? `${target.confidence}%` : 'N/A'}
               </span>
               <span className="text-xs text-muted-foreground">Độ tin cậy AI</span>
@@ -175,15 +177,15 @@ export const TargetDetailsPanel: React.FC<{ className?: string }> = ({ className
           </div>
 
           {/* 2. Tọa độ bàn giao cứu nạn (Font 16-18px) */}
-          <div className="p-2.5 rounded-lg bg-card border border-border/80 shadow-2xs flex flex-col gap-2">
+          <div className="p-2.5 rounded-kvc-control bg-card border border-border/80 shadow-2xs flex flex-col gap-2">
             <div className="flex items-center justify-between border-b border-border/50 pb-1.5">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Tọa độ bàn giao cứu nạn
               </span>
               <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground">
                 <Clock className="h-3.5 w-3.5" />
-                <span className={is_stale || rx_age_ms > 3000 ? 'text-amber-500 font-bold' : ''}>
-                  {rx_age_ms}ms {is_stale ? '(STALE)' : ''}
+                <span className={isAgeStale(rx_age_ms, is_stale) ? 'text-[var(--kvc-warn-ink)] font-bold' : ''}>
+                  {rx_age_ms}ms {isAgeStale(rx_age_ms, is_stale) ? '(STALE)' : ''}
                 </span>
               </div>
             </div>
@@ -228,11 +230,21 @@ export const TargetDetailsPanel: React.FC<{ className?: string }> = ({ className
               size="default"
               onClick={handleCopyCoord}
               className="min-h-[36px] h-9 text-xs sm:text-sm font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs cursor-pointer focus-visible:ring-2 focus-visible:ring-primary"
-              title="Sao chép tọa độ mục tiêu định dạng chuẩn cứu nạn"
-              aria-label="Sao chép tọa độ chuẩn SAR"
+              title={
+                target.coordinate_frame === 'LOCAL_GRID'
+                  ? 'Sao chép toạ độ LOCAL (cm) — không phải WGS-84'
+                  : 'Sao chép cặp toạ độ WGS-84'
+              }
+              aria-label={
+                target.coordinate_frame === 'LOCAL_GRID'
+                  ? 'Sao chép Local (cm)'
+                  : 'Sao chép WGS-84'
+              }
             >
               <Copy className="h-4 w-4" />
-              <span>Sao chép SAR</span>
+              <span>
+                {target.coordinate_frame === 'LOCAL_GRID' ? 'Sao chép Local (cm)' : 'Sao chép WGS-84'}
+              </span>
             </Button>
             <Button
               variant="secondary"

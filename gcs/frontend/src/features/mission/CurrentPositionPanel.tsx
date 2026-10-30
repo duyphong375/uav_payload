@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+﻿import React, { useState } from 'react'
 import {
   ArrowDownUp,
   ChevronDown,
@@ -88,8 +88,8 @@ export const CurrentPositionPanel: React.FC<CurrentPositionPanelProps> = ({
     : 'N/A'
 
   const baseContainerClasses = floating
-    ? 'absolute top-3 left-3 z-[400] w-72 sm:w-80 bg-card/95 backdrop-blur-md border border-border/80 rounded-2xl shadow-md p-3 select-none pointer-events-auto transition-all'
-    : 'w-full bg-card border border-border/80 rounded-xl shadow-xs p-3 select-none transition-all'
+    ? 'absolute top-3 left-3 z-[var(--kvc-z-panel)] w-72 sm:w-80 bg-[var(--kvc-surface)]/95 border border-[var(--kvc-line-strong)] rounded-kvc-panel shadow-xs p-3 select-none pointer-events-auto transition-all'
+    : 'w-full bg-card border border-border rounded-kvc-panel shadow-xs p-3 select-none transition-all'
 
   return (
     <div
@@ -99,7 +99,7 @@ export const CurrentPositionPanel: React.FC<CurrentPositionPanelProps> = ({
       {/* 1. Header: Tiêu đề, Badge trạng thái & Nút thu gọn */}
       <div className="flex items-center justify-between gap-2 pb-2 border-b border-border/60">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="p-1.5 rounded-lg bg-primary/10 text-primary border border-primary/20 shrink-0">
+          <div className="p-1.5 rounded-kvc-control bg-primary/10 text-primary border border-primary/20 shrink-0">
             <MapPin className="h-4 w-4" />
           </div>
           <div className="flex flex-col min-w-0">
@@ -107,7 +107,7 @@ export const CurrentPositionPanel: React.FC<CurrentPositionPanelProps> = ({
               <span className="text-sm font-bold tracking-tight text-foreground truncate">
                 Vị trí hiện tại
               </span>
-              <InfoTip text="Tọa độ WGS-84, độ cao thực tế LiDAR mặt nước và hướng la bàn của tải UAV thời gian thực." />
+              <InfoTip text="Tọa độ WGS-84, cự ly siêu âm tới mặt nước và hướng la bàn của tải UAV thời gian thực." />
             </div>
             <span className="text-xs text-muted-foreground truncate">
               Tải nhiệm vụ UAV (Payload)
@@ -120,9 +120,9 @@ export const CurrentPositionPanel: React.FC<CurrentPositionPanelProps> = ({
             variant={coordStatus.variant}
             className={`text-xs font-mono px-2 py-0.5 ${
               coordStatus.label === 'MÔ PHỎNG'
-                ? 'border-purple-500/40 text-purple-600 dark:text-purple-300 bg-purple-500/10'
+                ? 'border-[var(--kvc-mock-line)] text-[var(--kvc-mock-ink)] bg-[var(--kvc-mock-bg)]'
                 : coordStatus.label === 'DỮ LIỆU CŨ'
-                ? 'border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10'
+                ? 'border-[var(--kvc-warn-line)] text-[var(--kvc-warn-ink)] bg-[var(--kvc-warn-bg)]'
                 : ''
             }`}
           >
@@ -165,7 +165,7 @@ export const CurrentPositionPanel: React.FC<CurrentPositionPanelProps> = ({
         /* 3. Dạng mở rộng: Thông tin chi tiết của tải UAV */
         <div className="pt-2 flex flex-col gap-2.5 text-xs">
           {/* Tọa độ WGS-84 Tải UAV (Font 16px) */}
-          <div className="grid grid-cols-2 gap-2 p-2.5 rounded-lg bg-muted/40 border border-border/60 font-mono">
+          <div className="grid grid-cols-2 gap-2 p-2.5 rounded-kvc-control bg-muted/40 border border-border/60 font-mono">
             <div className="flex flex-col min-w-0">
               <span className="text-xs font-sans text-muted-foreground">Vĩ độ (Lat):</span>
               <span className="text-base font-bold text-foreground truncate" title={latDisplay}>
@@ -180,11 +180,11 @@ export const CurrentPositionPanel: React.FC<CurrentPositionPanelProps> = ({
             </div>
           </div>
 
-          {/* Độ cao GNSS & LiDAR & Hướng bay */}
-          <div className="grid grid-cols-3 gap-1.5 p-2 rounded-lg bg-muted/20 border border-border/40 font-mono text-xs">
+          {/* Độ cao GNSS & siêu âm & hướng bay */}
+          <div className="grid grid-cols-3 gap-1.5 p-2 rounded-kvc-control bg-muted/20 border border-border/40 font-mono text-xs">
             <div className="flex flex-col">
               <span className="text-xs text-muted-foreground font-sans flex items-center gap-1">
-                <Mountain className="h-3 w-3 text-emerald-500" /> Alt:
+                <Mountain className="h-3 w-3 text-[var(--kvc-ok-ink)]" /> Alt:
               </span>
               <span className="font-semibold text-foreground">
                 {camera_position.altitude_m != null ? `${camera_position.altitude_m.toFixed(1)}m` : '—'}
@@ -192,7 +192,7 @@ export const CurrentPositionPanel: React.FC<CurrentPositionPanelProps> = ({
             </div>
             <div className="flex flex-col">
               <span className="text-xs text-muted-foreground font-sans flex items-center gap-1">
-                <ArrowDownUp className="h-3 w-3 text-indigo-500" /> LiDAR:
+                <ArrowDownUp className="h-3 w-3 text-[var(--kvc-accent-ink)]" /> Siêu âm:
               </span>
               <span className="font-semibold text-foreground">
                 {telemetry.lidar_range_cm != null ? `${telemetry.lidar_range_cm}cm` : '—'}
@@ -210,11 +210,11 @@ export const CurrentPositionPanel: React.FC<CurrentPositionPanelProps> = ({
 
           {/* Hệ quy chiếu & Độ trễ tín hiệu */}
           <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex items-center justify-between p-2 rounded-lg bg-muted/20 border border-border/30">
+            <div className="flex items-center justify-between p-2 rounded-kvc-control bg-muted/20 border border-border/30">
               <span className="text-xs text-muted-foreground">Hệ quy chiếu:</span>
               <span className="font-mono font-bold text-foreground">WGS-84</span>
             </div>
-            <div className="flex items-center justify-between p-2 rounded-lg bg-muted/20 border border-border/30">
+            <div className="flex items-center justify-between p-2 rounded-kvc-control bg-muted/20 border border-border/30">
               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 Độ trễ tín hiệu:
                 <InfoTip text="Thời gian trôi qua từ gói tin gần nhất của tải UAV: Dưới 1s (Xanh) là trực tiếp, 1-3s (Vàng) là nghẽn sóng, trên 3s (Đỏ) là mất tín hiệu." />
@@ -224,17 +224,17 @@ export const CurrentPositionPanel: React.FC<CurrentPositionPanelProps> = ({
                   rx_age_ms > 3000
                     ? 'text-destructive'
                     : rx_age_ms > 1000
-                    ? 'text-amber-500'
-                    : 'text-emerald-600 dark:text-emerald-400'
+                    ? 'text-[var(--kvc-warn-ink)]'
+                    : 'text-[var(--kvc-ok-ink)]'
                 }`}
               >
                 <span
                   className={`h-2 w-2 rounded-full shrink-0 ${
                     rx_age_ms > 3000
-                      ? 'bg-destructive animate-pulse'
+                      ? 'bg-destructive '
                       : rx_age_ms > 1000
-                      ? 'bg-amber-500'
-                      : 'bg-emerald-500'
+                      ? 'bg-[var(--kvc-warn)]'
+                      : 'bg-[var(--kvc-ok)]'
                   }`}
                 />
                 {rx_age_ms > 3000 ? `${(rx_age_ms / 1000).toFixed(1)}s (Mất tín hiệu)` : `${rx_age_ms} ms`}
@@ -243,9 +243,9 @@ export const CurrentPositionPanel: React.FC<CurrentPositionPanelProps> = ({
           </div>
 
           {/* Khóa vệ tinh & Chi tiết GNSS */}
-          <div className="flex items-center justify-between p-2 rounded-lg bg-cyan-500/5 border border-cyan-500/20 text-xs">
+          <div className="flex items-center justify-between p-2 rounded-kvc-control bg-[var(--kvc-accent)]/5 border border-[var(--kvc-accent-line)] text-xs">
             <div className="flex items-center gap-1.5">
-              <Radio className="h-3.5 w-3.5 text-cyan-600 dark:text-cyan-400" />
+              <Radio className="h-3.5 w-3.5 text-[var(--kvc-accent-ink)]" />
               <span className="text-muted-foreground">Khóa vệ tinh GNSS:</span>
               <span className="font-mono font-bold text-foreground">
                 {hasGpsFix ? 'Số vệ tinh / HDOP: N/A' : 'Mất khóa GNSS'}
@@ -254,7 +254,7 @@ export const CurrentPositionPanel: React.FC<CurrentPositionPanelProps> = ({
             <button
               type="button"
               onClick={() => window.dispatchEvent(new CustomEvent('kvc-open-satellite-sheet'))}
-              className="text-xs font-semibold text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer"
+              className="text-xs font-semibold text-[var(--kvc-accent-ink)] hover:underline cursor-pointer"
             >
               Chi tiết &rarr;
             </button>
@@ -263,12 +263,12 @@ export const CurrentPositionPanel: React.FC<CurrentPositionPanelProps> = ({
           {/* Cảnh báo lý do cụ thể khi tọa độ không hoàn hảo */}
           {(!hasGpsFix || is_stale || source_mode === 'MOCK') && (
             <div
-              className={`flex items-start gap-1.5 p-2 rounded-lg text-xs leading-snug border ${
+              className={`flex items-start gap-1.5 p-2 rounded-kvc-control text-xs leading-snug border ${
                 !hasGpsFix
                   ? 'bg-destructive/10 border-destructive/30 text-destructive'
                   : is_stale
-                  ? 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300'
-                  : 'bg-purple-500/10 border-purple-500/30 text-purple-700 dark:text-purple-300'
+                  ? 'bg-[var(--kvc-warn-bg)] border-[var(--kvc-warn-line)] text-[var(--kvc-warn-ink)]'
+                  : 'bg-[var(--kvc-mock-bg)] border-[var(--kvc-mock-line)] text-[var(--kvc-mock-ink)]'
               }`}
             >
               <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />

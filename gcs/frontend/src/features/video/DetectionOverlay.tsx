@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import type { BoundingBox } from '@/types/telemetry'
 
 interface DetectionOverlayProps {
@@ -40,18 +40,18 @@ export const DetectionOverlay: React.FC<DetectionOverlayProps> = ({
               width: widthPct,
               height: heightPct,
             }}
-            className="absolute border-2 border-emerald-400 bg-emerald-500/10 shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all duration-150"
+            className="absolute border-2 border-[var(--kvc-ok)] bg-[var(--kvc-ok-bg)] shadow-[0_0_8px_rgba(16,185,129,0.3)] transition-all duration-150"
           >
             {/* Nhãn đối tượng phía trên góc trái box */}
-            <div className="absolute -top-6 left-0 bg-emerald-600 text-white text-[11px] font-mono px-1.5 py-0.5 rounded-t whitespace-nowrap shadow flex items-center gap-1">
+            <div className="absolute -top-6 left-0 bg-[var(--kvc-ok-fill)] text-[var(--kvc-text-on-fill)] text-[11px] font-mono px-1.5 py-0.5 rounded-t whitespace-nowrap shadow flex items-center gap-1">
               <span>{box.label}</span>
               <span className="font-bold opacity-90">{box.confidence}%</span>
             </div>
             {/* 4 góc nhọn định vị target (Corner brackets) */}
-            <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-emerald-300" />
-            <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-emerald-300" />
-            <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-emerald-300" />
-            <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-emerald-300" />
+            <div className="absolute top-0 left-0 w-2 h-2 border-t-2 border-l-2 border-[var(--kvc-ok-line)]" />
+            <div className="absolute top-0 right-0 w-2 h-2 border-t-2 border-r-2 border-[var(--kvc-ok-line)]" />
+            <div className="absolute bottom-0 left-0 w-2 h-2 border-b-2 border-l-2 border-[var(--kvc-ok-line)]" />
+            <div className="absolute bottom-0 right-0 w-2 h-2 border-b-2 border-r-2 border-[var(--kvc-ok-line)]" />
           </div>
         )
       })}

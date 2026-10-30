@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import {
   Select,
   SelectContent,
@@ -24,7 +24,7 @@ export const AlertFilters: React.FC<AlertFiltersProps> = ({
   onChange,
 }) => {
   return (
-    <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-lg border border-border bg-card text-xs">
+    <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-kvc-control border border-border bg-card text-xs">
       {/* 1. Lọc Mức Độ */}
       <div className="flex items-center gap-1.5">
         <span className="text-muted-foreground font-medium">Mức độ:</span>
@@ -82,7 +82,7 @@ export const AlertFilters: React.FC<AlertFiltersProps> = ({
             <SelectItem value="GPS">GNSS / GPS</SelectItem>
             <SelectItem value="VIDEO">Video Stream</SelectItem>
             <SelectItem value="TELEMETRY">Telemetry / RF</SelectItem>
-            <SelectItem value="SENSORS">Cảm biến / Pin</SelectItem>
+            <SelectItem value="SENSORS">Cảm biến</SelectItem>
             <SelectItem value="STORAGE">Thẻ nhớ / Ghi log</SelectItem>
             <SelectItem value="SYSTEM">Hệ thống chung</SelectItem>
           </SelectContent>

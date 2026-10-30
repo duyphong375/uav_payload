@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+﻿import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { MissionProvider } from '@/state/MissionProvider'
@@ -23,8 +23,9 @@ describe('MissionPage - Giám sát định vị tải nhiệm vụ UAV', () => {
     // 1. Tiêu đề và nhãn bắt buộc
     expect(screen.getByText('Giám sát định vị tải nhiệm vụ')).toBeDefined()
     expect(screen.getByText(/Nguồn: MOCK/i)).toBeDefined()
-    expect(screen.getAllByText('MẤT KẾT NỐI').length).toBeGreaterThan(0)
-    // ReplayControls đã được chuyển hoàn toàn sang /history theo yêu cầu người dùng
+    // MOCK LOCAL không có WebSocket theo thiết kế → không được báo "MẤT KẾT NỐI"
+    expect(screen.queryByText('MẤT KẾT NỐI')).toBeNull()
+    // Không còn vùng điều khiển phát lại nào trên trang tác chiến
     expect(screen.queryByRole('region', { name: 'Điều khiển phát lại' })).toBeNull()
 
     // 2. Nút "Đặt lại khung nhìn" có mặt
@@ -69,7 +70,7 @@ describe('MissionPage - Giám sát định vị tải nhiệm vụ UAV', () => {
     expect(screen.getByText('UAV:')).toBeDefined()
     expect(screen.getByText('Target:')).toBeDefined()
     expect(screen.getByText('Alt:')).toBeDefined()
-    expect(screen.getByText('LiDAR:')).toBeDefined()
+    expect(screen.getByText('Siêu âm:')).toBeDefined()
     expect(screen.getByText('LoRa:')).toBeDefined()
     expect(screen.getByText('Trễ:')).toBeDefined()
   })
@@ -86,7 +87,7 @@ describe('MissionPage - Giám sát định vị tải nhiệm vụ UAV', () => {
     )
 
     // Kiểm tra có các nút chuyển đổi khung nhìn
-    const radarBtn = screen.getByRole('button', { name: /Xem Radar Sa Bàn/i })
+    const radarBtn = screen.getByRole('button', { name: /Xem Radar Local/i })
     expect(radarBtn).toBeDefined()
 
     const mapBtn = screen.getByRole('button', { name: /Xem Bản đồ WGS-84/i })
@@ -187,7 +188,7 @@ describe('MissionPage - Giám sát định vị tải nhiệm vụ UAV', () => {
     )
 
     expect(screen.getByText('Mục tiêu cứu nạn (Target)')).toBeDefined()
-    expect(screen.getByRole('button', { name: /Sao chép tọa độ chuẩn SAR/i })).toBeDefined()
+    expect(screen.getByRole('button', { name: /Sao chép WGS-84/i })).toBeDefined()
 
     const bookmarkBtn = screen.getByRole('button', { name: /Đánh dấu sự kiện mục tiêu/i })
     expect(bookmarkBtn).toBeDefined()

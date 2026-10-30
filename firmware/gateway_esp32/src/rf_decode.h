@@ -35,9 +35,10 @@ constexpr uint8_t kRfSync1 = 0x55U;
 constexpr uint8_t kMsgIdTelemetry = 0x01U;
 constexpr uint8_t kMsgIdHeartbeat = 0x02U;
 
-/* CRC-16/CCITT-FALSE của golden vector GV-01 (IF-02 mục 3), dùng chung với
- * firmware MCU và parser Python. */
-constexpr uint16_t kGoldenGv01Crc16 = 0x304EU;
+/* CRC-16/CCITT-FALSE của golden vector GV-02 (IF-02 mục 3), dùng chung với
+ * firmware MCU và parser Python. GV-02 thay GV-01 sau khi KVC bỏ đo pin
+ * (byte 25 status_reserved = 0). */
+constexpr uint16_t kGoldenGv02Crc16 = 0xE260U;
 
 /**
  * @brief Gói telemetry 32 byte Little-Endian nhận từ UAV.
@@ -61,7 +62,7 @@ struct __attribute__((packed)) RfTelemetryPacket32 {
   uint8_t class_id;     // Byte 22
   uint8_t confidence;   // Byte 23
   uint8_t sensor_flags; // Byte 24
-  uint8_t battery_raw;  // Byte 25
+  uint8_t status_reserved; // Byte 25 (trước là battery_raw; bỏ đo pin)
   uint8_t reserved[4];  // Byte 26..29
   uint16_t crc16;       // Byte 30..31
 };
@@ -89,8 +90,8 @@ static_assert(offsetof(RfTelemetryPacket32, confidence) == 23,
               "IF-02: confidence @23");
 static_assert(offsetof(RfTelemetryPacket32, sensor_flags) == 24,
               "IF-02: sensor_flags @24");
-static_assert(offsetof(RfTelemetryPacket32, battery_raw) == 25,
-              "IF-02: battery_raw @25");
+static_assert(offsetof(RfTelemetryPacket32, status_reserved) == 25,
+              "IF-02: status_reserved @25");
 static_assert(offsetof(RfTelemetryPacket32, reserved) == 26,
               "IF-02: reserved @26");
 static_assert(offsetof(RfTelemetryPacket32, crc16) == 30, "IF-02: crc16 @30");
@@ -128,13 +129,13 @@ bool bytesToHexString(const uint8_t *data, size_t length, char *output,
                       size_t outputSize);
 
 /**
- * @brief Kiểm tra gói có khớp golden vector GV-01 của IF-02 hay không.
+ * @brief Kiểm tra gói có khớp golden vector GV-02 của IF-02 hay không.
  *        Dùng để phát hiện lệch ABI giữa MCU, Gateway và parser Python.
  *
  * @param pkt Gói cần kiểm tra; NULL trả về false.
- * @return true nếu mọi trường và CRC khớp GV-01.
+ * @return true nếu mọi trường và CRC khớp GV-02.
  */
-bool matchesGoldenGv01(const RfTelemetryPacket32 *pkt);
+bool matchesGoldenGv02(const RfTelemetryPacket32 *pkt);
 
 } // namespace kvc
 

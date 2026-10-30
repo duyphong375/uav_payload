@@ -1115,7 +1115,7 @@ static void kvc_m1_dump_rx_stats(void) {
 
 /* KVC-FIX-ABI-20261025-001: tự kiểm ABI IF-02 ngay trên MCU.
  *
- * Dựng lại đúng golden vector GV-01 bằng struct thật trong kvc_telemetry.h,
+ * Dựng lại đúng golden vector GV-02 bằng struct thật trong kvc_telemetry.h,
  * tính CRC-16/CCITT-FALSE trên 30 byte đầu rồi so với hằng số đã pin.
  * Mục đích: nếu ai sửa struct/thứ tự field/CRC coverage mà không cập nhật
  * IF-02 + Gateway + parser Python, log UART5 sẽ báo FAIL ngay khi boot
@@ -1148,17 +1148,17 @@ static void kvc_m1_dump_abi_selfcheck(void) {
     pkt.class_id       = KVC_CLASS_ID_PERSON;
     pkt.confidence     = 92U;
     pkt.sensor_flags   = 0x0FU;
-    pkt.battery_raw    = 126U;
+    pkt.status_reserved = 0U;
     kvc_finalize_telemetry_packet(&pkt);
     crc = pkt.crc16;
 
-    kvc_m1_buf_puts("ABI GV-01 SIZE=");
+    kvc_m1_buf_puts("ABI GV-02 SIZE=");
     kvc_m1_buf_dec32((uint32_t)sizeof(KvcTelemetryPacket32));
     kvc_m1_buf_puts(" CRC=");
     kvc_m1_buf_hex32((uint32_t)crc);
     kvc_m1_buf_puts(" EXPECT=");
-    kvc_m1_buf_hex32((uint32_t)KVC_GOLDEN_GV01_CRC16);
-    kvc_m1_buf_puts(kvc_telemetry_match_golden_gv01(&pkt) ? " PASS"
+    kvc_m1_buf_hex32((uint32_t)KVC_GOLDEN_GV02_CRC16);
+    kvc_m1_buf_puts(kvc_telemetry_match_golden_gv02(&pkt) ? " PASS"
                                                           : " FAIL");
 }
 #endif /* KVC_M1_CLOCK_DIAG || KVC_M2_RX_STATS_DIAG */
@@ -1742,12 +1742,10 @@ int main(void) {
     pkt.class_id       = KVC_CLASS_ID_NONE;
     pkt.confidence     = 0;
     pkt.sensor_flags   = 0;
-    /* FIX (Codex F5): trước đây battery_raw luôn = 126 (12.6 V) nên GCS hiển thị
-     * pin 100% như dữ liệu thật. Hiện KHÔNG có ADC đo pin trong firmware, nên
-     * phát 0 = "chưa đo" thay vì bịa giá trị đầy pin.
-     * GIỚI HẠN: backend hiện map battery_raw = 0 thành 0% chứ chưa có cờ riêng
-     * cho "không đo"; muốn phân biệt cần thêm cờ trong ABI (task riêng). */
-    pkt.battery_raw    = 0;
+    /* KVC bỏ hẳn phép đo pin: byte 25 là status_reserved, luôn ghi 0.
+     * Trước đây (Codex F5) byte này = 0 với nghĩa "chưa đo" vì không có ADC;
+     * nay ngữ nghĩa đó bị bỏ khỏi ABI nên phía nhận không suy ra % nữa. */
+    pkt.status_reserved = 0;
 
     uint8_t seq = 1;
 

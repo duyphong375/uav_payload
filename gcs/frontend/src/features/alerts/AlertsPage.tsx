@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+﻿import React, { useMemo, useState } from 'react'
 import {
   AlertCircle,
   AlertTriangle,
@@ -71,7 +71,7 @@ export const AlertsPage: React.FC = () => {
       <PageHeader
         breadcrumb="Dữ liệu · Cảnh báo hệ thống"
         title="Trung tâm cảnh báo kỹ thuật"
-        infoTip="Hệ thống giám sát và quản lý toàn bộ cảnh báo về mức pin tải, ngắt kết nối LoRa/Wi-Fi, độ lệch cảm biến LiDAR và khóa vệ tinh GNSS."
+        infoTip="Hệ thống giám sát và quản lý toàn bộ cảnh báo về ngắt kết nối LoRa/Wi-Fi, độ lệch cảm biến siêu âm và khóa vệ tinh GNSS."
         subtitle="Tiếp nhận, phân loại và xử lý các sự cố an toàn tải nhiệm vụ, cảm biến và kênh truyền."
         badge={
           <Badge
@@ -119,7 +119,7 @@ export const AlertsPage: React.FC = () => {
                 {activeAlerts.length}
               </span>
             </div>
-            <div className="p-2.5 rounded-xl bg-primary/10 border border-primary/20 text-primary">
+            <div className="p-2.5 rounded-kvc-panel bg-primary/10 border border-primary/20 text-primary">
               <Bell className="h-5 w-5" />
             </div>
           </CardContent>
@@ -133,13 +133,13 @@ export const AlertsPage: React.FC = () => {
               </span>
               <span
                 className={`text-2xl font-bold font-mono mt-0.5 ${
-                  unackCount > 0 ? 'text-amber-500' : 'text-foreground'
+                  unackCount > 0 ? 'text-[var(--kvc-warn-ink)]' : 'text-foreground'
                 }`}
               >
                 {unackCount}
               </span>
             </div>
-            <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500">
+            <div className="p-2.5 rounded-kvc-panel bg-[var(--kvc-warn-bg)] border border-[var(--kvc-warn-line)] text-[var(--kvc-warn-ink)]">
               <AlertTriangle className="h-5 w-5" />
             </div>
           </CardContent>
@@ -153,13 +153,13 @@ export const AlertsPage: React.FC = () => {
               </span>
               <span
                 className={`text-2xl font-bold font-mono mt-0.5 ${
-                  criticalCount > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-foreground'
+                  criticalCount > 0 ? 'text-[var(--kvc-crit-ink)]' : 'text-foreground'
                 }`}
               >
                 {criticalCount}
               </span>
             </div>
-            <div className="p-2.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500">
+            <div className="p-2.5 rounded-kvc-panel bg-[var(--kvc-crit-bg)] border border-[var(--kvc-crit-line)] text-[var(--kvc-crit-ink)]">
               <AlertCircle className="h-5 w-5" />
             </div>
           </CardContent>
@@ -170,10 +170,10 @@ export const AlertsPage: React.FC = () => {
       <AlertFilters filters={filters} onChange={setFilters} />
 
       {/* 4. Danh Sách Cảnh Báo */}
-      <div className="flex flex-col gap-2.5 flex-1 pb-6">
+      <div className="flex flex-col gap-2.5 flex-1 pb-6" aria-live="polite" aria-atomic="false">
         {activeAlerts.length === 0 ? (
-          <div className="py-12 border border-border rounded-2xl bg-card text-center flex flex-col items-center justify-center gap-2 shadow-xs">
-            <ShieldCheck className="h-10 w-10 stroke-[1.5] text-emerald-500" />
+          <div className="py-12 border border-border rounded-kvc-panel bg-card text-center flex flex-col items-center justify-center gap-2 shadow-xs">
+            <ShieldCheck className="h-10 w-10 stroke-[1.5] text-[var(--kvc-ok-ink)]" />
             <span className="text-sm font-semibold text-foreground">
               Không có sự cố hoặc cảnh báo nào đang mở
             </span>
@@ -182,7 +182,7 @@ export const AlertsPage: React.FC = () => {
             </span>
           </div>
         ) : filteredAlerts.length === 0 ? (
-          <div className="py-12 border border-border rounded-2xl bg-card text-center flex flex-col items-center justify-center gap-2 shadow-xs">
+          <div className="py-12 border border-border rounded-kvc-panel bg-card text-center flex flex-col items-center justify-center gap-2 shadow-xs">
             <FilterX className="h-10 w-10 stroke-[1.5] text-muted-foreground/50" />
             <span className="text-sm font-semibold text-foreground">
               Không tìm thấy cảnh báo phù hợp với bộ lọc

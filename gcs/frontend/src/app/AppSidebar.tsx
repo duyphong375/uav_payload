@@ -1,4 +1,4 @@
-import React from 'react'
+﻿import React from 'react'
 import {
   Bell,
   ChevronLeft,
@@ -103,21 +103,17 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
     }
   }
 
-  // Thu gọn session_id
-  const displaySessionId = state.session_id.length > 14
-    ? `${state.session_id.slice(0, 12)}...`
-    : state.session_id
-
   return (
     <aside
       className={`h-full flex flex-col bg-card border-r border-border transition-all duration-200 select-none ${
         collapsed ? 'w-16' : 'w-[220px]'
       }`}
+      aria-label="Điều hướng chính"
     >
       {/* 1. Header Sidebar: Logo & Tên dự án */}
       <div className="h-14 flex items-center px-3.5 border-b border-border/60 shrink-0 justify-between">
         <div className="flex items-center gap-2.5 overflow-hidden">
-          <div className="h-8 w-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
+          <div className="h-8 w-8 rounded-kvc-control bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0">
             <ShieldAlert className="h-4 w-4 text-primary" />
           </div>
           {!collapsed && (
@@ -125,7 +121,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
               <span className="text-xs font-bold tracking-tight text-foreground truncate">
                 KVC · GCS
               </span>
-              <span className="text-[10px] text-muted-foreground truncate font-mono">
+              <span className="text-[11px] text-muted-foreground truncate font-mono">
                 Payload Monitor
               </span>
             </div>
@@ -138,7 +134,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         {navGroups.map((group) => (
           <div key={group.group} className="flex flex-col gap-1">
             {!collapsed && (
-              <span className="px-2.5 text-[10px] font-semibold tracking-wider text-muted-foreground/80 uppercase">
+              <span className="px-2.5 text-[11px] font-semibold tracking-wider text-muted-foreground/80 uppercase">
                 {group.group}
               </span>
             )}
@@ -149,7 +145,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                   <button
                     type="button"
                     onClick={() => handleNavigate(item.path)}
-                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs font-medium transition-colors relative ${
+                    aria-current={isActive ? 'page' : undefined}
+                    aria-label={collapsed ? item.title : undefined}
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-kvc-control text-xs font-medium transition-colors relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                       isActive
                         ? 'bg-primary/10 text-primary dark:bg-primary/20 font-semibold shadow-xs'
                         : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
@@ -169,7 +167,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                     {item.badgeCount !== undefined && item.badgeCount > 0 && (
                       <Badge
                         variant="destructive"
-                        className={`h-4 min-w-4 px-1 text-[10px] font-mono leading-none rounded-full flex items-center justify-center ${
+                        className={`h-4 min-w-4 px-1 text-[11px] font-mono leading-none rounded-full flex items-center justify-center ${
                           collapsed ? 'absolute -top-1 -right-1' : ''
                         }`}
                       >
@@ -186,7 +184,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
                       <TooltipContent side="right" className="text-xs font-medium">
                         {item.title}
                         {item.badgeCount !== undefined && item.badgeCount > 0 && (
-                          <span className="ml-1.5 text-red-400">({item.badgeCount})</span>
+                          <span className="ml-1.5 text-[var(--kvc-crit-ink)]">({item.badgeCount})</span>
                         )}
                       </TooltipContent>
                     </Tooltip>
@@ -200,50 +198,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         ))}
       </div>
 
-      {/* 3. Footer Sidebar: Nguồn dữ liệu, Phiên & Nút Thu Gọn */}
+      {/* 3. Footer Sidebar: chỉ còn nút thu gọn.
+          Nguồn dữ liệu và mã phiên đã hiển thị duy nhất ở AppHeader. */}
       <div className="p-2.5 border-t border-border/60 bg-muted/15 flex flex-col gap-2 shrink-0">
-        {!collapsed ? (
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">
-                Nguồn dữ liệu
-              </span>
-              <Badge
-                variant="outline"
-                className={`text-[10px] px-1.5 py-0 font-mono ${
-                  state.source_mode === 'MOCK'
-                    ? 'border-purple-500/40 text-purple-600 dark:text-purple-300 bg-purple-500/10'
-                    : state.source_mode === 'REPLAY'
-                    ? 'border-cyan-500/40 text-cyan-600 dark:text-cyan-300 bg-cyan-500/10'
-                    : state.hardware_link.status === 'CONNECTED'
-                    ? 'bg-emerald-600 text-white border-transparent'
-                    : 'border-rose-500/50 text-rose-600 dark:text-rose-400 bg-rose-500/10'
-                }`}
-              >
-                {state.source_mode === 'REAL' && state.hardware_link.status !== 'CONNECTED'
-                  ? 'REAL (CHƯA INGRESS)'
-                  : state.source_mode}
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono">
-              <span className="text-[10px] text-muted-foreground">Phiên:</span>
-              <span className="truncate max-w-[120px]" title={state.session_id}>
-                {displaySessionId}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-1">
-            <Badge
-              variant="outline"
-              className="text-[9px] px-1 py-0 font-mono text-muted-foreground"
-              title={`Nguồn: ${state.source_mode}`}
-            >
-              {state.source_mode.slice(0, 1)}
-            </Badge>
-          </div>
-        )}
-
         {/* Nút Thu gọn / Mở rộng */}
         <Button
           variant="ghost"

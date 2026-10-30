@@ -1,4 +1,4 @@
-import React, { useRef } from 'react'
+﻿import React, { useRef } from 'react'
 import type L from 'leaflet'
 import { Compass, LocateFixed } from 'lucide-react'
 import { Panel } from '@/components/shared/Panel'
@@ -120,8 +120,8 @@ export const GpsMapPanel: React.FC<GpsMapPanelProps> = ({
         <div className="flex items-center gap-2">
           {/* Trạng thái kết nối GNSS / Kênh truyền */}
           <StatusBadge
-            label={ws_connected ? (hasGpsFix ? (is_stale ? 'GPS CŨ' : 'GNSS: 3D FIX') : 'MẤT GNSS FIX') : 'MẤT KẾT NỐI'}
-            variant={ws_connected && hasGpsFix ? (is_stale ? 'amber' : 'emerald') : 'red'}
+            label={ws_connected && hasGpsFix ? (is_stale ? 'GNSS CHẬM' : 'GNSS 3D FIX') : 'GNSS NO FIX'}
+            variant={ws_connected && hasGpsFix ? (is_stale ? 'warn' : 'ok') : 'crit'}
           />
 
           {/* Nút Đặt lại khung nhìn */}

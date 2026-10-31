@@ -55,6 +55,7 @@ $tests = @(
     @{ name="tb_upsample_nearest";  srcs=@("KVC_PR\src\processing\upsample_nearest.v") },
     @{ name="tb_residual_add_int8"; srcs=@("KVC_PR\src\processing\residual_add_int8.v") },
     @{ name="tb_sppf_block";        srcs=@("KVC_PR\src\processing\sppf_block.v","KVC_PR\src\processing\maxpool2d.v") },
+    @{ name="tb_line_buffer_mc";    srcs=@("KVC_PR\src\line_buffer_mc.v") },
     @{ name="tb_async_fifo_cdc";    srcs=@("KVC_PR\src\async_fifo_cdc.v") },
     @{ name="tb_yolo_nms";          srcs=@("KVC_PR\src\yolo_nms.v") },
     @{ name="tb_kvc_top_demo";      srcs=@(

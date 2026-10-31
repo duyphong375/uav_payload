@@ -394,10 +394,47 @@ Mỗi TB **phải `$fatal` khi fail**.
 | `tb_upsample_nearest` | SF=2, SF=2 (C2), SF=4 | **PASS 3/3** |
 | `tb_residual_add_int8` | **Quét toàn bộ 65.536 tổ hợp** | **PASS 65536/65536** |
 | `tb_sppf_block` | 3 maxpool + concat 4 nhánh | **PASS 64/64** |
+| `tb_line_buffer_mc` | Line buffer 3 dòng đa kênh, window packed 27 byte | **PASS 5/5** |
 
-**Chạy toàn bộ:** `pwsh scripts/run_fpga_tb.ps1` → **14 PASS, 0 FAIL, exit 0**.
+**Chạy toàn bộ:** `pwsh scripts/run_fpga_tb.ps1` → **15 PASS, 0 FAIL, exit 0**.
 
 **Chưa có TB cho:** `spi_flash_wrapper` (E-05 đã sửa nhưng chưa verify bằng simulation — cần mô hình SPI flash slave).
+
+### Line buffer đa kênh (mới, 31/10/2026)
+
+`src/line_buffer_mc.v` thay `line_buffer_3x3.v`:
+
+| | `line_buffer_3x3` (cũ) | `line_buffer_mc` (mới) |
+| :--- | :--- | :--- |
+| Kênh | 1 | C (tham số) |
+| Output | 9 port `win_00..win_22` | `win_data [(K*K*C*8)-1:0]` packed |
+| Kích thước | `3 × W` byte | `3 × W × C` byte |
+| Khớp engine | ❌ (engine cần packed) | ✅ |
+
+**Kiểm tra BSRAM** với W=160, K=3:
+
+| C | Line buffer | % BSRAM 103,5 KiB |
+| ---: | ---: | ---: |
+| 16 | 7,5 KiB | 7 % |
+| 64 | 30 KiB | 29 % |
+| 128 | 60 KiB | 58 % |
+| 256 | 120 KiB | **116 % ❌** |
+
+Từ `conv_layer_map.csv`, `(w × C)` lớn nhất (bỏ DFL) là **20.480** tại lớp 44 (w=80, C=256) → line buffer **60 KiB**, vừa BSRAM. Chỉ lớp 87 (DFL, w=8400) vượt, nhưng DFL bị loại trong C-b.
+
+### Việc chưa làm được: top-level tích hợp
+
+Đã thử viết `kvc_yolo_top_v2.v` (đã xoá, không commit) và **không hội tụ**:
+
+| Vấn đề | Chi tiết |
+| :--- | :--- |
+| Engine kẹt ở `ST_MAC` | Không nhận đủ `weight_rvalid && bias_rvalid && mult_rvalid` |
+| Nguyên nhân nghi ngờ | `spi_flash_wrapper` cần **4 lần `spi_int`** (4 byte/word) trước khi trả `rvalid`; stub SPI trong mô phỏng không tái hiện được |
+| Đã thử | 4 hướng sửa `win_valid` (combinational từ state, win_pending 2 bước, trễ win_ready, mô hình SPI đơn giản) — đều thất bại |
+
+**Kết luận:** tích hợp top-level cần mô hình SPI flash slave đầy đủ, không thể làm nhanh. Spec đã có tại `KVC_YOLO_TOP_REWRITE_SPEC.md`.
+
+**Trạng thái dự án:** 6 toán tử + engine + weights + bảng lớp đã verify; top-level chưa. Bitstream hiện tại (`kvc_top_demo`) chạy camera → mock bbox → UART, **không có CNN**.
 
 ### Kết quả verify toán tử (C-b, 31/10/2026)
 

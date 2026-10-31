@@ -224,15 +224,45 @@ Cần **4–8 MAC/cycle**. Các cách:
 | E-09 | `sum_acc` không reset khi sang pixel mới | Sửa cùng E-08 (`sum_acc <= 0` ở cả hai nhánh) |
 | E-10 | `win_vec` chỉ rộng 8 byte trong TB ban đầu | TB của tôi, không phải RTL — đã sửa `[63:0]` → `[215:0]` |
 
-### Kết quả verify (P3, 31/10/2026)
+### Kết quả verify (P3/P4, 31/10/2026)
 
 **Golden độc lập** sinh bởi `tools/gen_conv0_golden.py` (Python, không dùng RTL):
 - Seed `20261031`, config 3×3×3 → 16 out, 8×8 pixel, pad 1, stride 1, shift 31
 - `tb_conv0_golden` **PASS 1026/1026, 0 FAIL**, `win_pulse=64` (= 8×8 pixel)
 
-Đây là test **đầu tiên** trong repo chứng minh engine đúng số học, vì `verification/data/` trước đó **hoàn toàn rỗng** (không có golden nào trong git history).
+**Weights thật từ YOLO11n** (`tools/gen_conv0_real.py` đọc ONNX):
+- Nguồn: `yolo11n_2class_best.onnx`, tensor `model.0.conv.weight` `[16,3,3,3]` + `model.0.conv.bias` `[16]`
+- Per-output-channel symmetric INT8, `input_scale = 1/255`
+- `bias.hex` = `[4, 1, 4, 13, ...]`, `quant.hex` shift 41–42, mult 0.59–0.99 × 2^31
+- `tb_conv0_real` **PASS 1026/1026, 0 FAIL**, `win_pulse=64`
 
-**Còn mở:** `verification/data/conv0_golden/` là dữ liệu **tổng hợp** (`SYNTHETIC_ONLY`), không phải conv0 thật của YOLO11n. Chưa chứng minh engine đúng với weights thật.
+Đây là test **đầu tiên** trong repo chứng minh engine đúng số học **với dữ liệu model thật**, vì `verification/data/` trước đó **hoàn toàn rỗng**.
+
+**Giới hạn cần ghi rõ:**
+
+| Hạng mục | Trạng thái |
+| :--- | :--- |
+| Weights nguồn | ✅ Thật, từ ONNX YOLO11n |
+| Activation test | ⚠️ Sinh giả lập `[-64, 64]`, **không phải ảnh thật** |
+| `output_scale` | ⚠️ **Giả định** `input_scale × 128.5`, **chưa calibration** |
+| Resolution | ONNX là 640×640, nhưng conv0 `[16,3,3,3]` độc lập resolution — dùng được cho 160 |
+| Độ chính xác model | ❌ Không đánh giá được từ test này; cần calibration set thật |
+
+**Không được kết luận:** test này chứng minh **số học engine đúng**, không chứng minh **model chính xác** hay **INT8 không mất mAP**.
+
+### Công thức quant đúng (ghi để tránh lặp lỗi)
+
+```
+out_q = clamp( round_ties_even( (acc * mult_q31) >> shift ) + bias_q , -128, 127 )
+
+Trong đó:
+  weight_q  = round(w_fp / w_scale)            w_scale = max|w_fp| / 127  (per-channel)
+  bias_q    = round(bias_fp / out_scale)        ← CHIA CHO out_scale
+  mult_q31  = round( (input_scale * w_scale / out_scale) × 2^(31-e) )
+  shift     = 31 - e,  e chọn để mult ∈ [2^30, 2^31)
+```
+
+**Lỗi đã mắc và sửa ở P4:** ban đầu đặt `bias_q = bias_fp / (input_scale × w_scale)`. Sai vì `bias` được cộng **sau** requant (đơn vị output), không phải trước (đơn vị accumulator). Kết quả: `bias_q` lớn gấp ~128 lần → 896/1024 output bão hoà về 127.
 
 ### 7.1 Bảng tra lỗi
 

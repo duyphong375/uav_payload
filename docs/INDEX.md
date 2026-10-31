@@ -36,7 +36,7 @@ Một tài liệu `ACTIVE` + `DESIGN` nghĩa là nội dung đang có hiệu l�
 |---|---|---|---|---|---|---|---|
 | HW-MCU-001 | SONiX SN34F788 | `hardware/mcu/CHIP_SONIX_SN34F788_MCU.md` | ACTIVE | SOURCE-VERIFIED | Phong | 2026-10-25 | `firmware/mcu_payload/project_keil/` |
 | HW-FPGA-001 | OneKiwi Primer 20K (GW2A) | `hardware/fpga/CHIP_ONEKIWI_20K_GOWIN_GW2A.md` | ACTIVE | SOURCE-VERIFIED | Vững | 2026-10-31 | `KVC_PR/src/KVC_FPGA.cst` |
-| HW-FPGA-002 | FPGA CNN Engine (YOLO11n INT8) | `hardware/fpga/FPGA_CNN_ENGINE.md` | DRAFT | **SIMULATED** (31/10/2026): golden độc lập PASS 1026/1026; E-01/E-02/E-08/E-09 FIXED; E-03/E-04/E-05/E-07 mở | Vững | 2026-10-31 | `KVC_PR/src/conv_engine_dynamic_fsm.v`, `KVC_PR/verification/tb/tb_conv0_golden.v`, `KVC_PR/tools/gen_conv0_golden.py` |
+| HW-FPGA-002 | FPGA CNN Engine (YOLO11n INT8) | `hardware/fpga/FPGA_CNN_ENGINE.md` | DRAFT | **SIMULATED** (31/10/2026): golden độc lập + weights thật từ ONNX đều PASS 1026/1026; E-01/E-02/E-08/E-09 FIXED; E-03/E-04/E-05 mở | Vững | 2026-10-31 | `KVC_PR/src/conv_engine_dynamic_fsm.v`, `tb_conv0_golden.v`, `tb_conv0_real.v`, `tools/gen_conv0_*.py` |
 | WIR-001 | Pinout và đấu dây tổng | `hardware/wiring/KVC_MASTER_PINOUT_WIRING.md` | ACTIVE | DESIGN | Phong | 2026-10-25 | `firmware/mcu_payload/inc/kvc_pinout.h` |
 | VEN-001 | Gói hãng (version/nguồn/checksum) | `hardware/vendor/VENDOR_PACKAGES.md` | ACTIVE | SOURCE-VERIFIED | Phong | 2026-10-25 | `firmware/mcu_payload/inc/SONiX.SN34F7_DFP.2.0.4/` |
 

@@ -1,0 +1,61 @@
+{
+  "purpose": "weights THAT cua conv0 YOLO11n de verify engine",
+  "source_onnx": "yolo11n_2class_best.onnx",
+  "source_onnx_sha256": "0fb3240eea01762d5656821d016f1a0c166d3770ff95ca0f21413d013591d4d4",
+  "source_tensor": "model.0.conv.weight",
+  "source_bias": "model.0.conv.bias",
+  "config": {
+    "out_c": 16,
+    "in_c": 3,
+    "kernel": 3,
+    "weight_count": 432,
+    "bias_count": 16
+  },
+  "quantization": {
+    "scheme": "per_output_channel_symmetric_int8",
+    "input_scale": 0.00392156862745098,
+    "output_scale": 0.5039370078740157,
+    "weight_scales": [
+      0.1149753961,
+      0.0485034777,
+      0.1246525847,
+      0.0944898936,
+      0.3346623098,
+      0.0754130056,
+      0.1853429389,
+      0.1129731606,
+      0.109042821,
+      0.0783116048,
+      0.1002118569,
+      0.1139164046,
+      0.1474755655,
+      0.1956739501,
+      0.0487221508,
+      0.0870309965
+    ],
+    "rounding": "nearest_even",
+    "bn_folded": true,
+    "bn_eps_note": "ONNX da fold BN voi eps=1e-3 (da verify luot 1)"
+  },
+  "resolution_note": "Weights/bias/quant KHONG phu thuoc resolution input. ONNX la 640x640 nhung conv0 [16,3,3,3] dung duoc cho ca 160. Chi activation shape thay doi.",
+  "evidence_level": "SOURCE_VERIFIED_MODEL_WEIGHTS",
+  "note": "Day la weights THAT tu YOLO11n, khac voi conv0_golden (random). Dung de chung minh engine xu ly dung du lieu model that.",
+  "sha256": {
+    "weight": "257bb3f84dd254b08876d589651d4cbad080768150547019e62cfa3dc7619eef",
+    "bias": "af344b8bbd30260c425bbdc720108fb8afa59c407ba43691d2d3a7bbaba67a62",
+    "quant": "67cf483333d08f00fa475111faf325254bf2686d5bc0c17c1af3e0ca7b8e05a4",
+    "input_act": "1bde5a79474729166d4a95d86815c7725da3c1c37e5bfea88d810f956b48192c",
+    "expected": "44ca12f0b079df2ebac7c1be7383fd9b36ec972a15813691293cdfac9cfdeda9"
+  },
+  "reference": {
+    "generator": "tools/gen_conv0_real_ref.py",
+    "seed": 20261031,
+    "act_range": [
+      -16,
+      16
+    ],
+    "img": 8,
+    "pad": 1,
+    "stride": 1
+  }
+}

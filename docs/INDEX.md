@@ -37,6 +37,7 @@ Một tài liệu `ACTIVE` + `DESIGN` nghĩa là nội dung đang có hiệu l�
 | HW-MCU-001 | SONiX SN34F788 | `hardware/mcu/CHIP_SONIX_SN34F788_MCU.md` | ACTIVE | SOURCE-VERIFIED | Phong | 2026-10-25 | `firmware/mcu_payload/project_keil/` |
 | HW-FPGA-001 | OneKiwi Primer 20K (GW2A) | `hardware/fpga/CHIP_ONEKIWI_20K_GOWIN_GW2A.md` | ACTIVE | SOURCE-VERIFIED | Vững | 2026-10-31 | `KVC_PR/src/KVC_FPGA.cst` |
 | HW-FPGA-002 | FPGA CNN Engine (YOLO11n INT8) | `hardware/fpga/FPGA_CNN_ENGINE.md` | DRAFT | **SIMULATED** (31/10/2026): 3 TB engine PASS (1026+1026+146); E-01/E-02/E-03/E-05/E-06/E-08/E-09 FIXED; E-04 (module `conv_engine_dynamic` chưa hoàn chỉnh) + E-07 (calibration) mở | Vững | 2026-10-31 | `KVC_PR/src/conv_engine_dynamic_fsm.v`, `tb_conv0_golden.v`, `tb_conv0_real.v`, `tb_depthwise.v`, `tools/gen_*.py` |
+| HW-FPGA-003 | Spec viet lai kvc_yolo_top (C-b) | hardware/fpga/KVC_YOLO_TOP_REWRITE_SPEC.md | DRAFT | DESIGN (chua implement) | (chua chon) | 2026-10-31 | KVC_PR/rtl/gen/kvc_yolo_top.v, docs/hardware/fpga/FPGA_CNN_ENGINE.md |
 | WIR-001 | Pinout và đấu dây tổng | `hardware/wiring/KVC_MASTER_PINOUT_WIRING.md` | ACTIVE | DESIGN | Phong | 2026-10-25 | `firmware/mcu_payload/inc/kvc_pinout.h` |
 | VEN-001 | Gói hãng (version/nguồn/checksum) | `hardware/vendor/VENDOR_PACKAGES.md` | ACTIVE | SOURCE-VERIFIED | Phong | 2026-10-25 | `firmware/mcu_payload/inc/SONiX.SN34F7_DFP.2.0.4/` |
 
@@ -102,6 +103,8 @@ Tổng: **21 báo cáo + `review/README.md`**.
 | ID | Tài liệu | Đường dẫn | Trạng thái | Bằng chứng | Owner | Kiểm tra gần nhất | Code liên quan |
 |---|---|---|---|---|---|---|---|
 | VER-001 | Kế hoạch kiểm thử gateway | `verification/GATEWAY_TEST_PLAN.md` | ACTIVE | DESIGN | Thịnh | 2026-10-25 | `firmware/gateway_esp32/` |
+| VER-002 | Kế hoạch bench MCU | `verification/MCU_BENCH_TEST_PLAN.md` | ACTIVE | DESIGN | Phong | 2026-10-28 | `firmware/mcu_payload/` |
+| VER-003 | Checklist bring-up FPGA trên kit | `verification/BRINGUP_CHECKLIST.md` | ACTIVE | DESIGN (chưa chạy — chờ kit) | Vững | 2026-10-31 | `scripts/manual/fpga_uart_capture.py`, `KVC_PR/impl/pnr/KVC_FPGA.fs` |
 
 ## Kế hoạch và phân công
 

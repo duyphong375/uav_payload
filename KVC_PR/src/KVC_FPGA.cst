@@ -1,0 +1,98 @@
+// =========================================================================
+// GOWIN PHYSICAL CONSTRAINTS FILE (.cst)
+// Project: KVC_FPGA
+// Board: KIWI Primer 20K (Gowin GW2A-LV18PG256C8/I7)
+// =========================================================================
+
+// -------------------------------------------------------------------------
+// 1. CLOCK & RESET
+// -------------------------------------------------------------------------
+IO_LOC "clk_27m" H11;
+IO_PORT "clk_27m" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+IO_LOC "rst_n" A5;
+IO_PORT "rst_n" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+// -------------------------------------------------------------------------
+// 2. LEDS
+// -------------------------------------------------------------------------
+IO_LOC "led_camera_ok" J1;
+IO_PORT "led_camera_ok" IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "led_cnn_done" J2;
+IO_PORT "led_cnn_done" IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "led_uart_busy" H1;
+IO_PORT "led_uart_busy" IO_TYPE=LVCMOS33 DRIVE=8;
+
+// -------------------------------------------------------------------------
+// 3. UART & MCU INTERFACE (Chuan ABI IF-02)
+// -------------------------------------------------------------------------
+IO_LOC "uart_tx" R13; 
+IO_PORT "uart_tx" IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "data_ready" R12;
+IO_PORT "data_ready" IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "mcu_ack" T12;
+IO_PORT "mcu_ack" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
+
+// -------------------------------------------------------------------------
+// 4. SPI FLASH
+// -------------------------------------------------------------------------
+IO_LOC "spi_cs"   N9;  
+IO_PORT "spi_cs"  IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "spi_sclk" L10; 
+IO_PORT "spi_sclk" IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "spi_mosi" R10; 
+IO_PORT "spi_mosi" IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "spi_miso" P10; 
+IO_PORT "spi_miso" IO_TYPE=LVCMOS33 PULL_MODE=UP;
+
+// -------------------------------------------------------------------------
+// 5. CAMERA OV2640 DVP (Header J1 - Khoa chuan theo Silk-screen OneKiwi)
+// -------------------------------------------------------------------------
+IO_LOC "ov2640_sda"   E11;
+IO_PORT "ov2640_sda"  IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8;
+
+IO_LOC "ov2640_scl"   F9;
+IO_PORT "ov2640_scl"  IO_TYPE=LVCMOS33 PULL_MODE=UP DRIVE=8;
+
+IO_LOC "cam_vsync"    A15;
+IO_PORT "cam_vsync"   IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
+
+IO_LOC "cam_href"     B14;
+IO_PORT "cam_href"    IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
+
+IO_LOC "cam_pclk"     A14;
+IO_PORT "cam_pclk"    IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
+
+IO_LOC "cam_xclk"     B13;
+IO_PORT "cam_xclk"    IO_TYPE=LVCMOS33 DRIVE=8;
+
+IO_LOC "cam_data[0]"  C11;
+IO_PORT "cam_data[0]" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
+
+IO_LOC "cam_data[1]"  A11;
+IO_PORT "cam_data[1]" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
+
+IO_LOC "cam_data[2]"  E9;
+IO_PORT "cam_data[2]" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
+
+IO_LOC "cam_data[3]"  D8;
+IO_PORT "cam_data[3]" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
+
+IO_LOC "cam_data[4]"  A12;
+IO_PORT "cam_data[4]" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
+
+IO_LOC "cam_data[5]"  B11;
+IO_PORT "cam_data[5]" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
+
+IO_LOC "cam_data[6]"  C9;
+IO_PORT "cam_data[6]" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;
+
+IO_LOC "cam_data[7]"  A9;
+IO_PORT "cam_data[7]" IO_TYPE=LVCMOS33 PULL_MODE=DOWN;

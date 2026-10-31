@@ -1,0 +1,18 @@
+{
+  "status": "PASS",
+  "scope": "Python integer reference for Conv0 requantization only",
+  "layer": "/model.0/conv/Conv",
+  "shape": [
+    1,
+    16,
+    320,
+    320
+  ],
+  "elements": 1638400,
+  "q31_shift": 31,
+  "mismatch_count": 0,
+  "max_abs_diff": 0,
+  "multiplier_policy": "ceil(input_scale * weight_scale / output_scale * 2^31)",
+  "rounding": "nearest, ties-to-even",
+  "note": "Not an RTL simulation and not a full convolution validation."
+}

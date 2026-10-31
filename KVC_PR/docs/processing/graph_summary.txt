@@ -1,0 +1,23 @@
+Model: yolo11n_2class_best.onnx
+Input: [{'name': 'images', 'shape': [1, 3, 640, 640]}]
+Output: [{'name': 'output0', 'shape': [1, 6, 8400]}]
+Nodes: 321
+
+Operator counts:
+  Add: 16
+  Concat: 21
+  Conv: 88
+  Div: 1
+  MatMul: 2
+  MaxPool: 3
+  Mul: 79
+  Reshape: 11
+  Resize: 2
+  Sigmoid: 78
+  Slice: 2
+  Softmax: 2
+  Split: 10
+  Sub: 2
+  Transpose: 4
+
+Graph-level RTL reminder: this graph has branched paths, residual Add, Split/Concat, 3 MaxPool, Resize, attention MatMul/Softmax/Transpose/Reshape, and DFL/head output transforms. A serial chain of Conv nodes does not reproduce the model.

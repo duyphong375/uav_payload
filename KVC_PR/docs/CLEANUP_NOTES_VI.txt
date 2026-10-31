@@ -1,0 +1,61 @@
+DỌN FILE THỪA — KVC_PR (2).zip
+
+Giữ nguyên mã nguồn, weights, testbench, dữ liệu kiểm chứng, constraints và tất cả file tạm sinh IP trong src/**/temp/.
+Giữ impl/KVC_FPGA_process_config.json (TopModule=kvc_top_demo).
+Giữ impl/gwsynthesis/KVC_FPGA.log để bảo toàn bằng chứng lỗi RP0006: 65385 logic, 59403 LUTs, 4446 ALUs, 256 SSRAMs, giới hạn 20736. Log này là kết quả cũ, không phải build mới.
+Không sửa RTL hay .gprj; thao tác này không khắc phục lỗi vượt tài nguyên.
+.gprj.user chứa trạng thái build cũ; cần chạy lại synthesis và place & route.
+Giữ file testbench rỗng tb/tb_async_fifo_cdc.v để không làm đứt tham chiếu script có thể có.
+Chưa chạy Gowin EDA.
+
+ĐÃ LOẠI BỎ:
+constraints/kvc_top.sdc.txt (0 bytes)
+impl/gwsynthesis/KVC_FPGA.prj (7526 bytes)
+impl/gwsynthesis/KVC_FPGA.vg (81620 bytes)
+impl/gwsynthesis/KVC_FPGA_syn.rpt.html (35274 bytes)
+impl/gwsynthesis/KVC_FPGA_syn_resource.html (3035 bytes)
+impl/gwsynthesis/KVC_FPGA_syn_rsc.xml (488 bytes)
+impl/gwsynthesis/RTL_GAO/ao_0/gw_ao_expression.v (605 bytes)
+impl/gwsynthesis/RTL_GAO/ao_0/gw_ao_init.v (3616 bytes)
+impl/gwsynthesis/RTL_GAO/ao_0/gw_ao_parameter.v (3387 bytes)
+impl/gwsynthesis/RTL_GAO/ao_0/gw_ao_top_define.v (110 bytes)
+impl/gwsynthesis/RTL_GAO/ao_control/gw_con_parameter.v (27 bytes)
+impl/gwsynthesis/RTL_GAO/ao_control/gw_con_top_define.v (21 bytes)
+impl/gwsynthesis/RTL_GAO/gw_gao_top.v (1969 bytes)
+impl/pnr/ao_0.bin (907418 bytes)
+impl/pnr/ao_0.binx (907964 bytes)
+impl/pnr/ao_0.fs (7264181 bytes)
+impl/pnr/cmd.do (694 bytes)
+impl/pnr/device.cfg (609 bytes)
+impl/pnr/KVC_FPGA.bin (907418 bytes)
+impl/pnr/KVC_FPGA.binx (907939 bytes)
+impl/pnr/KVC_FPGA.db (81340 bytes)
+impl/pnr/KVC_FPGA.fs (7264154 bytes)
+impl/pnr/KVC_FPGA.log (596 bytes)
+impl/pnr/KVC_FPGA.pin.html (62731 bytes)
+impl/pnr/KVC_FPGA.power.html (9005 bytes)
+impl/pnr/KVC_FPGA.rpt.html (68072 bytes)
+impl/pnr/KVC_FPGA.rpt.txt (53021 bytes)
+impl/pnr/KVC_FPGA.timing_paths (14696 bytes)
+impl/pnr/KVC_FPGA.tr.html (351 bytes)
+impl/pnr/KVC_FPGA_tr_cata.html (7873 bytes)
+impl/pnr/KVC_FPGA_tr_content.html (292779 bytes)
+impl/temp/rtl_parser.result (15764 bytes)
+impl/temp/rtl_parser_arg.json (7305 bytes)
+src/spi_flash_controller.v.v (0 bytes)
+vish_stacktrace.vstf (235 bytes)
+vsim.wlf (73728 bytes)
+work/conv_engine/verilog.prw (3163 bytes)
+work/conv_engine/verilog.psm (91328 bytes)
+work/conv_engine/_primary.dat (6387 bytes)
+work/conv_engine/_primary.dbs (6743 bytes)
+work/conv_engine/_primary.vhd (3293 bytes)
+work/tb_conv_engine_conv0_full/verilog.prw (1433 bytes)
+work/tb_conv_engine_conv0_full/verilog.psm (44776 bytes)
+work/tb_conv_engine_conv0_full/_primary.dat (5358 bytes)
+work/tb_conv_engine_conv0_full/_primary.dbs (3184 bytes)
+work/tb_conv_engine_conv0_full/_primary.vhd (110 bytes)
+work/_info (1028 bytes)
+work/_vmake (26 bytes)
+__pycache__/gen_conv0_multiplier.cpython-314.pyc (6755 bytes)
+__pycache__/gen_conv0_multiplier_fixed.cpython-314.pyc (11784 bytes)

@@ -1,0 +1,13 @@
+{
+  "conv_index": 2,
+  "onnx_node_index": 6,
+  "node_name": "/model.2/cv1/conv/Conv",
+  "input_shape_nchw": [1, 32, 160, 160],
+  "output_shape_nchw": [1, 32, 160, 160],
+  "weight_shape_oihw": [32, 32, 1, 1],
+  "kernel": [1, 1],
+  "stride": [1, 1],
+  "pads_top_left_bottom_right": [0, 0, 0, 0],
+  "groups": 1,
+  "graph_note": "This layer is inside model.2 C2f and receives the output of model.2/cv1 activation then Split; do not assume it directly follows Conv1."
+}

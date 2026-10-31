@@ -386,9 +386,41 @@ Mỗi TB **phải `$fatal` khi fail**.
 | `tb_uart_tx` | Framing 8N1, start bit | **PASS 29/29** |
 | `tb_bbox_packetizer` | Little-endian vs parser C MCU | **PASS 103/103** |
 | `tb_kvc_top_demo` | Top-level mock path | **PASS 4/4** |
-| `tb_async_fifo_cdc` | CDC FIFO | **PASS** (TB cũ, không assertion) |
+| `tb_async_fifo_cdc` | CDC FIFO | **PASS** |
+| `tb_yolo_nms` | NMS | **PASS** |
+| `tb_maxpool2d` | 4 cấu hình (K2S2, K3S1P1, K5S1P2 SPPF, K1) | **PASS 4/4** |
+| `tb_concat_n_feature` | N=3, N=2, N=1 | **PASS 3/3** |
+| `tb_split_channels` | C=4/8/3, chia đều và lẻ | **PASS 3/3** |
+| `tb_upsample_nearest` | SF=2, SF=2 (C2), SF=4 | **PASS 3/3** |
+| `tb_residual_add_int8` | **Quét toàn bộ 65.536 tổ hợp** | **PASS 65536/65536** |
+| `tb_sppf_block` | 3 maxpool + concat 4 nhánh | **PASS 64/64** |
 
-**Chưa có TB cho:** `spi_flash_wrapper` (E-05 sửa nhưng chưa verify bằng simulation — cần mô hình SPI flash slave).
+**Chạy toàn bộ:** `pwsh scripts/run_fpga_tb.ps1` → **14 PASS, 0 FAIL, exit 0**.
+
+**Chưa có TB cho:** `spi_flash_wrapper` (E-05 đã sửa nhưng chưa verify bằng simulation — cần mô hình SPI flash slave).
+
+### Kết quả verify toán tử (C-b, 31/10/2026)
+
+Sáu module toán tử cần cho model rút gọn **đã có testbench và PASS**:
+
+| Module | Vai trò trong YOLO11n | Số node ONNX | Kết quả |
+| :--- | :--- | ---: | :--- |
+| `maxpool2d` | SPPF | 3 | ✅ PASS |
+| `concat_n_feature` | Neck/Head | 21 | ✅ PASS |
+| `residual_add_int8` | C3k2 | 16 | ✅ PASS |
+| `split_channels` | C2PSA | 10 | ✅ PASS |
+| `upsample_nearest` | Neck | 2 | ✅ PASS |
+| `sppf_block` | SPPF | 3 | ✅ PASS |
+
+**Phát hiện trong quá trình viết TB:**
+
+| Vấn đề | Chi tiết |
+| :--- | :--- |
+| `concat_n_feature` không xuất `bank_index` | TB phải đếm `output_we` để suy ra bank đang đọc. Nếu tích hợp vào top, cần cân nhắc thêm port debug hoặc đảm bảo thứ tự quét. |
+| `sppf_block` bật `done` cùng chu kỳ `output_we` cuối | TB phải chờ thêm vài chu kỳ trước khi đọc memory. Không phải bug nhưng là chi tiết dễ bỏ sót khi tích hợp. |
+| `maxpool2d` cần RAM đồng bộ | RTL đổi `input_addr` trước khi data về (`REQ → WAIT_RAM → SAMPLE`). TB dùng mux combinational sẽ fail. |
+
+Cả ba đều là **đặc điểm thiết kế**, không phải bug. Nhưng phải biết khi viết top-level.
 
 ---
 

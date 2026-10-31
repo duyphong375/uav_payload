@@ -52,7 +52,7 @@ ID giao diện là **bất biến**. Đổi tên file phải giữ ID trong tiê
 | IF-03 | ESP32 ↔ GCS WebSocket | `interfaces/IF_ESP32_GCS_WS.md` | ACTIVE | SOURCE-VERIFIED (ABI payload IF-02 đã duyệt 29/10/2026) | Thịnh | 2026-10-29 | `gcs/backend/esp32_ingress.py` |
 | IF-04 | GCS REST/WebSocket route | `interfaces/IF_GCS_DATA_CONTRACT.md` | ACTIVE | SOURCE-VERIFIED | Phong | 2026-10-25 | `gcs/backend/main.py` |
 | IF-04-SEM | GCS semantics dữ liệu | `interfaces/KVC_GCS_DATA_CONTRACT.md` | ACTIVE | DESIGN | Phong | 2026-10-25 | `gcs/backend/schemas.py`, `gcs/backend/state.py` |
-| IF-CAM | Camera ↔ FPGA | `interfaces/IF_CAMERA_FPGA.md` | ACTIVE | SOURCE-VERIFIED (pin map) / DESIGN (pipeline) | Kiên | 2026-10-31 | `KVC_PR/src/KVC_FPGA.cst:58-98`, `KVC_PR/src/camera/` |
+| IF-CAM | Camera ↔ FPGA | `interfaces/IF_CAMERA_FPGA.md` | ACTIVE | **SIMULATED** cho FIFO+timestamp (31/10/2026); ảnh thật chưa đo | Kiên | 2026-10-31 | `KVC_PR/src/KVC_FPGA.cst:58-98`, `KVC_PR/src/camera/`, `KVC_PR/src/async_fifo_cdc.v` |
 | IF-MATRIX | Ma trận giao diện | `interfaces/README.md` | ACTIVE | SOURCE-VERIFIED | — | 2026-10-25 | tất cả `IF-*` |
 
 Ghi chú IF-04: `IF_GCS_DATA_CONTRACT.md` là đặc tả **route/endpoint**; 

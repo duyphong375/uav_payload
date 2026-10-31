@@ -350,11 +350,23 @@ module kvc_top_demo
     wire       pack_packet_done;
     wire       uart_tx_busy_sig;
 
-    // Timestamp 32-bit (100MHz ticks)
+    // Timestamp 32-bit, DON VI MILI-GIAY (MCU hieu la ms theo IF-01 §3).
+    // Truoc day dem truc tiep tick 100 MHz -> MCU doc sai don vi va tran
+    // sau 42,9 s. Chia 100.000 de ra 1 ms.
+    localparam integer MS_DIV = 100_000;   // 100 MHz / 100 kHz = 1 kHz = 1 ms
+
+    reg [31:0] ms_div_cnt;
     reg [31:0] frame_timestamp;
     always @(posedge clk_100m or negedge rst_n) begin
-        if (!rst_n) frame_timestamp <= 32'd0;
-        else        frame_timestamp <= frame_timestamp + 32'd1;
+        if (!rst_n) begin
+            ms_div_cnt      <= 32'd0;
+            frame_timestamp <= 32'd0;
+        end else if (ms_div_cnt == MS_DIV - 1) begin
+            ms_div_cnt      <= 32'd0;
+            frame_timestamp <= frame_timestamp + 32'd1;
+        end else begin
+            ms_div_cnt <= ms_div_cnt + 32'd1;
+        end
     end
 
     // Frame bbox counter

@@ -4,7 +4,22 @@
 - **Hai đầu kết nối:** Cụm Camera quang học (**Trương Trung Kiên** - Chọn cáp, nguồn, gá lắp) ↔ Bo FPGA OneKiwi Primer 20K V1.1 (**Nguyễn Tất Vững** - Nhận luồng pixel và cấu hình)
 - **Trạng thái:** `ACTIVE` — **OV2640 DVP 8-bit đã chốt** cho phạm vi hiện tại (Phê duyệt B-4, 31/10/2026). `OV9782 DVP 8-bit` (global shutter) **bị loại khỏi phạm vi**; nếu sau này cần cho UAV chuyển động, phải mở lại IF-CAM và hiệu chuẩn lại toàn bộ pipeline.
 - **Pin map:** 14 `IO_LOC` đã khoá tại `KVC_PR/src/KVC_FPGA.cst:58-98`, đối chiếu khớp 14/14 với Header J1 pin 5–20 tại `docs/hardware/fpga/CHIP_ONEKIWI_20K_GOWIN_GW2A.md:206-228`. Bitstream đã map đúng (`KVC_PR/impl/pnr/KVC_FPGA.pin.html`).
-- **Giới hạn đã biết:** OV2640 dùng **rolling shutter** — ảnh bị méo khi UAV di chuyển ngang. Vận hành yêu cầu tốc độ bay ≤ 1 m/s hoặc chấp nhận méo. Chưa hardware-verified; DDR3 trên board vẫn mâu thuẫn giữa trang hãng và schematic V1.1.
+- **Giới hạn đã biết:** OV2640 dùng **rolling shutter** — ảnh bị méo khi UAV di chuyển ngang. Vận hành yêu cầu tốc độ bay ≤ 1 m/s hoặc chấp nhận méo. DDR3 trên board vẫn mâu thuẫn giữa trang hãng và schematic V1.1.
+
+### Trạng thái triển khai (P2, 31/10/2026)
+
+| Hạng mục | Trạng thái | Bằng chứng |
+| :--- | :--- | :--- |
+| `async_fifo_cdc` 2-FF sync | ✅ FIXED | `tb_async_fifo_cdc` PASS; `wr_gray_meta→wr_gray_sync_r`, `rd_gray_meta→rd_gray_sync_r` |
+| `empty`/`full` đúng chiều | ✅ FIXED | `empty` so `rd_ptr_gray` với `wr_ptr_gray_sync_w`; `full` so `wr_ptr_gray` với `rd_ptr_gray_sync_w` |
+| Gray pointer lệch 1 | ✅ FIXED | `wr_ptr_gray <= bin2gray(wr_ptr_next_bin)` cùng nhịp với bin |
+| Timestamp đơn vị ms | ✅ FIXED | `kvc_top_demo.v` chia 100.000 (`MS_DIV`) thay vì đếm tick |
+| Header comment OV5640 | ✅ FIXED | `camera_rx.v:5` ghi OV2640 |
+| `line_buffer` ADDR_W ≥ 17 | ⏸ HOÃN sang P3 | Nằm trong CNN path đang tắt (`USE_MOCK_BBOX=1`) |
+| `ov2640_config` RGB565 | ⏸ CHƯA KIỂM CHỨNG | `0xDA=0x08` có thể đã đúng; cần đo màu thật |
+| PCLK routing (PR1014) | ⏸ MỞ | Cần `IO_LOC ... CLOCK` hoặc BUFG; đo skew trước |
+
+**Bằng chứng:** `SIMULATED` cho FIFO và timestamp; `BUILT` (Fmax 100 MHz, 0 violation). **Chưa `HARDWARE-VERIFIED`** — chưa có ảnh capture thật.
 
 > **Task:** `KVC-CAM-CANDIDATE-20261019-001` · Owner: Codex · Scope: cập nhật lựa chọn camera PoC và đối chiếu thông tin bộ nhớ OneKiwi giữa tài liệu · Allowed files: `docs/interfaces/IF_CAMERA_FPGA.md`, `docs/architecture/KVC_ThietKeHeThong.md`, `docs/architecture/KVC_PROJECT_STATUS.md`, `docs/hardware/fpga/CHIP_ONEKIWI_20K_GOWIN_GW2A.md` · Acceptance: phân biệt PoC giá thấp với candidate cho UAV chuyển động; ghi rõ DDR3 còn mâu thuẫn giữa trang hãng và schematic cục bộ; không chốt pinout/rail hoặc tuyên bố hardware-verified · Status: `DOC UPDATE COMPLETE` · Verification: đối chiếu Markdown/nguồn hoàn tất; `git diff --check` PASS (exit 0; chỉ cảnh báo chuẩn hóa LF/CRLF); build/test và kiểm tra camera trên board `NOT RUN` vì task chỉ cập nhật tài liệu.
 

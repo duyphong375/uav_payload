@@ -2,7 +2,7 @@
 // Module: camera_rx.v
 // Author: Vững (assistant)
 // Date:   2026-10-15
-// Desc:   DVP receiver cho OV5640 (8-bit DVP)
+// Desc:   DVP receiver cho OV2640 (8-bit DVP) — camera da chot 31/10/2026 (B-4)
 // - Ghép 2 byte liên tiếp thành 1 pixel RGB565 (first byte = high byte)
 // - Bỏ SKIP_FRAMES đầu để camera ổn định exposure
 // - Xử lý VSYNC rising edge để phát hiện frame start

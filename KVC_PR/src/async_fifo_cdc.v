@@ -29,8 +29,8 @@ module async_fifo_cdc
     reg [PTR_W-1:0] rd_ptr_bin;
     reg [PTR_W-1:0] rd_ptr_gray;
 
-    reg [PTR_W-1:0] wr_ptr_gray_sync;
-    reg [PTR_W-1:0] rd_ptr_gray_sync;
+    // (cac reg wr_ptr_gray_sync / rd_ptr_gray_sync cu da duoc thay bang
+    //  chuoi 2-FF wr_gray_meta/wr_gray_sync_r va rd_gray_meta/rd_gray_sync_r)
 
     reg [DATA_WIDTH-1:0] mem [0:DEPTH-1];
 
@@ -57,24 +57,28 @@ module async_fifo_cdc
     // --------------------------------------------------------------------
     // Write side
     // --------------------------------------------------------------------
+    // wr_ptr_next_bin: gia tri bin KE TIEP, dung de cap nhat gray cung nhip
+    // (truoc day wr_ptr_gray <= bin2gray(wr_ptr_bin) dung gia tri CU, lech 1)
+    wire [PTR_W-1:0] wr_ptr_next_bin = wr_ptr_bin + ((wr_en && !full) ? 1'b1 : 1'b0);
+    wire [PTR_W-1:0] rd_ptr_next_bin = rd_ptr_bin + ((rd_en && !empty) ? 1'b1 : 1'b0);
+
     always @(posedge wr_clk or negedge rst_n) begin
         if (!rst_n) begin
-            wr_ptr_bin <= {PTR_W{1'b0}};
+            wr_ptr_bin  <= {PTR_W{1'b0}};
             wr_ptr_gray <= {PTR_W{1'b0}};
-            overflow <= 1'b0;
+            overflow    <= 1'b0;
         end
         else begin
             overflow <= 1'b0;
 
             if (wr_en && !full) begin
                 mem[wr_ptr_bin[DEPTH_BITS-1:0]] <= wr_data;
-                wr_ptr_bin <= wr_ptr_bin + 1'b1;
+                wr_ptr_bin  <= wr_ptr_next_bin;
+                wr_ptr_gray <= bin2gray(wr_ptr_next_bin);
             end
             else if (wr_en && full) begin
                 overflow <= 1'b1;
             end
-
-            wr_ptr_gray <= bin2gray(wr_ptr_bin);
         end
     end
 
@@ -83,53 +87,66 @@ module async_fifo_cdc
     // --------------------------------------------------------------------
     always @(posedge rd_clk or negedge rst_n) begin
         if (!rst_n) begin
-            rd_ptr_bin <= {PTR_W{1'b0}};
+            rd_ptr_bin  <= {PTR_W{1'b0}};
             rd_ptr_gray <= {PTR_W{1'b0}};
-            rd_data <= {DATA_WIDTH{1'b0}};
-            underflow <= 1'b0;
+            rd_data     <= {DATA_WIDTH{1'b0}};
+            underflow   <= 1'b0;
         end
         else begin
             underflow <= 1'b0;
 
             if (rd_en && !empty) begin
-                rd_data <= mem[rd_ptr_bin[DEPTH_BITS-1:0]];
-                rd_ptr_bin <= rd_ptr_bin + 1'b1;
+                rd_data     <= mem[rd_ptr_bin[DEPTH_BITS-1:0]];
+                rd_ptr_bin  <= rd_ptr_next_bin;
+                rd_ptr_gray <= bin2gray(rd_ptr_next_bin);
             end
             else if (rd_en && empty) begin
                 underflow <= 1'b1;
             end
-
-            rd_ptr_gray <= bin2gray(rd_ptr_bin);
         end
     end
 
     // --------------------------------------------------------------------
-    // Pointer synchronization
+    // Pointer synchronization — 2 flip-flop per miền (chuẩn CDC Gray)
     // --------------------------------------------------------------------
+    // wr_ptr_gray -> rd_clk (2 FF)
+    reg [PTR_W-1:0] wr_gray_meta, wr_gray_sync_r;
     always @(posedge rd_clk or negedge rst_n) begin
         if (!rst_n) begin
-            wr_ptr_gray_sync <= {PTR_W{1'b0}};
+            wr_gray_meta   <= {PTR_W{1'b0}};
+            wr_gray_sync_r <= {PTR_W{1'b0}};
         end
         else begin
-            wr_ptr_gray_sync <= wr_ptr_gray;
+            wr_gray_meta   <= wr_ptr_gray;
+            wr_gray_sync_r <= wr_gray_meta;
         end
     end
 
+    // rd_ptr_gray -> wr_clk (2 FF)
+    reg [PTR_W-1:0] rd_gray_meta, rd_gray_sync_r;
     always @(posedge wr_clk or negedge rst_n) begin
         if (!rst_n) begin
-            rd_ptr_gray_sync <= {PTR_W{1'b0}};
+            rd_gray_meta   <= {PTR_W{1'b0}};
+            rd_gray_sync_r <= {PTR_W{1'b0}};
         end
         else begin
-            rd_ptr_gray_sync <= rd_ptr_gray;
+            rd_gray_meta   <= rd_ptr_gray;
+            rd_gray_sync_r <= rd_gray_meta;
         end
     end
+
+    // Ten cu duoc giu de khong pha vo noi dung ben ngoai module
+    wire [PTR_W-1:0] wr_ptr_gray_sync_w = wr_gray_sync_r;  // da dong bo sang rd_clk
+    wire [PTR_W-1:0] rd_ptr_gray_sync_w = rd_gray_sync_r;  // da dong bo sang wr_clk
 
     // --------------------------------------------------------------------
     // Empty / full detection
+    //   empty (mien doc):  rd_ptr_gray == wr_ptr_gray DA DONG BO
+    //   full  (mien ghi):  wr_ptr_gray == rd_ptr_gray DA DONG BO (bit MSB dao)
     // --------------------------------------------------------------------
     always @(*) begin
-        empty = (wr_ptr_gray == rd_ptr_gray_sync);
-        full  = (wr_ptr_gray_sync[PTR_W-1] != rd_ptr_gray[PTR_W-1]) &&
-                (wr_ptr_gray_sync[PTR_W-2:0] == rd_ptr_gray[PTR_W-2:0]);
+        empty = (rd_ptr_gray == wr_ptr_gray_sync_w);
+        full  = (wr_ptr_gray[PTR_W-1]     != rd_ptr_gray_sync_w[PTR_W-1]) &&
+                (wr_ptr_gray[PTR_W-2:0]   == rd_ptr_gray_sync_w[PTR_W-2:0]);
     end
 endmodule

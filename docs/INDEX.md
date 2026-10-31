@@ -120,7 +120,8 @@ Các mục dưới **chưa có source hoặc tài liệu**. Không tạo file gi
 | ALG-MCU-001 | Hợp nhất cảm biến (IMU + GNSS + siêu âm) | Planned | Chờ `firmware/mcu_payload/src/algorithms/` |
 | ALG-MCU-002 | Hiệu chuẩn và bù sai số cảm biến | Planned | Chờ source thuật toán |
 | ALG-MCU-003 | Ước lượng vị trí / dead-reckoning | Planned | Chờ source thuật toán |
-| RTL-001 | RTL FPGA (BBox/UART/camera pipeline) | **SIMULATED** — P1 xong: 4 lỗi P0 sửa, 3 TB PASS, Fmax 100 MHz, 0 violation. Bitstream `.fs` có nhưng chưa chứa CNN (`USE_MOCK_BBOX=1`) | `KVC_PR/src/`, `KVC_PR/rtl/`; thư mục `KVC_PR/` đã vào git từ commit `3ab8da2` |
+| RTL-001 | RTL FPGA (BBox/UART/camera pipeline) | **SIMULATED** — P1–P5 xong: 7 lỗi engine sửa, 7 TB PASS, Fmax 100 MHz, 0 violation. Bitstream `.fs` có nhưng **chưa chứa CNN** (`USE_MOCK_BBOX=1`). **P6 chặn:** `kvc_yolo_top.v` chưa bao giờ compile (instantiation `.p_in_w`, `.win_00`, `.fifo_rd_en` không tồn tại trong `conv_engine_dynamic`); cần 4–6 tuần | `KVC_PR/src/`, `KVC_PR/rtl/`; commit `3ab8da2` → `2c49446` |
+| RTL-003 | Bảng cấu hình lớp | **SOURCE-VERIFIED** — `layer_table.vh` sinh từ `conv_layer_map.csv`: 88 dòng, 7 stride=2, 7 grouped, 0 placeholder, verify 0 mismatch | `KVC_PR/rtl/gen/layer_table.vh`, `KVC_PR/tools/gen_layer_table.py` |
 | RTL-002 | Testbench FPGA | **SIMULATED** — 3 TB có `$fatal`: `tb_uart_tx` 29/29, `tb_bbox_packetizer` 103/103, `tb_kvc_top_demo` 4/4 | `KVC_PR/verification/tb/`; stub `sim_stubs.v` cho primitive Gowin |
 | GCS-REPLAY-002 | Đồng bộ replay đa client | Planned | Chưa có task |
 | CAM-001 | Chốt camera chính (OV2640 vs OV9782) | **Decided 31/10/2026 — OV2640 DVP 8-bit** | IF-CAM đã ACTIVE; OV9782 loại khỏi phạm vi |

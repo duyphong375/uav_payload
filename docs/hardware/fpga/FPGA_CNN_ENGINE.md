@@ -237,6 +237,69 @@ Review lượt 2 mô tả E-04 là "`out_c` luôn 0" ở `conv_engine_dynamic.v:
 
 **Việc cần làm ở P6:** đổi `kvc_yolo_top.v:1073` sang `conv_engine_dynamic_fsm`, hoặc port các sửa E-01/E-02/E-03/E-06 sang `conv_engine_dynamic`. Cách thứ nhất ít rủi ro hơn.
 
+### P6 — Kết quả khảo sát (31/10/2026): KHÔNG THỂ tích hợp trong 1 bước
+
+Ba phát hiện chặn P6:
+
+**1. `kvc_yolo_top.v` chưa bao giờ compile được.**
+
+Instantiation `u_eng` (dòng 112-129) truyền các port **không tồn tại** trong `conv_engine_dynamic.v`:
+
+| Port trong instantiation | Có trong module? |
+| :--- | :---: |
+| `.p_in_w`, `.p_in_h`, `.p_in_c` | ❌ |
+| `.p_out_w`, `.p_out_h`, `.p_out_c` | ❌ |
+| `.p_k_size`, `.p_ic_per_group`, `.p_oc_per_group` | ❌ |
+| `.win_00` … `.win_22` (9 port riêng) | ❌ (module dùng `win_data` packed) |
+| `.fifo_rd_en`, `.fifo_rd_data`, `.fifo_empty` | ❌ |
+| `.bias_data`, `.quant_multiplier`, `.output_we` | ❌ |
+
+Bằng chứng: Gowin báo `ERROR (EX3937): Instantiating unknown module 'conv_engine_dynamic'` khi đặt `kvc_yolo_top` làm top — vì `.gprj` **không có** `conv_engine_dynamic.v` trong danh sách source. Module chưa từng được synthesis.
+
+**2. `kvc_yolo_top` chỉ có conv + activation, không đủ graph YOLO11n.**
+
+| Thành phần ONNX | Có trong `kvc_yolo_top`? |
+| :--- | :---: |
+| Conv | ✅ |
+| SiLU/activation | ✅ (`activation_dynamic`) |
+| MaxPool (3) | ❌ |
+| Concat (21) | ❌ |
+| Add/residual (16) | ❌ |
+| Split (10) | ❌ |
+| Resize/upsample (2) | ❌ |
+| MatMul/Softmax (attention C2PSA) | ❌ |
+| DFL decode | ❌ |
+
+⇒ Kể cả sửa được interface, module này chỉ chạy được các nhánh thuần conv, không phải YOLO11n.
+
+**3. Bảng lớp đã sửa nhưng chưa dùng được.**
+
+Đã sinh `layer_table.vh` (88 dòng, 7 stride=2, 7 grouped, 0 placeholder, verify 0 mismatch so với CSV) và thay vào `kvc_yolo_top.v`. Nhưng bảng này chỉ có tác dụng khi engine được nối đúng — hiện engine chưa compile.
+
+### Việc thực sự cần cho P6
+
+| # | Việc | Ước lượng |
+| ---: | :--- | ---: |
+| 1 | Viết lại `kvc_yolo_top.v` theo interface `conv_engine_dynamic_fsm` (win_data packed, bias/mult req/rvalid) | 2–3 ngày |
+| 2 | Bổ sung RTL cho MaxPool/Concat/Add/Split/Resize | 1–2 tuần |
+| 3 | Bổ sung RTL cho attention C2PSA (MatMul/Softmax) hoặc loại nhánh đó khỏi model | 1–2 tuần |
+| 4 | DFL decode + NMS theo class | 3–5 ngày |
+| 5 | Nạp weights, verify end-to-end trên 1 ảnh | 2–3 ngày |
+
+**Tổng: 4–6 tuần**, không phải một bước tích hợp.
+
+### Đề xuất thay thế: model rút gọn
+
+Nếu mục tiêu là "có AI chạy trên FPGA" trong thời gian ngắn, hướng khả thi hơn:
+
+| Phương án | Nội dung | Thời gian |
+| :--- | :--- | ---: |
+| **Rút gọn graph** | Train lại model chỉ giữ conv + SiLU + maxpool (bỏ C2PSA attention, bỏ DFL — dùng anchor-based head). Cần train lại từ đầu. | 2–3 tuần |
+| **Chỉ dùng `kvc_yolo_top` hiện tại** | Chấp nhận chạy **1 lớp conv** như testbench, không phải YOLO | Đã có |
+| **Giữ nguyên mock bbox** | Bitstream hiện tại: camera → mock → UART. Dùng để bring-up, không có AI. | Đã có |
+
+**Khuyến nghị:** hoàn thành bring-up phần cứng (G2/G6) trước, vì 4–6 tuần P6 chỉ có nghĩa nếu đường UART/camera đã chứng minh chạy thật.
+
 ### Kết quả verify (P3/P4, 31/10/2026)
 
 **Golden độc lập** sinh bởi `tools/gen_conv0_golden.py` (Python, không dùng RTL):

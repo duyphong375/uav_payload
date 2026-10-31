@@ -1,0 +1,30 @@
+{
+  "purpose": "weights THAT cho 88 lop conv YOLO11n",
+  "source_onnx": "yolo11n_2class_best.onnx",
+  "source_onnx_sha256": "0fb3240eea01762d5656821d016f1a0c166d3770ff95ca0f21413d013591d4d4",
+  "source_layer_map": "docs/processing/conv_layer_map.csv",
+  "n_layers": 88,
+  "weight_bytes": 2574656,
+  "bias_entries": 7887,
+  "quant_entries": 7887,
+  "weight_nonzero": 2539072,
+  "weight_nonzero_pct": 98.6179,
+  "quant_nonzero": 7887,
+  "quantization": {
+    "weight": "per_output_channel_symmetric_int8",
+    "input_scale": 0.00392156862745098,
+    "out_scale_assumed": 0.5039370078740157,
+    "out_scale_note": "GIA DINH, chua calibration that — chi dung verify so hoc",
+    "bias_formula": "bias_q = round(bias_fp / out_scale)",
+    "mult_shift_bits": 31,
+    "bn_folded_in_onnx": true,
+    "bn_eps_used_by_export": 0.001
+  },
+  "sha256": {
+    "weights.bin": "0f2e0d311b9cf4940acaa77d5415bcd0d1fb7f63586ca55f60489f46be8f4898",
+    "bias.hex": "004c7a076bfd1c3071e3f6209e3380fc738c5700054e3073489dd33a521d0a7e",
+    "quant.hex": "12fbc032aa7039104ac074812553e0b9c0372b5607f492b1a45d2442bf57b233"
+  },
+  "evidence_level": "SOURCE_VERIFIED_MODEL_WEIGHTS",
+  "note": "Weights THAT tu ONNX. KHONG dung de danh gia mAP: out_scale chua calibration. Dung de verify engine va nap flash."
+}

@@ -30,7 +30,7 @@ module conv_engine_dynamic_fsm
     output reg        bias_req,
 
     output reg [15:0] mult_addr,
-    input  wire [31:0] mult_rdata,
+    input  wire [39:0] mult_rdata,   // [39:32]=shift, [31:0]=mult Q31
     input  wire        mult_rvalid,
     output reg        mult_req,
 
@@ -76,16 +76,53 @@ module conv_engine_dynamic_fsm
 
     reg [31:0] addr_tmp32;
     reg [31:0] weight_addr32;
+    reg [15:0] shift_val;      // so bit dich requant, tu mult_rdata[39:32] neu co
 
     reg [7:0] win_vec [0:26];
     integer k;
 
-    function automatic [7:0] clamp_q;
-        input signed [31:0] v;
+    // Requantization dung (E-02 FIXED):
+    //   acc      : tich luy INT32
+    //   mult_val : Q31 multiplier
+    //   shift    : so bit dich (metadata ghi 31)
+    //   out      = clamp( round((acc * mult) >> shift) + bias )
+    // Truoc day: clamp_q(sum_acc * mult_val + bias_val) — thieu shift,
+    // tich 32x32 bi cat vao 32 bit, khong round.
+    function automatic [7:0] requant;
+        input signed [31:0] acc;
+        input signed [31:0] mult;
+        input        [15:0] shift;
+        reg   signed [63:0] prod;
+        reg   signed [63:0] rounded;
+        reg   signed [63:0] shifted;
+        reg   signed [63:0] with_bias;
+        reg          [63:0] p_abs;
+        reg          [63:0] half;
+        reg          [63:0] rem;
+        reg          [63:0] q_abs;
         begin
-            if (v > 127) clamp_q = 8'd127;
-            else if (v < -128) clamp_q = 8'd128;
-            else clamp_q = v[7:0];
+            prod = $signed(acc) * $signed(mult);
+
+            if (shift == 16'd0) begin
+                shifted = prod;
+            end
+            else begin
+                // Ties-to-even (khop metadata conv0 "rounding: nearest, ties-to-even")
+                // Lam viec tren tri tuyet doi de khong phu thuoc bit dau.
+                p_abs = (prod < 0) ? (-prod) : prod;
+                half  = (64'd1 <<< (shift - 16'd1));
+                rem   = p_abs & ((64'd1 <<< shift) - 64'd1);
+                q_abs = p_abs >>> shift;
+                if (rem > half || (rem == half && q_abs[0]))
+                    q_abs = q_abs + 64'd1;
+                shifted = (prod < 0) ? (-$signed(q_abs)) : $signed(q_abs);
+            end
+
+            with_bias = shifted + $signed({{32{bias_val[31]}}, bias_val});
+
+            if (with_bias > 64'sd127)       requant = 8'd127;
+            else if (with_bias < -64'sd128) requant = 8'd128;  // -128
+            else                            requant = with_bias[7:0];
         end
     endfunction
 
@@ -128,6 +165,7 @@ module conv_engine_dynamic_fsm
             bias_val <= 32'sd0;
             mult_val <= 32'sd0;
             weight_val <= 32'sd0;
+            shift_val <= 16'd31;   // mac dinh Q31 theo metadata conv0
         end
         else begin
             out_valid <= 1'b0;
@@ -161,11 +199,14 @@ module conv_engine_dynamic_fsm
                 end
 
                 ST_PREP: begin
-                    weight_addr32 = p_weight_base + ((oc * IN_C * KERNEL * KERNEL) +
-                                   (ic * KERNEL * KERNEL) +
-                                   (ky * KERNEL) + kx);
+                    // E-01 FIXED: giu du 24 bit dia chi flash.
+                    // Truoc day `weight_addr <= weight_addr32[15:0]` cat mat 8 bit
+                    // cao, bien p_weight_base=0x400000 thanh 0x0000.
+                    weight_addr32 = p_weight_base + (oc * IN_C * KERNEL * KERNEL) +
+                                    (ic * KERNEL * KERNEL) +
+                                    (ky * KERNEL) + kx;
 
-                    weight_addr <= weight_addr32[15:0];
+                    weight_addr <= weight_addr32[23:0];
                     bias_addr <= oc;
                     mult_addr <= oc;
 
@@ -181,14 +222,18 @@ module conv_engine_dynamic_fsm
                     bias_req <= 1'b0;
                     mult_req <= 1'b0;
 
-                    if (weight_rvalid) weight_val <= $signed(weight_rdata);
-                    if (bias_rvalid) bias_val <= $signed(bias_rdata);
-                    if (mult_rvalid) mult_val <= $signed(mult_rdata);
-
+                    // LUU Y: phai dung truc tiep *_rdata (gia tri DANG co tren bus),
+                    // KHONG dung weight_val/bias_val/mult_val vi chung duoc gan bang
+                    // nonblocking trong cung chu ky -> van la gia tri CU cua tap truoc.
+                    // Day la loi N-08 (tap dau dung weight reset) da duoc sua.
                     if (weight_rvalid && bias_rvalid && mult_rvalid) begin
+                        mult_val  <= $signed(mult_rdata[31:0]);
+                        shift_val <= {8'd0, mult_rdata[39:32]};
+                        bias_val  <= $signed(bias_rdata);
+
                         sum_acc <= sum_acc +
-                            ($signed(win_vec[(ic * 9) + (ky * 3) + kx]) *
-                             $signed(weight_val[7:0]));
+                            ($signed(win_vec[(ic * KERNEL * KERNEL) + (ky * KERNEL) + kx]) *
+                             $signed(weight_rdata[7:0]));
 
                         if (kx == KERNEL - 1) begin
                             kx <= 16'd0;
@@ -222,19 +267,26 @@ module conv_engine_dynamic_fsm
                     out_x <= ox;
                     out_y <= oy;
                     out_c <= oc;
-                    out_q <= clamp_q((sum_acc * mult_val) + bias_val);
+                    out_q <= requant(sum_acc, mult_val, shift_val);
                     out_addr <= addr_tmp32[16:0];
                     done <= 1'b1;
 
                     if (oc == OUT_C - 1) begin
                         oc <= 16'd0;
+                        sum_acc <= 32'sd0;
+                        // PIXEL MOI: phai xin window moi tu line buffer.
+                        // Truoc day chuyen thang sang buoc tiep ma khong quay lai
+                        // ST_WAIT_WIN -> engine dung lai window cua pixel dau
+                        // cho toan bo anh (phat hien qua tb_conv0_golden: 987 mismatch).
                         if (ox + p_stride < IMG_W) begin
                             ox <= ox + p_stride;
+                            state <= ST_WAIT_WIN;
                         end
                         else begin
                             ox <= 16'd0;
                             if (oy + p_stride < IMG_H) begin
                                 oy <= oy + p_stride;
+                                state <= ST_WAIT_WIN;
                             end
                             else begin
                                 oy <= 16'd0;

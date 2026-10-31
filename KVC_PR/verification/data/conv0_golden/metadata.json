@@ -1,0 +1,36 @@
+{
+  "purpose": "golden vector doc lap cho conv_engine_dynamic_fsm",
+  "generator": "tools/gen_conv0_golden.py",
+  "seed": 20261031,
+  "config": {
+    "kernel": 3,
+    "in_c": 3,
+    "out_c": 16,
+    "img": 8,
+    "pad": 1,
+    "stride": 1,
+    "shift": 31
+  },
+  "quantization": {
+    "weight_dtype": "int8",
+    "act_dtype": "int8",
+    "bias_dtype": "int32",
+    "mult_dtype": "q31",
+    "rounding": "nearest_even"
+  },
+  "counts": {
+    "act": 192,
+    "weight": 432,
+    "bias": 16,
+    "expected": 1024
+  },
+  "sha256": {
+    "input_act": "dfd20fd25fe93c32012054da7c11054a856c58497766a767f786badf5517ac68",
+    "weight": "ac9365d8c7adf8459f3d2777b655e9e200ca55277c044d83acd0f6192753fc89",
+    "bias": "06c6b80aa21a73c42296386b66f0504e4cb6132826d158853b8183595b9f597e",
+    "expected": "b221f386ec5def192c95474499a7cf83dd9fb91fd085a4a346c87c07667a63a2",
+    "quant": "e429b7339c2679320bce4fcf06add8ecb6fa228ddf5f7ca330b549f957cefdbc"
+  },
+  "evidence_level": "SYNTHETIC_ONLY",
+  "note": "Du lieu SINH GIA LAP, khong phai conv0 that cua YOLO11n. Muc dich: verify so hoc engine (acc, requant, clamp). Khong dung de danh gia do chinh xac model."
+}

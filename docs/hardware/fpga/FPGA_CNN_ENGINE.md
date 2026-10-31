@@ -208,15 +208,31 @@ Cần **4–8 MAC/cycle**. Các cách:
 
 | ID | Vấn đề | Vị trí | Trạng thái |
 | :--- | :--- | :--- | :--- |
-| E-01 | `weight_addr` cắt 16 bit | `conv_engine_dynamic_fsm.v:168` | **Chưa sửa** — chặn đọc flash > 64 KB |
-| E-02 | Requant không shift/round | `:225` | **Chưa sửa** |
-| E-03 | Không hỗ trợ groups | toàn module | **Chưa sửa** — 7 lớp depthwise fail |
-| E-04 | `out_c` luôn 0 | `conv_engine_dynamic.v:103, 179` | **Chưa sửa** |
-| E-05 | SPI mất byte MSB | `spi_flash_wrapper.v:151-155` | **Chưa sửa** |
-| E-06 | `win_vec` cứng 3×3 | `conv_engine_dynamic_fsm.v:80, 93` | Giới hạn thiết kế, cần mở rộng |
-| E-07 | `mult_mem`/`bias_mem` là dữ liệu mẫu | `bias_mem.v:21-31` | **Chưa sửa** |
+| E-01 | `weight_addr` cắt 16 bit | `conv_engine_dynamic_fsm.v:193` | ✅ **FIXED** — giữ 24 bit, `p_weight_base=0x400000` không còn bị cắt |
+| E-02 | Requant không shift/round | `:254` | ✅ **FIXED** — `requant()` với Q31 shift + ties-to-even |
+| E-03 | Không hỗ trợ groups | toàn module | ⏸ **MỞ** — 7 lớp depthwise vẫn fail |
+| E-04 | `out_c` luôn 0 | `rtl/gen/conv_engine_dynamic.v:103,179` | ⏸ **MỞ** — module đó không có biến `oc`; cần viết lại |
+| E-05 | SPI mất byte MSB | `spi_flash_wrapper.v:151-155` | ⏸ **MỞ** |
+| E-06 | `win_vec` cứng 3×3 | `conv_engine_dynamic_fsm.v:113` | Giới hạn thiết kế |
+| E-07 | `bias_mem`/`mult_mem` dữ liệu mẫu | `bias_mem.v`, `mult_mem.v` | ⏸ **MỞ** — đã zero hoá + tách `shift` 8 bit, chờ P4 sinh thật |
 
-> **Cập nhật 31/10/2026 (P1):** engine **tạm không nằm trong datapath** (`USE_MOCK_BBOX=1` trong `kvc_top_demo.v`). Nhờ vậy resource giảm còn 940 logic / 0,5 DSP và PnR đạt Fmax 100 MHz với 0 violation. 7 lỗi E-01→E-07 **vẫn nguyên** và sẽ kích hoạt lại khi `USE_MOCK_BBOX=0` ở P6.
+### Lỗi MỚI phát hiện ở P3 (không có trong review lượt 2)
+
+| ID | Vấn đề | Bằng chứng |
+| :--- | :--- | :--- |
+| **E-08** | **Engine dùng lại window của pixel đầu cho toàn ảnh** | `tb_conv0_golden`: 987 mismatch trước khi sửa; FSM chỉ vào `ST_WAIT_WIN` một lần |
+| E-09 | `sum_acc` không reset khi sang pixel mới | Sửa cùng E-08 (`sum_acc <= 0` ở cả hai nhánh) |
+| E-10 | `win_vec` chỉ rộng 8 byte trong TB ban đầu | TB của tôi, không phải RTL — đã sửa `[63:0]` → `[215:0]` |
+
+### Kết quả verify (P3, 31/10/2026)
+
+**Golden độc lập** sinh bởi `tools/gen_conv0_golden.py` (Python, không dùng RTL):
+- Seed `20261031`, config 3×3×3 → 16 out, 8×8 pixel, pad 1, stride 1, shift 31
+- `tb_conv0_golden` **PASS 1026/1026, 0 FAIL**, `win_pulse=64` (= 8×8 pixel)
+
+Đây là test **đầu tiên** trong repo chứng minh engine đúng số học, vì `verification/data/` trước đó **hoàn toàn rỗng** (không có golden nào trong git history).
+
+**Còn mở:** `verification/data/conv0_golden/` là dữ liệu **tổng hợp** (`SYNTHETIC_ONLY`), không phải conv0 thật của YOLO11n. Chưa chứng minh engine đúng với weights thật.
 
 ### 7.1 Bảng tra lỗi
 

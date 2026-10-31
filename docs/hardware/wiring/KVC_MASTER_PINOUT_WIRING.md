@@ -2,8 +2,8 @@
 
 - **Mã tài liệu:** `KVC-HW-PINOUT-01`
 - **Trạng thái:** `DRAFT HARDWARE SPECIFICATION (DESIGN BASELINE - SOURCE-VERIFIED)`
-- **Phiên bản:** `1.0.0 (DRAFT)`
-- **Phạm vi:** Pinout và nguồn của Sonix SN34F780 Starter-Kit V1.1 cùng các kết nối thiết kế được liệt kê. Các module/carrier và giao diện camera, FPGA, gateway cần xác nhận đúng phiên bản trước khi đấu dây; tài liệu chưa được kiểm chứng trên phần cứng.
+- **Phiên bản:** `1.1.0 (DRAFT)` — cập nhật 31/10/2026
+- **Phạm vi:** Pinout và nguồn của Sonix SN34F780 Starter-Kit V1.1 cùng các kết nối thiết kế được liệt kê. **Camera đã chốt: OV2640 DVP 8-bit** (14 chân tại §3.5.1, khớp `KVC_PR/src/KVC_FPGA.cst:58-98`). Các module/carrier còn lại cần xác nhận đúng phiên bản trước khi đấu dây; tài liệu chưa được kiểm chứng trên phần cứng.
 - **Tài liệu căn cứ:**
   - [docs/hardware/mcu/CHIP_SONIX_SN34F788_MCU.md](../mcu/CHIP_SONIX_SN34F788_MCU.md)
   - [docs/interfaces/IF_MCU_SENSORS.md](../../interfaces/IF_MCU_SENSORS.md)
@@ -25,7 +25,7 @@ flowchart TD
         end
 
         subgraph AI_BLOCK ["Khối Xử Lý Quang Học & AI"]
-            CAM["Camera DVP<br/>OV2640 / OV9782"] -->|"DVP 8-bit / SCCB"| FPGA["FPGA OneKiwi GW2A 20K<br/>YOLO AI Inference"]
+            CAM["Camera OV2640 DVP 8-bit<br/>(chốt 31/10/2026)"] -->|"DVP 8-bit / SCCB"| FPGA["FPGA OneKiwi GW2A 20K<br/>YOLO11n INT8 Inference"]
         end
 
         subgraph MCU_CORE ["Khối Điều Phối & Tính Toán Tọa Độ"]
@@ -223,13 +223,42 @@ GPIO Sonix SN34F788 — **không cần cầu phân áp**.
 
 | Tín hiệu kết nối | Chân trên FPGA OneKiwi (Header J2) | Chân trên MCU Sonix (LQFP64) | Chân trên Kit Sonix | Mức logic | Ý nghĩa chức năng |
 | :--- | :--- | :--- | :--- | :---: | :--- |
-| **UART_TX (FPGA) ➔ URXD1** | **`R13`** (J2 Pin 11, Bank 2) | **`P2.3`** (`URXD1`, Pin 17) | `JP3` Pin 7 hoặc 8 | 3.3 V CMOS | Luồng dữ liệu khung BBox (38.400 bps mặc định / 115.200 bps khi có PLL, Header `0x5A 0xA5`) |
+| **UART_TX (FPGA) ➔ URXD1** | **`R13`** (J2 Pin 11, Bank 2) | **`P2.3`** (`URXD1`, Pin 17) | `JP3` Pin 7 hoặc 8 | 3.3 V CMOS | Luồng dữ liệu khung BBox (**38.400 bps, 8N1** — chốt 31/10/2026; Header `0x5A 0xA5`, **N ≤ 12 box**) |
 | **DATA_READY ➔ EXTI** | **`R12`** (J2 Pin 13, Bank 2) | **`P0.12`** (Pin 3) | `JP1` Pin 11 hoặc 12 | 3.3 V CMOS | Xung báo ngắt khung ảnh mới sẵn sàng (độ rộng 1–5 µs) |
 | **UART_RX (FPGA) ◄ UTXD1** | **`T13`** (J2 Pin 12, Bank 2) | **`P2.2`** (`UTXD1`, Pin 16) | `JP3` Pin 5 hoặc 6 | 3.3 V CMOS | Tín hiệu phản hồi điều khiển / ACK (dự phòng) |
 | **GND CHUNG** | **`GND`** (J2 Pin 14) | `VSS` (GND) | **`J5`** Pin 1, 2, 3 hoặc 4 | 0 V | **Nối chung đất bắt buộc** giữa bo OneKiwi và kit Sonix |
 
 > [!TIP]
 > **Ưu điểm cắm dây thực tế:** Các chân `11`, `12`, `13`, `14` trên Header J2 của bo OneKiwi nằm liên tiếp nhau thành một cụm 4 chân thẳng hàng. Có thể dùng ngay một dải cáp bus cái-cái 4 sợi (Dupont 4-pin ribbon cable) cắm trực tiếp mà không cần bấm dây rời rạc!
+
+---
+
+### 3.5.1. Kết Nối Camera OV2640 DVP ↔ FPGA OneKiwi (Giao Diện IF-CAM)
+
+**Chốt 31/10/2026 (B-4).** 14 chân đã khoá tại `KVC_PR/src/KVC_FPGA.cst:58-98`, đối chiếu khớp 14/14 với Header J1 pin 5–20 (`docs/hardware/fpga/CHIP_ONEKIWI_20K_GOWIN_GW2A.md:206-228`). Bitstream đã áp dụng (`KVC_PR/impl/pnr/KVC_FPGA.pin.html`).
+
+| Tín hiệu OV2640 | Ball FPGA | Header J1 pin | Chức năng | Ghi chú |
+| :--- | :---: | :---: | :--- | :--- |
+| `SDA` (SCCB) | `E11` | 5 | Cấu hình thanh ghi sensor | `PULL_MODE=UP`, open-drain |
+| `SCL` (SCCB) | `F9` | 7 | Clock SCCB | `PULL_MODE=UP` |
+| `VSYNC` | `A15` | 6 | Đồng bộ khung | `PULL_MODE=DOWN` |
+| `HREF` | `B14` | 8 | Đồng bộ dòng | `PULL_MODE=DOWN` |
+| `PCLK` | `A14` | 10 | Clock pixel từ camera | Xem cảnh báo bên dưới |
+| `XCLK` | `B13` | 12 | Clock tham chiếu cấp cho camera | `DRIVE=8` |
+| `D0` | `C11` | 9 | Bit 0 bus dữ liệu | |
+| `D1` | `A11` | 11 | Bit 1 | |
+| `D2` | `E9` | 13 | Bit 2 | |
+| `D3` | `D8` | 15 | Bit 3 | |
+| `D4` | `A12` | 14 | Bit 4 | |
+| `D5` | `B11` | 16 | Bit 5 | |
+| `D6` | `C9` | 18 | Bit 6 | |
+| `D7` | `A9` | 20 | Bit 7 | |
+
+> ⚠️ **Lưu ý kỹ thuật:**
+> - `PCLK` (A14) và `XCLK` (B13) nằm cùng một cặp LVDS (`IOL8_N/P`). Dùng single-ended trên cặp vi sai là hợp lệ, nhưng nếu sau này cần LVDS thật thì hai cặp này bị chiếm.
+> - `SDA`/`SCL` (E11/F9) nằm cùng cặp `IOL31_N/P`, cùng lưu ý.
+> - `PCLK` hiện được route bằng **generic routing resource** (`PR1014` trong `KVC_PR/impl/pnr/KVC_FPGA.log:16`) → skew lớn. Nếu ảnh bị lệch pixel, cần thêm `IO_LOC ... CLOCK` hoặc dùng BUFG.
+> - OV2640 dùng **rolling shutter** — ảnh méo khi UAV di chuyển ngang > 1 m/s.
 
 ---
 
@@ -249,7 +278,7 @@ GPIO Sonix SN34F788 — **không cần cầu phân áp**.
 
 ### 3.7. Chân FPGA khi KHÔNG có bo FPGA
 
-Bo bench hiện tại (28/10/2026) **không có** FPGA OneKiwi, và phía FPGA chưa có RTL/top-level phát BBox. Firmware mặc định `KVC_FPGA_ENABLE=0` nên **không khởi tạo UART1**, và đặt hai chân giao tiếp về mức xác định:
+Bo bench hiện tại **không có** FPGA OneKiwi. RTL **đã có** trong `KVC_PR/` nhưng bitstream chưa đạt timing (Fmax 14,6 MHz) và không chứa YOLO11n, nên chưa nạp bo. Firmware mặc định `KVC_FPGA_ENABLE=0` nên **không khởi tạo UART1**, và đặt hai chân giao tiếp về mức xác định:
 
 | Chân MCU | Trạng thái khi `KVC_FPGA_ENABLE=0` | Lý do |
 | :--- | :--- | :--- |
@@ -329,4 +358,4 @@ Nối toàn bộ chân GND của Pin, Buck 5V, LDO 3.3V, Sonix, AJ-SR04M, GY-87,
 - [ ] **Cực tính nguồn:** Đã kiểm tra đúng chiều (+) và (-), đồng thời xác nhận bo GNSS M10 được cấp đúng nguồn 5.0 V DC vào chân 5V (LDO trên bo hạ về 3.3 V), các đường tín hiệu TX/RX giữ chuẩn logic 3.3 V.
 
 ---
-*Trạng thái: DRAFT HARDWARE SPECIFICATION (DESIGN BASELINE - SOURCE-VERIFIED). SOURCE-VERIFIED chỉ phản ánh đối chiếu tài liệu/sơ đồ; chưa có phép đo hoặc xác minh trên bo thật. Chờ Human approval trước khi dùng làm wiring release.*
+*Trạng thái: DRAFT HARDWARE SPECIFICATION (DESIGN BASELINE - SOURCE-VERIFIED). SOURCE-VERIFIED chỉ phản ánh đối chiếu tài liệu/sơ đồ; chưa có phép đo hoặc xác minh trên bo thật. Camera OV2640 đã chốt pin map 31/10/2026 nhưng chưa hardware-verified. Chờ Human approval trước khi dùng làm wiring release.*

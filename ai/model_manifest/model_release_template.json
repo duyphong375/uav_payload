@@ -5,8 +5,14 @@
   "model_hash_sha256": "PENDING_CHECKPOINT_HASH",
   "architecture": "yolo11n",
   "training_framework": "ultralytics_8.3",
+  "evidence_level": "SYNTHETIC_ONLY",
+  "evidence_note": "Chưa có ảnh thật ở độ cao 2,0-5,0 m. mAP đo trên val sinh từ crop 4K native, split theo source_image_id. Không dùng số này để khẳng định năng lực SAR.",
   "dataset_metadata": {
     "version": "dataset_4k_yolo_v1_hardware_2class",
+    "derivation": "crop_160_native_from_4k",
+    "crop_px": 480,
+    "split_strategy": "group_by_source_image",
+    "split_leak_check": "PENDING",
     "evidence_status": "FILE_INVENTORY_ONLY_SEMANTIC_QA_PENDING",
     "train_images": 4800,
     "train_labels": 4800,
@@ -17,6 +23,11 @@
     "imbalance_ratio_person_to_lifebuoy": null,
     "locked_test_status": "NOT_VERIFIED",
     "calibration_status": "NOT_VERIFIED"
+  },
+  "real_data_pending": {
+    "required_for": ["mAP_claim", "sar_deployment"],
+    "planned_test_images": 100,
+    "status": "NOT_COLLECTED"
   },
   "classes": {
     "0": {
@@ -35,15 +46,17 @@
     }
   },
   "preprocessing_contract": {
-    "input_resolution": [640, 640],
-    "input_shape": [1, 3, 640, 640],
+    "input_resolution": [160, 160],
+    "input_shape": [1, 3, 160, 160],
     "color_space": "RGB",
     "normalization": "pixel / 255.0 (0.0 to 1.0)",
     "letterbox": {
       "aspect_ratio_preserving": true,
       "pad_value": [114, 114, 114],
       "center_padded": true
-    }
+    },
+    "contract_locked": "2026-10-31",
+    "change_requires": ["RTL letterbox", "conv_layer_map.csv", "this manifest"]
   },
   "inference_thresholds": {
     "nms_iou_threshold": 0.45,
@@ -73,8 +86,14 @@
   },
   "runtime_targets": {
     "fpga_goai": {
-      "supported": null,
-      "quantization": "INT8_PTQ_DESIGN_TARGET",
+      "supported": false,
+      "note": "GW2A-18 không có GoAI NPU; dùng conv engine RTL tự phát triển",
+      "quantization": "INT8_PTQ",
+      "weights_source": "SPI flash W25Q128 @ 0x400000",
+      "weights_size_bytes": 2574656,
+      "bsram_available_kib": 103.5,
+      "throughput_ceiling_fps": 9.7,
+      "target_fps": [2, 4],
       "calibration_manifest": "ai/manifests/calibration_manifest.csv",
       "status": "NOT_VERIFIED"
     },
@@ -90,5 +109,5 @@
     }
   },
   "release_status": "EVIDENCE_BLOCKED",
-  "notes": "Template chưa phải release. Cần provenance/license, session hashes, human QA, locked-test, calibration manifest hợp lệ, checkpoint hash và metric tái lập trước khi đổi trạng thái."
+  "notes": "Template chưa phải release. contract_locked 31/10/2026: input 160x160 (B-5). Cần provenance/license, session hashes, human QA, locked-test, calibration manifest hợp lệ, checkpoint hash và metric tái lập trước khi đổi trạng thái."
 }

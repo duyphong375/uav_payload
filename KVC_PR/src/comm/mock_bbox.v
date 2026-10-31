@@ -11,8 +11,9 @@
 //     2'b01 -> 1 bbox
 //     2'b10 -> 2 bbox (person + lifebuoy)
 //     2'b11 -> MAX_BBOX (lặp pattern)
-// - Mỗi bbox 64-bit (8 byte) theo định dạng:
-//     [15:0] X_center, [15:0] Y_center, [7:0] W, [7:0] H, [7:0] class_id, [7:0] conf
+// - Mỗi bbox 64-bit (8 byte), Little-Endian khi packetizer gửi:
+//     byte0-1: X_center, byte2-3: Y_center, byte4: W, byte5: H,
+//     byte6: class_id, byte7: conf
 // - Outputs:
 //     bbox_data[63:0] : dữ liệu bbox hiện tại (valid 1 cycle khi bbox_valid=1)
 //     bbox_valid      : pulse 1 clk cho mỗi bbox
@@ -41,25 +42,29 @@ module mock_bbox #(
     reg [7:0] send_idx;      // index of next to send
     reg       active;
 
-    // Two sample bboxes (person, lifebuoy) encoded as 64-bit fields:
-    // Format (big-endian bytes when sent by packetizer):
-    // [15:0] X_center, [15:0] Y_center, [7:0] W, [7:0] H, [7:0] class, [7:0] conf
+    // Two sample bboxes (person, lifebuoy) encoded as 64-bit fields.
+    // Layout PHAI khop parser C cua MCU (kvc_fpga_bbox.c:281-286) sau khi
+    // packetizer gui Little-Endian (byte thap truoc):
+    //   byte0 = X[7:0], byte1 = X[15:8]
+    //   byte2 = Y[7:0], byte3 = Y[15:8]
+    //   byte4 = W, byte5 = H, byte6 = class, byte7 = conf
+    // => word64 = { conf, class, H, W, Y[15:0], X[15:0] }  (X o bit thap nhat)
     localparam [63:0] BBOX_PERSON = {
-        16'h0140, // X = 320
-        16'h00F0, // Y = 240
-        8'h32,    // W = 50
-        8'h64,    // H = 100
-        8'h01,    // class = 1 (person)
-        8'd90     // confidence = 90 percent
+        8'd90,    // conf = 90 percent  -> byte7
+        8'h01,    // class = 1 (person) -> byte6
+        8'h64,    // H = 100            -> byte5
+        8'h32,    // W = 50             -> byte4
+        16'h00F0, // Y = 240            -> byte3:2
+        16'h0140  // X = 320            -> byte1:0
     };
 
     localparam [63:0] BBOX_LIFE = {
-        16'h0064, // X = 100
-        16'h00C8, // Y = 200
-        8'h50,    // W = 80
-        8'h50,    // H = 80
+        8'd95,    // conf = 95
         8'h02,    // class = 2 (lifebuoy)
-        8'd95     // confidence = 95 percent
+        8'h50,    // H = 80
+        8'h50,    // W = 80
+        16'h00C8, // Y = 200
+        16'h0064  // X = 100
     };
 
     // Generate pattern based on index

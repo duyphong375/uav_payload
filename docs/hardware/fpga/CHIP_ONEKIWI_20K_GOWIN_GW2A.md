@@ -204,6 +204,9 @@ Bo OneKiwi Primer 20K cung cấp 2 header 40 chân (J1, J2) bước 2.54 mm và 
 | 7, 8 | `3.3V` | — | — | Nguồn cấp 3.3V DC (tối đa 500mA) |
 
 ### 6.2 Header 40-Pin J1 (Tối ưu hóa các cặp vi sai LVDS)
+
+> 📷 **Đã cấp phát cho camera OV2640 DVP (chốt 31/10/2026):** 14 ball thuộc **pin 5–20** của J1 được dùng làm giao diện camera. Chi tiết ánh xạ tại [KVC_MASTER_PINOUT_WIRING.md](../wiring/KVC_MASTER_PINOUT_WIRING.md) §3.5.1 và `KVC_PR/src/KVC_FPGA.cst:58-98`. Hai ball `A10` (pin 17) và `B9` (pin 19) **không dùng** trong cấu hình hiện tại.
+
 | Chân Header | Tên tín hiệu | Chân FPGA | Bank | Chân Header | Tên tín hiệu | Chân FPGA | Bank |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | **1** | `GND` | — | — | **2** | `GND` | — | — |
@@ -265,6 +268,7 @@ Bo OneKiwi Primer 20K cung cấp 2 header 40 chân (J1, J2) bước 2.54 mm và 
 1.  **Về bộ nhớ RAM ngoài (DDR3):**
     *   Trang sản phẩm OneKiwi hiện công bố board có **512 MB DDR3 SDRAM**. Tuy vậy, ghi chú khi đọc schematic V1.1 cục bộ cho biết trang `ddr3.kicad_sch` (trang 7/13) chỉ có fiducial markers và chưa xác định được chip/đường bus DDR3. Hai nguồn đang mâu thuẫn; không kết luận board có hoặc không có DDR3 chỉ từ các ghi chú này.
     *   Trước khi dùng DDR3 cho frame buffer, đối chiếu revision schematic/BOM với board thực (marking chip và các kết nối), xác nhận pin mapping và IP/controller Gowin. Nếu chưa xác minh, chỉ tính BSRAM nội **828 Kbits** là bộ nhớ xác nhận được; mức này xấp xỉ 100 KiB và không chứa đủ một frame VGA RGB565 (~600 KiB). Line-buffer/streaming là lựa chọn thiết kế khác nhưng cần RTL/timing/resource verification.
+    *   **Quyết định 31/10/2026:** thiết kế hiện tại **không phụ thuộc DDR3**. Weights YOLO11n INT8 (2,57 MB) được stream từ **SPI flash W25Q128** (16 MiB, đủ chỗ), activation dùng line-buffer. Hệ quả: trần thông lượng ~9,7 FPS do băng thông flash, FPS mục tiêu 2–4. Nếu sau này xác minh được DDR3, có thể nâng trần.
 2.  **Về chuẩn ngõ vào/ngõ ra HDMI:**
     *   Cổng HDMI trên bo sử dụng trực tiếp các chân vi sai true LVDS ở Bank 0 với điện áp `VCCIO0 = 3.3V` kết hợp mạng điện trở phối trở kháng trên bo.
     *   Để thu/phát hình ảnh, thiết kế RTL cần tích hợp các IP Core tương thích (DVI/TMDS encoder, TMDS decoder) và tuân thủ chặt chẽ ràng buộc xung nhịp (timing constraints) cho xung nhịp pixel và xung nhịp dữ liệu (5× pixel clock).

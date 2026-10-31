@@ -87,11 +87,11 @@ Sơ đồ mô tả luồng tín hiệu, bus vật lý và sự phân định ran
 ```mermaid
 flowchart TB
     subgraph AIR["TẢI NHIỆM VỤ TRÊN UAV (AIR UNIT PAYLOAD)"]
-        CAM["Camera quang học<br/>(model / giao diện TBD)"]
+        CAM["Camera OV2640 DVP 8-bit<br/>(chốt 31/10/2026)"]
         subgraph FPGA_BOX["FPGA OneKiwi Primer 20K (GW2A-LV18PG256)"]
-            RX["Camera RX & Tiền xử lý<br/>(Letterbox / Resize 640×640)"]
-            MEM["BSRAM nội 828 Kbit<br/>(khả năng đệm frame cần đánh giá)"]
-            AI["Hardware Accelerator<br/>(GoAI YOLO11n INT8 / Fallback: HSV Morphology)"]
+            RX["Camera RX & Tiền xử lý<br/>(Letterbox / Resize 160×160)"]
+            MEM["BSRAM nội 828 Kbit<br/>(line buffer + bias/quant)"]
+            AI["YOLO11n INT8 Engine<br/>(stream weights từ SPI flash, 2–4 FPS)"]
             TX["Bộ đệm FIFO & UART TX<br/>(Ứng viên BBox: X, Y, W, H, Conf, Class)"]
             RX --- MEM
             RX --> AI
@@ -105,7 +105,7 @@ flowchart TB
             FUSION --> GEOREF --> PACKET
         end
         subgraph SENSORS["CẢM BIẾN ĐỊNH VỊ & KHÔNG GIAN"]
-            ULTRASONIC["AJ-SR04M Siêu âm chống nước<br/>(Cự ly mặt nước — UART 9600 bps)"]
+            ULTRASONIC["AJ-SR04M Siêu âm chống nước<br/>(Cự ly mặt nước — UART 9600 bps, trần 700 cm sau B-7)"]
             IMU["GY-87 IMU<br/>(MPU-6050 Accel+Gyro — I2C0 400 kHz)<br/>HMC5883L hoãn, BMP180 loại bỏ"]
             GNSS["GNSS u-blox NEO-M10-0-10<br/>(Tọa độ WGS-84 — UART 9600/38400 bps NMEA/UBX, 1–10 Hz)"]
         end
@@ -113,7 +113,7 @@ flowchart TB
         LED_STATUS["LED Chỉ báo Trạng thái (PWR / GNSS / Ready)<br/>& Serial Debug (SN-LINK Lite)"]
 
         CAM -->|Giao diện theo camera/board đã xác minh| RX
-        TX -->|UART 115200 bps + GPIO DATA_READY| FUSION
+        TX -->|UART 38400 bps + GPIO DATA_READY| FUSION
         ULTRASONIC -->|UART 9600 bps| FUSION
         IMU -->|I2C0 400 kHz| FUSION
         GNSS -->|UART 9600 bps UBX/NMEA| FUSION
@@ -195,10 +195,10 @@ Kênh truyền LoRa (Long Range) đóng vai trò là xương sống thông tin l
 
 | Phân hệ / Khối chức năng | Linh kiện chuẩn hóa được chọn | Thông số kỹ thuật cốt lõi | Vai trò cụ thể trong dự án |
 | :--- | :--- | :--- | :--- |
-| **Tải UAV — Khối Xử lý Ảnh & AI** | **OneKiwi Primer 20K V1.1** | Gowin GW2A-LV18PG256, 20.736 LUTs, 828 Kbit BSRAM, chip nạp GWU2X; hardware notes cho biết không có DDR3 ngoài trên board | Candidate nhận ảnh qua giao diện sẽ xác minh; đánh giá khả năng đệm bằng tài nguyên có thật, khả thi AI và xuất BBox qua UART. |
-| **Tải UAV — Camera Quang học** | **Camera quang học — model TBD** | Sensor, giao diện, connector/cáp và rail cấp nguồn chưa chốt; không mặc định OV2640/OV5640, DVP/MIPI hay FPC trên OneKiwi | Thu nhận hình ảnh mặt nước sau khi xác minh camera, board, cáp, nguồn và pin map thực tế. |
+| **Tải UAV — Khối Xử lý Ảnh & AI** | **OneKiwi Primer 20K V1.1** | Gowin GW2A-LV18PG256, 20.736 LUTs, 828 Kbit BSRAM, chip nạp GWU2X; hardware notes cho biết không có DDR3 ngoài trên board | Nhận ảnh OV2640 DVP 8-bit, tiền xử lý (resize/letterbox 160×160), chạy YOLO11n INT8 stream weights từ SPI flash, xuất BBox qua UART 38.400 bps. **FPS mục tiêu 2–4** (trần SPI ~9,7 FPS). |
+| **Tải UAV — Camera Quang học** | **OV2640 DVP 8-bit** (chốt 31/10/2026, B-4) | Rolling shutter, RGB565/YUV/JPEG, HFOV ~60°, VGA 640×480 làm việc. 14 `IO_LOC` đã khoá tại `KVC_PR/src/KVC_FPGA.cst:58-98`, khớp Header J1 pin 5–20 | Thu nhận hình ảnh mặt nước ở độ cao 2,0–5,0 m (setpoint 3,0–3,5 m). **Giới hạn:** rolling shutter gây méo khi bay ngang > 1 m/s. |
 | **Tải UAV — MCU Điều khiển & Dung hợp** | **Sonix STK SN34F788** | ARM Cortex-M4F 192 MHz, Flash 512 KB, SRAM 160 KB, FPU phần cứng, tích hợp SN-LINK Lite | Giải mã BBox từ UART, đọc và lọc cảm biến AHRS/Siêu âm/GNSS, giải bài toán giao điểm chiếu tia 3D, đóng gói LoRa 32-byte. |
-| **Tải UAV — Cảm biến cự ly siêu âm** | **AJ-SR04M (JSN-SR04T)** | Siêu âm chống nước IP67, 40 kHz, dải 0,2–6 m, UART 9600 bps / Trig-Echo, nguồn 5V logic 3,3V/5V | Đo khoảng cách thẳng đứng từ UAV xuống mặt nước để xác định độ cao mặt phẳng phục vụ chiếu tia, phản xạ tốt trên bề mặt nước. |
+| **Tải UAV — Cảm biến cự ly siêu âm** | **AJ-SR04M (JSN-SR04T)** | Siêu âm chống nước IP67, 40 kHz, dải datasheet 0,2–8 m; firmware nâng trần 500 → **700 cm** (B-7, 31/10/2026); UART 9600 bps / Trig-Echo; góc mở ~75° → vệt đo 4,6 m @ 3 m | Đo khoảng cách từ UAV xuống mặt nước để xác định độ cao phẳng phục vụ chiếu tia. **Lưu ý:** vệt đo rộng hơn vùng phủ camera khi độ cao > ~2 m; cần `alt_quality` và bán kính bất định. |
 | **Tải UAV — IMU 10-DOF** | **GY-87** | MPU-6050 (Accel 3 trục + Gyro 3 trục), I2C 400 kHz. Module còn có HMC5883L (la bàn) và BMP180 (áp suất) nhưng **firmware không dùng**: HMC5883L hoãn tới khi có kit để hiệu chuẩn, BMP180 đã loại khỏi thiết kế (xem [IF_MCU_SENSORS.md](../interfaces/IF_MCU_SENSORS.md) §3.2 B–C). | Cung cấp gia tốc để ước lượng Roll/Pitch. **Chưa có Yaw tuyệt đối**, nên $\mathbf{R}_{\text{camera}}$ hiện chỉ đủ khi camera hướng Bắc; muốn đủ 3 góc phải bổ sung Yaw (dự kiến từ GNSS `track_made_good`). |
 | **Tải UAV — GNSS Định vị** | **u-blox NEO-M10-0-10** | Thu đồng thời GPS + GLONASS + Galileo + BeiDou + QZSS + SBAS (theo datasheet module), cập nhật 1–10 Hz (mặc định 1 Hz), UART TTL 8N1 — firmware chạy 9600 sau khi gửi UBX CFG-PRT đổi từ 38400 mặc định, anten SMA ngoài trời | Xác định tọa độ vị trí toàn cầu WGS-84 của UAV ngoài trời khi đạt 3D fix (`GPS_VALID = 1`). |
 | **Tải UAV — Module phát LoRa (TX)** | **Ai-Thinker Ra-02 (SX1278)** | Dải 410–525 MHz, SPI, nguồn 3,3V; datasheet V1.1: công suất tối đa 18 ± 1 dBm tại 433 MHz | Phát metadata 32 byte theo ABI IF-02 đã duyệt (29/10/2026) xuống trạm đất theo chu kỳ được đo/duyệt. |
@@ -218,9 +218,9 @@ Danh mục dưới đây phân loại chính xác linh kiện theo 5 phân hệ 
 ##### A. Phân hệ 1: Trạm Tải trên UAV (Air Unit) — Khối Xử lý Ảnh & AI trên FPGA
 | STT | Tên linh kiện cụ thể | Số lượng | Điện áp / Bus | Chức năng trong KVC | In — Đầu vào | Out — Đầu ra | Yêu cầu kỹ thuật thực tế |
 | :---: | :--- | :---: | :---: | :--- | :--- | :--- | :--- |
-| **A1** | **OneKiwi Primer 20K V1.1** | 1 bo | Nguồn/IO theo schematic và board thực tế | Bo FPGA hiện có; khả năng pipeline camera/AI cần kiểm tra. | Nguồn và cấu hình theo board; đầu vào camera chưa chốt. | Ứng viên BBox qua UART và `DATA_READY` sau khi duyệt IF-01. | Không có DDR3 ngoài theo hardware notes; đánh giá BSRAM nội 828 Kbit. Dung lượng SPI Flash cần xác minh vì tài liệu nguồn khác nhau. |
-| **A2** | **Camera quang học (model TBD)** | 1 module | Rail và logic theo camera thực tế | Thu nhận hình ảnh quang học bề mặt nước. | Ánh sáng; nguồn và clock theo candidate đã chọn. | Giao diện/pixel bus theo camera và board đã xác minh. | Chưa chốt sensor, FOV, connector, cáp, voltage hoặc pin map; xác minh trước đặt mua/đấu nối. |
-| **A3** | **Cáp/adapter Camera–OneKiwi (TBD)** | 1 bộ | Theo camera/board đã chốt | Nối camera đã chọn với board FPGA sau khi xác nhận interface. | Connector phía camera và board thực tế. | Tín hiệu theo pin map được duyệt. | Không mặc định FPC 24-pin hay header 2.54 mm; xác minh chiều dài và signal integrity theo candidate. |
+| **A1** | **OneKiwi Primer 20K V1.1** | 1 bo | Nguồn/IO theo schematic và board thực tế | Bo FPGA hiện có; pipeline camera/AI đã có RTL trong `KVC_PR/` nhưng chưa đạt timing. | Nguồn và cấu hình theo board; camera OV2640 DVP đã chốt. | BBox qua UART 38.400 bps và `DATA_READY` theo IF-01. | Không có DDR3 ngoài theo hardware notes; weights stream từ SPI flash W25Q128 (16 MiB). BSRAM nội 828 Kbit dùng cho line buffer + bias/quant. |
+| **A2** | **Camera OV2640 DVP 8-bit** (chốt 31/10/2026) | 1 module | 3,3 V rail từ Buck; logic 3,3 V | Thu nhận hình ảnh quang học bề mặt nước ở 2,0–5,0 m. | Rolling shutter — hạn chế bay ngang > 1 m/s. HFOV ~60°. | DVP 8-bit + SCCB, 14 chân Header J1 pin 5–20. | Pin map đã khoá `KVC_PR/src/KVC_FPGA.cst:58-98`; chưa hardware-verified. |
+| **A3** | Cáp/adapter Camera–OneKiwi | 1 bộ | Theo module OV2640 đã chọn | Nối camera DVP với Header J1. | Connector 2.54 mm trên module breakout. | Tín hiệu theo pin map §3.5.1 của `KVC_MASTER_PINOUT_WIRING.md`. | Không dùng module FPC 24-pin hoặc MIPI; chỉ dùng breakout DVP 2.54 mm. |
 
 ##### B. Phân hệ 2: Trạm Tải trên UAV (Air Unit) — Khối Điều khiển Sonix MCU, Cảm biến & LoRa TX
 | STT | Tên linh kiện cụ thể | Số lượng | Điện áp / Bus | Chức năng trong KVC | In — Đầu vào | Out — Đầu ra | Yêu cầu kỹ thuật thực tế |
@@ -275,7 +275,7 @@ Danh mục dưới đây phân loại chính xác linh kiện theo 5 phân hệ 
 
 | Phân hệ | Nhiệm vụ bắt buộc (Bắt buộc hoàn thành) | Nhiệm vụ mở rộng (Làm khi còn thời gian) |
 | :--- | :--- | :--- |
-| **FPGA** | Camera RX, bộ đệm theo bộ nhớ đã xác minh, tiền xử lý ảnh (Resize/Letterbox), accelerator AI sau kiểm khả thi, bộ đệm FIFO và UART TX đóng gói ứng viên BBox; có chế độ BBox giả (Mock) phục vụ kiểm thử. | Tối ưu xung nhịp FPS, chuyển toàn bộ thuật toán NMS sang RTL, thiết kế pipeline song song kép. |
+| **FPGA** | Camera RX OV2640 DVP, letterbox/resize về **160×160**, YOLO11n INT8 engine stream weights từ SPI flash, NMS trên RTL (`MAX_BOXES=12`), FIFO và UART TX 38.400 bps; có chế độ BBox giả (Mock) phục vụ kiểm thử. | Tăng MAC song song 4→8; kiểm tra khả năng DDR3 nếu xác minh được; pipeline song song kép. |
 | **MCU Tải (Sonix)**| Bộ giải mã UART từ FPGA, thu thập cảm biến có timestamp (Cảm biến siêu âm, IMU, GNSS), thuật toán chiếu tia định vị mục tiêu, theo dõi (tracking) 1 mục tiêu ở mức thiết kế, đóng gói và điều khiển phát LoRa 32 byte, watchdog an toàn. | Lọc Kalman nâng cao, theo dõi đa mục tiêu đồng thời, lưu trữ flash bền vững khi mất sóng dài ngày. |
 | **MCU Trạm đất** | Driver SPI điều khiển Ra-02 ở chế độ nhận, kiểm CRC, đọc RSSI/SNR và xuất telemetry qua Wi-Fi SoftAP/WebSocket v1. ESP32-C3 có nguồn riêng; kiểm thử tài nguyên khi các tác vụ chạy đồng thời. | Bổ sung cơ chế phát gói ACK phản hồi khi đường truyền rảnh. |
 | **Dashboard GCS** | Ingress nhận dữ liệu từ ESP32 qua transport được chốt, kiểm tra session và giải mã RF v1, bộ quản lý trạng thái (Reducer), giao diện Radar local và Bản đồ WGS-84, SQLite logger (WAL), Replay phiên. | Hiển thị lớp bản đồ vệ tinh ngoại tuyến (Tile map), thống kê nâng cao. |
@@ -419,7 +419,7 @@ Dữ liệu cần phản ánh hai bối cảnh trình diễn: video lũ lụt c�
 
 - **Mô hình thống nhất:** Ultralytics **YOLO11n** (biến thể nano của YOLO11), tác vụ detection, hai lớp person/lifebuoy. Tên kiến trúc trong cấu hình là `yolo11n`; model nền là `yolo11n.pt`; checkpoint sau train có thể mang tên `best.pt` hoặc `last.pt` trong run tương ứng. [Tài liệu YOLO11 chính thức](https://docs.ultralytics.com/models/yolo11/).
 - **Trạng thái:** đây là lựa chọn mô hình của dự án, không xác nhận mọi file best.pt đã là YOLO11n. Trước sử dụng phải đối chiếu kiến trúc, mapping lớp và hash của checkpoint. Đổi nhãn không chuyển kiến trúc weights; hỗ trợ GoAI/INT8 và kết quả trên FPGA vẫn cần xác minh.
-- **Hợp đồng tiền xử lý cần khóa theo candidate:** cấu hình tham chiếu PC dùng RGB, letterbox 640×640, màu đệm 114 và chuẩn hóa float [0,1]. Target FPGA cần chốt một kích thước và cách chuyển pixel về ảnh gốc; tensor INT8 phải theo scale/zero-point của model chuyển đổi, không áp dụng float normalization một cách máy móc.
+- **Hợp đồng tiền xử lý đã khoá (31/10/2026, B-5):** input **160×160**, RGB, letterbox giữ tỉ lệ, màu đệm **114**, chuẩn hoá `/255.0`. Đây là hợp đồng cứng — đổi bất kỳ tham số nào phải sửa đồng thời RTL letterbox, manifest AI và `conv_layer_map.csv`. Không áp dụng float normalization một cách máy móc; tensor INT8 phải theo scale/zero-point của model chuyển đổi.
 - **Tập định chuẩn (Calibration Corpus):** Trích xuất **100 ảnh thực tế** đại diện từ tập `Train` để tính toán dynamic range cho các lớp mạng khi lượng tử hóa Post-Training Quantization (INT8). Tuyệt đối không dùng ảnh tập Test để calibration.
 - **Quy trình đối chiếu 4 bước nghiêm ngặt:**
   1. Đánh giá mô hình Float gốc trên máy tính.
@@ -440,7 +440,8 @@ Dữ liệu cần phản ánh hai bối cảnh trình diễn: video lũ lụt c�
 | :--- | :--- | :--- |
 | **Độ chính xác AI** | Locked-test độc lập ≥ 150 ảnh có nguồn/QA, bao phủ và báo riêng miền lũ lụt/bể bơi; khóa trước khi tiến hành nghiệm thu tổng thể. Đo false alarms trên đoạn video âm tính có thời lượng ghi rõ. | Mục tiêu **Recall ≥ 90%**, **Precision ≥ 90%** (IoU 0.5), báo động giả ≤ 1 lần/phút; video demo chọn sẵn không thay phép đo này. |
 | **Suy giảm INT8** | So sánh độ chính xác giữa mô hình Float gốc và mô hình INT8 trên FPGA. | Độ suy giảm Recall và Precision ≤ 3 điểm phần trăm. Sai lệch tâm BBox trung bình < 5 pixel trong cùng hệ tọa độ ảnh. |
-| **Thông lượng AI** | Đo thời gian xử lý liên tục 100 ảnh trên bo OneKiwi Primer 20K. | Đo FPS và độ trễ thực tế; chốt KPI chính xác khi hoàn thành đo kiểm thực nghiệm trên bo. |
+| **Thông lượng AI** | Đo thời gian xử lý liên tục 100 ảnh trên bo OneKiwi Primer 20K. | **FPS mục tiêu 2–4** (chốt 31/10/2026); trần lý thuyết ~9,7 FPS do stream weights 2,57 MB từ SPI flash. Ghi FPS và độ trễ thực đo kèm cấu hình. |
+| **Envelope độ cao** | Bay 2,0 / 3,0 / 3,5 / 5,0 m trên mặt nước tĩnh và gợn; ghi `frame_ok`, `alt_quality`, FPS từng mức. | Setpoint khuyến nghị **3,0–3,5 m**; hành lang vận hành **2,0–5,0 m**. `frame_ok ≥ 98 %` @ 3 m nước tĩnh. Xem [IF_MCU_SENSORS.md](../interfaces/IF_MCU_SENSORS.md) §5. |
 | **Truyền thông LoRa** | Thử ≥ 200 gói TxDone tại khu vực bể bơi/địa điểm đo có ghi khoảng cách và điều kiện; kiểm link tại gian thi là bài riêng. | Mục tiêu **PRR ≥ 95%**, tính gói hợp lệ duy nhất nhận được / gói TxDone trong cùng cửa sổ đo. Độ trễ đầu-cuối p95 ≤ 2 giây chỉ báo khi có clock đã đồng bộ hoặc mốc đo chung. |
 | **Sai số định vị Local** | Kiểm 20 vị trí ground truth đã đo tại khu vực bể bơi, có origin/pose/calibration; thực hiện trước cuộc thi, không yêu cầu sa bàn tại gian thi. | Báo median, p95 và maximum riêng theo cm cùng các mẫu invalid. Thiếu pose/calibration tại nơi thi phải báo INVALID/N/A; không coi test trực tiếp là nghiệm thu sai số nếu không có ground truth. |
 | **Công suất & Nhiệt độ**| Đo điện áp và dòng tiêu thụ ở nguồn cấp 12V trong 60 phút chạy toàn tải. | Ghi dòng trung bình/đỉnh, công suất, nhiệt và sụt áp từng rail với cấu hình thực. Chốt ngân sách nguồn từ số đo và giới hạn linh kiện; chưa có căn cứ dùng 3,36–4,20 W làm định mức. Yêu cầu không reset ngoài ý muốn và không vượt giới hạn điện/nhiệt. |

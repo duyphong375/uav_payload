@@ -17,10 +17,10 @@
 | AJ-SR04M (Mode 4, đã hàn R19 47 kΩ) | **Có** | UART2 9600: P2.14 TX / P2.15 RX qua cầu 1k/2k |
 | NEO-M10-0-10 GNSS | **Có** | UART3 9600: P2.0 TX / P2.1 RX |
 | SX1278 Ra-02 433 MHz | **Có** (cần anten) | SPI bit-bang: P2.4..P2.9 |
-| FPGA OneKiwi Primer 20K | **KHÔNG** | Chưa có RTL/top-level phát BBox |
+| FPGA OneKiwi Primer 20K | **KHÔNG** | RTL có trong `KVC_PR/` nhưng không có trên bo bench; bitstream chưa đạt timing |
 | ESP32-C3 gateway | **KHÔNG** | Không có đường nhận RF |
 
-**Hệ quả trực tiếp của việc thiếu FPGA:** cờ `KVC_FLAG_AI_DETECTED` luôn bằng 0, `class_id`/`confidence` luôn 0, `target_lat/lon` luôn 0, `target_x/y_local` luôn 0. Toàn bộ nhánh georef trong `main.c` **không chạy**. Vì vậy các rủi ro FW-001 (Codex, georef công bố toạ độ sai) và F4 (trần 500/800 cm) **không kích hoạt** trong buổi bench này — nhưng chúng vẫn là nợ kỹ thuật phải sửa trước khi có RTL.
+**Hệ quả trực tiếp của việc thiếu FPGA:** cờ `KVC_FLAG_AI_DETECTED` luôn bằng 0, `class_id`/`confidence` luôn 0, `target_lat/lon` luôn 0, `target_x/y_local` luôn 0. Toàn bộ nhánh georef trong `main.c` **không chạy**. Vì vậy các rủi ro FW-001 (Codex, georef công bố toạ độ sai) và F4 (trần siêu âm) **không kích hoạt** trong buổi bench này — nhưng chúng vẫn là nợ kỹ thuật phải sửa trước khi nối FPGA. **Trần siêu âm đã được nâng 500 → 700 cm ngày 31/10/2026 (B-7)**; cần nạp lại firmware và đo lại để xác nhận.
 
 ---
 

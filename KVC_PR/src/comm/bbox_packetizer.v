@@ -72,11 +72,11 @@ module bbox_packetizer #(
         end
     end
 
-    // Prepare timestamp bytes
-    wire [7:0] ts0 = timestamp[31:24];
-    wire [7:0] ts1 = timestamp[23:16];
-    wire [7:0] ts2 = timestamp[15:8];
-    wire [7:0] ts3 = timestamp[7:0];
+    // Prepare timestamp bytes (Little-Endian: byte thap truoc)
+    wire [7:0] ts0 = timestamp[7:0];
+    wire [7:0] ts1 = timestamp[15:8];
+    wire [7:0] ts2 = timestamp[23:16];
+    wire [7:0] ts3 = timestamp[31:24];
 
     // CRC instance (streaming)
     reg         crc_data_valid;
@@ -175,6 +175,8 @@ module bbox_packetizer #(
                     end
                 end
 
+                // Doi 1 chu ky de crc_start duoc crc16_ccitt nhan
+                // (truoc day chuyen thang sang S_SEND_HEADER lam mat pulse nay)
                 S_PREP: begin
                     state <= S_SEND_HEADER;
                 end
@@ -207,7 +209,8 @@ module bbox_packetizer #(
                     if (cur_bbox_i < send_count) begin
                         if (!tx_in_flight && !uart_tx_busy) begin
                             cur_mem_word    = mem[cur_bbox_i];
-                            cur_send_byte   = (cur_mem_word >> ((7 - cur_bbox_byte) * 8)) & 8'hFF;
+                            // Little-Endian: byte 0 (LSB) truoc, byte 7 (MSB) sau
+                            cur_send_byte   = (cur_mem_word >> (cur_bbox_byte * 8)) & 8'hFF;
                             uart_tx_data   <= cur_send_byte;
                             uart_tx_start  <= 1'b1;
                             crc_data_in    <= cur_send_byte;
@@ -238,7 +241,8 @@ module bbox_packetizer #(
                 S_SEND_CRC_H: begin
                     if (!tx_in_flight && !uart_tx_busy) begin
                         crc_val        = force_bad_crc ? (crc_latched ^ 16'h0001) : crc_latched;
-                        uart_tx_data   <= crc_val[15:8];
+                        // Little-Endian: byte thap truoc
+                        uart_tx_data   <= crc_val[7:0];
                         uart_tx_start  <= 1'b1;
                         tx_in_flight   <= 1'b1;
                         return_state   <= S_SEND_CRC_L;
@@ -249,7 +253,7 @@ module bbox_packetizer #(
                 S_SEND_CRC_L: begin
                     if (!tx_in_flight && !uart_tx_busy) begin
                         crc_val        = force_bad_crc ? (crc_latched ^ 16'h0001) : crc_latched;
-                        uart_tx_data   <= crc_val[7:0];
+                        uart_tx_data   <= crc_val[15:8];
                         uart_tx_start  <= 1'b1;
                         tx_in_flight   <= 1'b1;
                         return_state   <= S_FINISH;

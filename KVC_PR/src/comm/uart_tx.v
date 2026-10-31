@@ -34,13 +34,16 @@ module uart_tx
 
     reg [COUNTER_W-1:0] baud_cnt;
     reg [3:0] bit_cnt;
-    reg [9:0] shifter;
+    // 9 bit: [8]=stop filler, [7:0]=data LSB-first.
+    // Start bit duoc phat truc tiep khi khoi dong, KHONG nam trong shifter,
+    // de tong khung dung 10 bit-time (1 start + 8 data + 1 stop).
+    reg [8:0] shifter;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             baud_cnt <= {COUNTER_W{1'b0}};
             bit_cnt <= 4'd0;
-            shifter <= 10'd0;
+            shifter <= 9'd0;
             tx_busy <= 1'b0;
             tx_ready <= 1'b1;
             tx_done <= 1'b0;
@@ -52,7 +55,7 @@ module uart_tx
 
             if (!tx_busy) begin
                 if (start_pulse) begin
-                    shifter <= {1'b1, tx_data, 1'b0}; // stop, 8-bit data, start
+                    shifter <= {1'b1, tx_data}; // stop filler + 8 data, LSB first
                     tx_busy <= 1'b1;
                     bit_cnt <= 4'd0;
                     baud_cnt <= {COUNTER_W{1'b0}};
@@ -68,7 +71,8 @@ module uart_tx
                 if (baud_cnt == BAUD_DIV - 1) begin
                     baud_cnt <= {COUNTER_W{1'b0}};
 
-                    if (bit_cnt == 4'd9) begin
+                    // bit_cnt 0..7 -> data bits; bit_cnt==8 -> stop bit
+                    if (bit_cnt == 4'd8) begin
                         tx_busy <= 1'b0;
                         tx_pin <= 1'b1; // stop bit
                         tx_ready <= 1'b1;
@@ -76,7 +80,7 @@ module uart_tx
                     end
                     else begin
                         tx_pin <= shifter[0];
-                        shifter <= {1'b1, shifter[9:1]};
+                        shifter <= {1'b1, shifter[8:1]};
                         bit_cnt <= bit_cnt + 4'd1;
                     end
                 end

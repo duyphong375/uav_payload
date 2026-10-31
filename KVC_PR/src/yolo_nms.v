@@ -7,7 +7,10 @@ module yolo_nms
     parameter integer BOX_H    = 16,
     parameter integer CONF_W   = 16,
     parameter integer CLASS_W  = 8,
-    parameter integer IOU_THRESH = 16'd32768
+    // Nguong IoU dang Q15. 16384 = 0.5 (50%) — gia tri NMS tieu chuan.
+    // Gia tri cu 32768 (=1.0) khien dieu kien rut gon thanh
+    // `inter_area > union_area`, khong bao gio dung => NMS la no-op.
+    parameter integer IOU_THRESH = 16'd16384
 )
 (
     input  wire clk,

@@ -7,12 +7,12 @@ Tài liệu này quản lý tập trung toàn bộ các giao diện kết nối 
 ## 1. Sơ đồ luồng dữ liệu toàn hệ thống
 
 ```text
-[ Camera Quang Học ]
-        │ (camera interface TBD; theo board/camera đã xác minh)
+[ Camera Quang Học — OV2640 DVP 8-bit ]
+        │ (DVP 8-bit: PCLK, VSYNC, HREF, D[7:0], SCCB; Header J1 pin 5–20)
         ▼
 [ FPGA OneKiwi Primer 20K (Vững) ]
         │
-        │  IF-01: UART BBox Frame (115.200 bps, Header 0x5A 0xA5, CRC-16)
+        │  IF-01: UART BBox Frame (38.400 bps, Header 0x5A 0xA5, CRC-16)
         ▼
 [ MCU Tải Sonix SN34F788 (Phong) ] ◄── Cảm biến: Siêu âm (AJ-SR04M), IMU (GY-87), GNSS (NEO-M10N)
         │
@@ -41,9 +41,9 @@ Tài liệu này quản lý tập trung toàn bộ các giao diện kết nối 
 
 | Mã giao diện | Tên giao diện | Đầu phát (TX / Server) | Đầu nhận (RX / Client) | Kênh vật lý / Transport | Tài liệu đặc tả chi tiết |
 | :---: | :--- | :--- | :--- | :--- | :--- |
-| **IF-CAM**| Luồng ảnh thô quang học từ Camera | Cụm camera (model TBD; **Kiên**) | FPGA OneKiwi (**Vững**) | Giao diện/cáp/connector TBD; cần xác minh theo board và camera thực | [IF_CAMERA_FPGA.md](IF_CAMERA_FPGA.md) |
+| **IF-CAM**| Luồng ảnh thô quang học từ Camera | Cụm camera (**OV2640 DVP 8-bit, đã chốt**; **Kiên**) | FPGA OneKiwi (**Vững**) | DVP 8-bit song song trên Header J1 pin 5–20; 14 `IO_LOC` tại `KVC_PR/src/KVC_FPGA.cst:58-98` | [IF_CAMERA_FPGA.md](IF_CAMERA_FPGA.md) |
 | **IF-00** | Cảm biến định vị tải UAV (Siêu âm AJ-SR04M, IMU, GNSS) | Cụm cảm biến (**Cường / Kiên**) | MCU Sonix (**Phong**) | UART (AJ-SR04M 9k6, GNSS 9k6), I2C (GY-87 400k) | [IF_MCU_SENSORS.md](IF_MCU_SENSORS.md) |
-| **IF-01** | Khung kết quả nhận diện BBox | FPGA OneKiwi (**Vững**) | MCU Sonix (**Phong**) | UART 3.3V CMOS (115.200 bps, 8N1) + Chân ngắt DATA_READY | [IF_FPGA_MCU_UART.md](IF_FPGA_MCU_UART.md) |
+| **IF-01** | Khung kết quả nhận diện BBox | FPGA OneKiwi (**Vững**) | MCU Sonix (**Phong**) | UART 3.3V CMOS (**38.400 bps**, 8N1) + Chân ngắt DATA_READY; **N ≤ 12 box** | [IF_FPGA_MCU_UART.md](IF_FPGA_MCU_UART.md) |
 | **IF-02** | Gói tin telemetry vô tuyến cứu nạn | MCU Sonix (**Phong**) | ESP32 Trạm Đất (**Thịnh**) | Sóng vô tuyến LoRa 433 MHz (SX1278 Ra-02, SPI) | [IF_MCU_LORA_RF.md](IF_MCU_LORA_RF.md) |
 | **IF-03** | Luồng telemetry từ Trạm đất sang Host | ESP32 Trạm Đất (**Thịnh**) | Backend GCS Laptop (**Thịnh**) | Wi-Fi 802.11 b/g/n (SoftAP) + WebSocket Protocol | [IF_ESP32_GCS_WS.md](IF_ESP32_GCS_WS.md) |
 | **IF-04** | Dữ liệu ứng dụng GCS Host nội bộ | Backend GCS FastAPI | Frontend Dashboard Web | Localhost HTTP / WebSocket (`ws://127.0.0.1:8000/ws/telemetry`) | [IF_GCS_DATA_CONTRACT.md](IF_GCS_DATA_CONTRACT.md) — **nguồn chuẩn route**; semantics tại [KVC_GCS_DATA_CONTRACT.md](KVC_GCS_DATA_CONTRACT.md) |

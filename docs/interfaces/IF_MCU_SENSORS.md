@@ -27,7 +27,7 @@
 | **GY-87 IMU 10-DOF** | I2C (100 / 400 kHz) | 3,3 V CMOS | **3,3 V** | SCL (Clock)<br>SDA (Data) | **I2C0_SCL** (`P0.10` - Pin 38)<br>**I2C0_SDA** (`P0.11` - Pin 39)<br>*(Kit có R3/R4 = 1 kΩ cho I2C0; không thêm pull-up ngoài. Kiểm tra pull-up có sẵn trên module và cô lập một bộ nếu cần.)* |
 | **GNSS u-blox M10** | UART (9.600 bps) | 3,3 V logic | **5,0 V DC** (LDO trên bo hạ về 3,3 V) | TXD ➔ RXD<br>RXD ◄ TXD; logic 3,3 V | **UART3_RX** (`P2.1` - Pin 15)<br>**UART3_TX** (`P2.0` - Pin 14) |
 | **LoRa Ra-02 (SX1278)** | SPI (1–4 MHz) | 3,3 V CMOS | **3,3 V** (DC-DC) | NSS, SCK, MISO, MOSI<br>DIO0 (Ngắt)<br>RST | **SPI0** (`P2.4..P2.7` - Pin 20..23)<br>**DIO0** (`P2.8` - Pin 24)<br>**RST** (`P2.9` - Pin 25) |
-| **FPGA BBox Data** | UART (38.400 bps / 115.200 bps nếu có PLL) | 3,3 V CMOS | Chung nguồn | RXD ◄ TXD (FPGA)<br>DATA_READY | **UART1_RX** (`P2.3` - Pin 17)<br>**DATA_READY** (`P0.12` - Pin 3) |
+| **FPGA BBox Data** | UART (38.400 bps, 8N1) | 3,3 V CMOS | Chung nguồn | RXD ◄ TXD (FPGA)<br>DATA_READY | **UART1_RX** (`P2.3` - Pin 17)<br>**DATA_READY** (`P0.12` - Pin 3) |
 | **Debug Console PC** | UART (9.600 bps mặc định / 115.200 bps khi có PLL) | 3,3 V TTL | Chung GND | TXD ➔ RXD<br>RXD ◄ TXD | **UART5_TX** (`P0.15` - Pin 6)<br>**UART5_RX** (`P0.14` - Pin 5) |
 
 ---
@@ -39,8 +39,10 @@
 > *Ghi chú cập nhật phần cứng:* Thay thế cảm biến laser ToF TF-Luna bằng cảm biến siêu âm chống nước AJ-SR04M (JSN-SR04T) chuẩn IP67 để giảm giá thành, chống chịu môi trường mưa lũ, bọt nước và phản xạ tốt trên bề mặt nước.
 
 * **Chuẩn truyền thông:** UART 9.600 bps, 8 bit dữ liệu, No Parity, 1 Stop bit (8N1) (chế độ xuất nối tiếp Serial). Có thể dùng chế độ xung Trigger/Echo qua GPIO.
-* **Dải đo danh định phần cứng:** 20 cm – 600 cm (0,2 m – 6,0 m).
+* **Dải đo danh định phần cứng:** 20 cm – 800 cm (0,2 m – 8,0 m) theo datasheet AJ-SR04M.
+* **Trần firmware hiện tại:** `KVC_USOUND_MAX_RANGE_CM = 500` (5,0 m) — **đang được nâng lên 700 cm** theo phê duyệt B-7 ngày 31/10/2026 để mở rộng envelope vận hành 2,0–5,0 m.
 * **Độ chính xác:** $\pm 1\text{ cm}$, độ phân giải 1 mm. Tần số sóng siêu âm: 40 kHz.
+* **Góc mở:** ~75° (−3 dB) → vệt đo 4,6 m đường kính ở 3 m; 7,7 m ở 5 m. Giá trị trả về là **điểm phản xạ mạnh nhất trong vệt**, không phải khoảng cách tới điểm ngay dưới UAV.
 * **Định dạng khung dữ liệu UART 4 byte:**
 
 ```text
@@ -136,7 +138,49 @@ Mô-đun GY-87 tích hợp 3 chip trên cùng 1 bus I2C:
 
 ---
 
-## 4. Trách nhiệm phối hợp kiểm thử giữa Phong và Cường
+## 5. Envelope vận hành (chốt 31/10/2026)
+
+### 5.1 Dải hành lang độ cao
+
+| Tham số | Giá trị | Ghi chú |
+| :--- | :--- | :--- |
+| **Setpoint khuyến nghị** | **3,0 m – 3,5 m** | Vùng tin cậy nhất: siêu âm mạnh, vùng phủ 9–12 m²/frame |
+| **Hành lang vận hành** | **2,0 m – 5,0 m** | Hệ thống phải hoạt động liên tục trong toàn dải này |
+| Vùng mù dưới | < 0,20 m | `KVC_USOUND_ERR_BLIND_ZONE` |
+| Ngưỡng mất tín hiệu | > 7,0 m | Sau khi nâng trần firmware lên 700 cm |
+| Hành lang dự phòng trên setpoint | +1,5 m đến +2,0 m | Đủ headroom trước khi chạm trần |
+
+### 5.2 Vùng phủ theo độ cao
+
+Với OV2640 HFOV ~60°, model input 160×160:
+
+| Độ cao | GSD | FOV ngang × dọc | Diện tích/frame |
+| ---: | ---: | :--- | ---: |
+| 2,0 m | 7,2 mm/px | 2,31 × 1,73 m | 4,0 m² |
+| 3,0 m | 10,8 mm/px | 3,46 × 2,60 m | 9,0 m² |
+| 3,5 m | 12,6 mm/px | 4,04 × 3,03 m | 12,2 m² |
+| 5,0 m | 18,1 mm/px | 5,77 × 4,33 m | 25,0 m² |
+
+### 5.3 Chất lượng đo cao (`alt_quality`)
+
+| Mức | Điều kiện | Hành vi georef |
+| :--- | :--- | :--- |
+| `GOOD` | std < 2 cm trong 5 mẫu | Chấp nhận, bán kính bất định nhỏ |
+| `FAIR` | std 2–5 cm | Chấp nhận, bán kính bất định trung bình |
+| `POOR` | std > 5 cm, hoặc `alt` dao động > 0,3 m trong 1 s | **Từ chối georef**, chỉ ghi Local Grid |
+
+### 5.4 Băng thông và tần suất
+
+| Tham số | Giá trị | Ghi chú |
+| :--- | :--- | :--- |
+| Tần suất đo siêu âm | ≤ 4 Hz | `TIMEOUT_MS = 250` (đang nâng 350 → ~2,9 Hz) |
+| Tần suất camera | 30 FPS | 1 giá trị độ cao phục vụ 7–10 frame |
+| FPS AI mục tiêu | **2–4 FPS** | Trần SPI flash ~9,7 FPS; chấp nhận chậm hơn camera |
+| N box tối đa | **12** | Xem `IF_FPGA_MCU_UART.md` §giới hạn N |
+
+**Hệ quả cần xử lý:** vì siêu âm chậm hơn camera 7–10×, mỗi giá trị `alt` được dùng lại cho nhiều frame. Khi UAV di chuyển nhanh, sai số georef tăng theo `v × Δt`. Cần ghi rõ trong `alt_quality` và bán kính bất định.
+
+---
 
 1. **Cường (Phần cứng):**
    - Kiểm tra thông mạch và đo điện áp các chân cấp nguồn bằng đồng hồ VOM trước khi cắm vào Kit Sonix.
@@ -144,3 +188,5 @@ Mô-đun GY-87 tích hợp 3 chip trên cùng 1 bus I2C:
 2. **Phong (Firmware):**
    - Viết module đọc lần lượt từng cảm biến trong `firmware/mcu_payload/src/sensors/`.
    - Cài đặt cơ chế Timeout cho các hàm đọc I2C/UART: nếu 1 cảm biến bị tuột dây hoặc treo bus, chương trình chính vẫn tiếp tục chạy điều phối, **tuyệt đối không bị treo vô hạn trong vòng lặp chờ**.
+   - Cài `alt_quality` và bán kính bất định theo §5.3; từ chối georef khi `POOR`.
+   - Nâng `KVC_USOUND_MAX_RANGE_CM` 500 → 700 và `KVC_USOUND_TIMEOUT_MS` 250 → 350 (B-7, 31/10/2026).

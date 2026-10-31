@@ -2,7 +2,9 @@
 
 - **Mã giao diện:** `IF-CAM`
 - **Hai đầu kết nối:** Cụm Camera quang học (**Trương Trung Kiên** - Chọn cáp, nguồn, gá lắp) ↔ Bo FPGA OneKiwi Primer 20K V1.1 (**Nguyễn Tất Vững** - Nhận luồng pixel và cấu hình)
-- **Trạng thái:** `DRAFT / CHƯA DUYỆT`; `OV2640 DVP` là candidate chi phí thấp để bring-up giao tiếp và pipeline ảnh; `OV9782 DVP 8-bit` vẫn là candidate cần cân nhắc cho UAV chuyển động nhờ global shutter. Chưa chốt camera chính. Module, adapter, rail, VCCIO, pin map và khả năng truy cập DDR3 trên board thực chưa được hardware-verified; tài liệu này không phải hướng dẫn đấu dây.
+- **Trạng thái:** `ACTIVE` — **OV2640 DVP 8-bit đã chốt** cho phạm vi hiện tại (Phê duyệt B-4, 31/10/2026). `OV9782 DVP 8-bit` (global shutter) **bị loại khỏi phạm vi**; nếu sau này cần cho UAV chuyển động, phải mở lại IF-CAM và hiệu chuẩn lại toàn bộ pipeline.
+- **Pin map:** 14 `IO_LOC` đã khoá tại `KVC_PR/src/KVC_FPGA.cst:58-98`, đối chiếu khớp 14/14 với Header J1 pin 5–20 tại `docs/hardware/fpga/CHIP_ONEKIWI_20K_GOWIN_GW2A.md:206-228`. Bitstream đã map đúng (`KVC_PR/impl/pnr/KVC_FPGA.pin.html`).
+- **Giới hạn đã biết:** OV2640 dùng **rolling shutter** — ảnh bị méo khi UAV di chuyển ngang. Vận hành yêu cầu tốc độ bay ≤ 1 m/s hoặc chấp nhận méo. Chưa hardware-verified; DDR3 trên board vẫn mâu thuẫn giữa trang hãng và schematic V1.1.
 
 > **Task:** `KVC-CAM-CANDIDATE-20261019-001` · Owner: Codex · Scope: cập nhật lựa chọn camera PoC và đối chiếu thông tin bộ nhớ OneKiwi giữa tài liệu · Allowed files: `docs/interfaces/IF_CAMERA_FPGA.md`, `docs/architecture/KVC_ThietKeHeThong.md`, `docs/architecture/KVC_PROJECT_STATUS.md`, `docs/hardware/fpga/CHIP_ONEKIWI_20K_GOWIN_GW2A.md` · Acceptance: phân biệt PoC giá thấp với candidate cho UAV chuyển động; ghi rõ DDR3 còn mâu thuẫn giữa trang hãng và schematic cục bộ; không chốt pinout/rail hoặc tuyên bố hardware-verified · Status: `DOC UPDATE COMPLETE` · Verification: đối chiếu Markdown/nguồn hoàn tất; `git diff --check` PASS (exit 0; chỉ cảnh báo chuẩn hóa LF/CRLF); build/test và kiểm tra camera trên board `NOT RUN` vì task chỉ cập nhật tài liệu.
 

@@ -2,8 +2,24 @@
 
 - **Mã giao diện:** `IF-01`
 - **Hai đầu kết nối:** FPGA OneKiwi Primer 20K (**Nguyễn Tất Vững** - Đầu phát TX) ↔ MCU Sonix SN34F788 (**Nguyễn Tá Duy Phong** - Đầu nhận RX)
-- **Trạng thái:** `DRAFT ABI` (Dự thảo kỹ thuật theo mục IV.2 [KVC_ThietKeHeThong.md](../architecture/KVC_ThietKeHeThong.md); cần Vững và Phong thống nhất trước khi khóa ABI)
-- **Trạng thái phía FPGA (28/10/2026): CHƯA CÓ RTL/top-level phát BBox.** Bo bench hiện tại không có FPGA. Phía MCU đã hỗ trợ vắng mặt qua `KVC_FPGA_ENABLE=0` — xem §1.4.
+- **Trạng thái:** `ACTIVE` — 38.400 bps và N ≤ 12 đã chốt 31/10/2026 (B-1, B-2).
+- **Bằng chứng:** `SIMULATED` (31/10/2026) — 3 testbench PASS, PnR `Fmax = 100 MHz`, 0 setup/hold violation, bitstream `.fs` sinh thành công. **Chưa `HARDWARE-VERIFIED`** (chưa nạp bo, chưa đo scope).
+- **Trạng thái phía FPGA (31/10/2026, sau P1):** 4 lỗi P0 đã sửa — `uart_tx` start bit, endianness `bbox_packetizer`, `yolo_nms` `IOU_THRESH`, `width/height` bbox. CNN/NMS tạm loại khỏi datapath qua `USE_MOCK_BBOX=1`. Bitstream hiện tại là **camera → mock bbox → packetizer → UART**, không chứa YOLO11n. Phía MCU hỗ trợ vắng mặt qua `KVC_FPGA_ENABLE=0` — xem §1.4.
+
+### Trạng thái triển khai (P1, 31/10/2026)
+
+| Hạng mục | Trạng thái | Bằng chứng |
+| :--- | :--- | :--- |
+| `uart_tx` bit start | ✅ FIXED | `tb_uart_tx` PASS 29/29, busy width = 9 bit-time |
+| `bbox_packetizer` endianness | ✅ FIXED | `tb_bbox_packetizer` PASS 103/103, đối chiếu parser C MCU |
+| `yolo_nms` IOU_THRESH | ✅ FIXED | `32768` → `16384` (`yolo_nms.v:10`) |
+| `width/height` bbox | ✅ FIXED (mock) | `bbox_data_src` lấy đúng trường, Little-Endian |
+| CNN/NMS trong datapath | ⏸ TẮT (`USE_MOCK_BBOX=1`) | Resource: DSP 0,5/24 thay vì 24/24 |
+| Timing | ✅ PASS | Fmax 100 MHz, 0 setup/hold violation |
+| Testbench có assertion | ✅ 3 TB | `$fatal` khi fail, đã xác nhận bắt được lỗi cũ |
+| Mock frame rate | 200 Hz | `MOCK_DIV = 500_000` @ 100 MHz |
+
+**Còn mở:** chưa nạp bo; sai số baud phía MCU (~4,34 %) chưa đo; `KVC_PR/gen/` vẫn là weights giả; engine requant chưa sửa (P3).
 
 ---
 
@@ -41,10 +57,11 @@ IO_PORT "data_ready" IO_TYPE=LVCMOS33 DRIVE=8;
 ```
 
 > 📌 **File cấu hình dự án đã tạo:** File ràng buộc chân vật lý đã được tạo tại [fpga/constraints/pins.cst](../../fpga/constraints/pins.cst). Header định nghĩa chân phía MCU tại [firmware/mcu_payload/inc/kvc_pinout.h](../../firmware/mcu_payload/inc/kvc_pinout.h). Tham chiếu đấu nối chi tiết xem tại [KVC_MASTER_PINOUT_WIRING.md](../hardware/wiring/KVC_MASTER_PINOUT_WIRING.md).
-
 ### 1.3. Tham số UART
-- **Baudrate:** Mặc định trong mã nguồn firmware MCU (`kvc_fpga_bbox.h`) là **38.400 bps** (cấu hình tối ưu với clock ngoại vi UCLK 12 MHz từ nguồn dao động nội IHRC của Sonix SN34F788).
-  - *Lưu ý về Clock Tree:* Ở xung UCLK 12 MHz, nếu chạy 115.200 bps thì sai số baudrate tối thiểu là **6,99 %** (vượt xa ngưỡng cho phép 3,125 %, gây lỗi khung UART). Do đó, tốc độ 115.200 bps chỉ áp dụng khi MCU được cấu hình PLL để nâng UCLK lên ≥ 24 MHz.
+
+- **Baudrate:** **38.400 bps** — chốt duy nhất ngày 31/10/2026 (B-1). FPGA dùng `BAUD_DIV = 2604 @100 MHz` = chính xác 38.400 (sai số 0 %). MCU dùng `DLL = 20 @UCLK 12 MHz` = 37.500 bps (−2,34 %).
+  - *Rủi ro còn mở:* xem §1.5 — sai số phía MCU cộng IHRC ±2 % thành ~4,34 %, vượt ngưỡng 3,125 %. Chưa đo bằng scope.
+  - 115.200 bps **không dùng** trong thiết kế hiện tại; chỉ khả thi nếu nâng UCLK lên ≥ 24 MHz bằng PLL (khi đó sai số 6,99 % mới giảm xuống mức chấp nhận).
 - **Cấu hình bit:** 8N1 (8 bit dữ liệu, No Parity, 1 Stop bit).
 
 ---
@@ -56,9 +73,28 @@ Toàn bộ số nguyên nhiều byte lưu theo định dạng **Little-Endian** 
 ```text
 +---------------+-----------+-----------------+----------------+--------------------+-----------+
 | Sync (2B)     | Ver (1B)  | Count N (1B)    | Timestamp (4B) | N x BBox (N x 8B)  | CRC (2B)  |
-| 0x5A 0xA5     | 0x01      | 0 .. 20         | uint32 (ms)    | Mỗi BBox 8 byte    | CRC-16    |
+| 0x5A 0xA5     | 0x01      | 0 .. 12         | uint32 (ms)    | Mỗi BBox 8 byte    | CRC-16    |
 +---------------+-----------+-----------------+----------------+--------------------+-----------+
 ```
+
+### Giới hạn N và băng thông (chốt 31/10/2026)
+
+**`N ≤ 12`** — thay đổi so với spec cũ (`0..20`), phê duyệt B-2.
+
+Lý do: khung = `10 + 8N` byte. Ở 38.400 bps × 30 FPS: ngân sách 128 B/frame.
+
+| N | Byte/frame | Băng thông @30 FPS | Sử dụng ngân sách |
+|---:|---:|---:|---:|
+| 0 | 10 | 300 B/s | 8 % |
+| 2 | 26 | 780 B/s | 20 % |
+| 8 | 74 | 2.220 B/s | 58 % |
+| **12** | **106** | **3.180 B/s** | **83 %** |
+| 16 | 138 | 4.140 B/s | 108 % ❌ |
+| 20 | 170 | 5.100 B/s | 133 % ❌ |
+
+Ngân sách thực tế = 3.840 B/s (38.400 bps / 10 bit/byte). N=12 còn margin 17 %.
+
+**Tác động:** `mock_bbox` và AI phải clamp `N ≤ 12`. Nếu phát hiện > 12 mục tiêu, giữ 12 box có `confidence` cao nhất.
 
 ### Bảng phân rã khung truyền
 
@@ -66,7 +102,7 @@ Toàn bộ số nguyên nhiều byte lưu theo định dạng **Little-Endian** 
 | :---: | :---: | :--- | :--- | :--- |
 | **0–1** | 2 byte | Sync Header | `uint8[2]` | Cố định `0x5A 0xA5` (nhận diện đầu khung) |
 | **2** | 1 byte | Version | `uint8` | Phiên bản giao thức (giá trị `1`) |
-| **3** | 1 byte | Candidate Count ($N$) | `uint8` | Số lượng mục tiêu phát hiện trong frame (tối đa 20 mục tiêu) |
+| **3** | 1 byte | Candidate Count ($N$) | `uint8` | Số lượng mục tiêu phát hiện trong frame (**tối đa 12**, xem §giới hạn trên) |
 | **4–7** | 4 byte | Timestamp | `uint32` | Thời điểm chụp/suy luận của khung ảnh (ms) |
 | **8 .. (8+8N-1)** | $N \times 8$ byte | Danh sách BBox | Mảng struct BBox | Chứa thông tin vị trí và phân loại của $N$ đối tượng |
 | **Cuối** | 2 byte | CRC-16 Checksum | `uint16` | **CRC-16/CCITT-FALSE** tính từ byte 0 đến hết danh sách BBox |
@@ -104,6 +140,8 @@ Mỗi mục tiêu được mã hóa trong đúng 8 byte:
 
 ## 1.4. Yêu cầu phía MCU khi KHÔNG có FPGA (28/10/2026)
 
+> **Cập nhật 31/10/2026:** RTL hiện đã có trong `KVC_PR/` (trước đây tài liệu ghi "chưa có RTL"). Chế độ `KVC_FPGA_ENABLE=0` vẫn giữ vì FPGA chưa được nạp bitstream hợp lệ (Fmax 14,6 MHz) và chưa hardware-verified.
+
 Bo bench hiện tại không có FPGA, và phía FPGA chưa có RTL/top-level. Firmware MCU phải **im lặng tuyệt đối** trên đường UART1 thay vì sinh log rác.
 
 | Yêu cầu | Cách hiện thực | Kiểm chứng trong log |
@@ -121,21 +159,28 @@ Bo bench hiện tại không có FPGA, và phía FPGA chưa có RTL/top-level. F
 
 ---
 
-## 1.5. Câu hỏi mở — sai số baud 38.400 (chưa chốt)
+## 1.5. Baud 38.400 — đã chốt, kèm rủi ro sai số chưa đo
 
-Đặc tả §1.3 chọn **38.400 bps** với lý do "tối ưu với UCLK 12 MHz". Nhưng chính dự án đã bác cấu hình này cho GNSS trong [MCU_BUILD_KEIL.md](../configuration/MCU_BUILD_KEIL.md) §5:
+**Quyết định 31/10/2026 (B-1): dùng 38.400 bps duy nhất** trên mọi tài liệu, kể cả phần cứng lẫn MCU.
 
-> Tại UCLK 12 MHz, divisor 20 cho 37.500 bps (lệch **−2,34 %**); cộng IHRC ±2 % thành ~4,3 %, **vượt** ngưỡng 3,125 % của UART không đồng bộ.
+**Rủi ro kỹ thuật còn mở (chưa giải quyết):** tại UCLK 12 MHz, divisor 20 cho 37.500 bps (lệch **−2,34 %**); cộng IHRC ±2 % thành ~4,34 %, **vượt** ngưỡng 3,125 % của UART không đồng bộ. Điều này đã được chính dự án bác cho GNSS trong [MCU_BUILD_KEIL.md](../configuration/MCU_BUILD_KEIL.md) §5.
 
-UART1 dùng **cùng UCLK 12 MHz, cùng IHRC, cùng bộ chia** (`KVC_FPGA_UART_DLL = 0x14 = 20`). Do đó về lý thuyết cùng sai số.
+UART1 dùng **cùng UCLK 12 MHz, cùng IHRC, cùng bộ chia** (`KVC_FPGA_UART_DLL = 0x14 = 20`). Về lý thuyết cùng sai số.
 
-**Hai phương án, cần Vững + Phong chốt trước khi có RTL:**
+**Vì sao vẫn chốt 38.400:**
 
-| Phương án | Baud | Sai số @ 12 MHz | Ưu / nhược |
-| :--- | :---: | :--- | :--- |
-| **A** (khuyến nghị) | **19.200** | DLL 39 → 19 231 bps, **+0,16 %** | An toàn; 10 byte/frame (N=0) = 5,2 ms; 170 byte (N=20) = 88 ms. Vẫn dư cho 1–5 Hz |
-| B | 38.400 | DLL 20 → 37 500 bps, **−2,34 %** | Nhanh gấp đôi nhưng nằm ngoài ngưỡng; chỉ chấp nhận nếu đo scope xác nhận cả hai đầu chịu được |
+| Lý do | Chi tiết |
+| :--- | :--- |
+| Ngân sách băng thông | 19.200 bps chỉ cho 1.920 B/s → N=12 @30 FPS cần 3.180 B/s (**vượt 66 %**) |
+| FPGA phát chuẩn | RTL dùng `BAUD_DIV = 2604` = chính xác 38.400, sai số 0 %. Chỉ MCU có sai số |
+| Chưa có bằng chứng | Chưa đo scope; chưa có `fe` từ UART1 thật |
 
-**Không đổi code một phía.** Nếu chọn A, phải sửa đồng thời `KVC_FPGA_UART_DLL`/`KVC_FPGA_UART_BAUD` trong `kvc_fpga_bbox.h`, RTL phía Vững, và §1.3 tài liệu này.
+**Biện pháp bắt buộc trước khi tuyên bố PASS:**
 
-**Bằng chứng cần thu khi có FPGA:** đo bằng scope/logic analyzer tại `P2.3` — đo độ rộng bit thực và đếm `fe` trong `[RING] FPGA`. Số `fe=2497 byt=2497` ghi trong tài liệu 26/10 **không** dùng làm bằng chứng cho UART1: khi đó chưa có RTL nên chân R13 float, và lời giải thích "TX idle LOW + cầu phân áp" áp dụng cho siêu âm (P2.15), không áp dụng cho đường LVCMOS33 push-pull của FPGA. Cùng bảng đó ghi GNSS `fe=0`.
+1. Đo độ rộng bit tại `P2.3` bằng logic analyzer ở 38.400 — phải thấy ~26,04 µs.
+2. Đếm `fe` trong `[RING] FPGA` trên 10.000 frame — phải `= 0`.
+3. Nếu `fe > 0`: hạ xuống **19.200** và chấp nhận FPS giảm còn ~15 (N=12), hoặc nâng UCLK lên 24 MHz (cần PLL, đổi cả firmware lẫn `.cst`).
+
+**Không đổi code một phía.** Nếu chọn 19.200, phải sửa đồng thời `KVC_FPGA_UART_DLL`/`KVC_FPGA_UART_BAUD` trong `kvc_fpga_bbox.h`, `BAUD_DIV` trong `KVC_PR/src/comm/uart_tx.v`, và §1.3 tài liệu này.
+
+**Bằng chứng cần thu:** đo bằng scope/logic analyzer tại `P2.3` — độ rộng bit thực và đếm `fe` trong `[RING] FPGA`. Số `fe=2497 byt=2497` ghi trong tài liệu 26/10 **không** dùng làm bằng chứng cho UART1: khi đó chưa có RTL nên chân R13 float, và lời giải thích "TX idle LOW + cầu phân áp" áp dụng cho siêu âm (P2.15), không áp dụng cho đường LVCMOS33 push-pull của FPGA. Cùng bảng đó ghi GNSS `fe=0`.

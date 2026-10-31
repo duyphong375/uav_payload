@@ -155,6 +155,20 @@ KvcGeoResult kvc_georef_target(const KvcGeoInput *in, const KvcGeoConfig *cfg) {
         return out;
     }
 
+    /* KVC-B7 (31/10/2026): tu choi georef khi chat luong do cao POOR.
+     *
+     * Ly do: siêu am co vet do ~75 do (4,6 m o 3 m, 7,7 m o 5 m). Khi gia tri
+     * dao dong > 5 cm (std), do cao khong tuong ung voi pixel dang chieu —
+     * toa do se sai mot cach he thong ma khong the phat hien tu output.
+     * Tra UAV_ONLY thay vi COMPUTED de backend/GCS khong danh dau muc tieu. */
+    if (in->alt_quality >= (uint8_t)KVC_GEO_ALT_POOR) {
+        out = geo_make_none();
+        out.kind     = KVC_GEO_POS_UAV_ONLY;
+        out.lat_deg7 = in->uav_lat_deg7;
+        out.lon_deg7 = in->uav_lon_deg7;
+        return out;
+    }
+
     /* ---- Bước 3: chiếu BBox xuống mặt nước (giữ nguyên số học bản cũ) ---- */
     if (cfg == 0) {
         kvc_geo_config_default(&default_cfg);

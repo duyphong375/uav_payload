@@ -53,6 +53,7 @@ static KvcGeoInput make_input(void) {
     in.uav_lon_deg7  = TEST_LON_DEG7;
     in.alt_valid     = true;
     in.alt_cm        = 300U;    /* 3 m */
+    in.alt_quality   = (uint8_t)KVC_GEO_ALT_GOOD;   /* KVC-B7 */
     in.yaw_valid     = true;
     in.yaw_deg10     = 0U;      /* Bắc */
     in.bbox_x_center = 320U;    /* tâm ảnh */
@@ -351,6 +352,57 @@ static void test_large_offset_saturates_cleanly(void) {
     TEST_ASSERT(r.lat_deg7 != 0 && r.lon_deg7 != 0, "toa do khac sentinel 0");
 }
 
+/* ============================================================================
+ * TEST 13: alt_quality POOR phải từ chối georef (KVC-B7, 31/10/2026)
+ * ============================================================================
+ * Bối cảnh: AJ-SR04M có vệt đo ~75° (4,6 m @ 3 m). Khi giá trị dao động
+ * > 5 cm (std), độ cao không tương ứng với pixel đang chiếu. Georef phải
+ * trả UAV_ONLY thay vì COMPUTED, nếu không GCS sẽ đánh dấu mục tiêu ở
+ * toạ độ sai mà không có cảnh báo.
+ */
+static void test_alt_quality_poor_rejects(void) {
+    KvcGeoInput in = make_input();
+    KvcGeoResult r;
+
+    printf("[TEST 13] alt_quality POOR -> tu choi georef...\n");
+
+    in.alt_quality = (uint8_t)KVC_GEO_ALT_GOOD;
+    r = kvc_georef_target(&in, NULL);
+    TEST_ASSERT(r.kind == KVC_GEO_POS_COMPUTED, "GOOD phai cho COMPUTED");
+
+    in.alt_quality = (uint8_t)KVC_GEO_ALT_FAIR;
+    r = kvc_georef_target(&in, NULL);
+    TEST_ASSERT(r.kind == KVC_GEO_POS_COMPUTED, "FAIR phai cho COMPUTED");
+
+    in.alt_quality = (uint8_t)KVC_GEO_ALT_POOR;
+    r = kvc_georef_target(&in, NULL);
+    TEST_ASSERT(r.kind == KVC_GEO_POS_UAV_ONLY, "POOR phai tra UAV_ONLY");
+    TEST_ASSERT(r.lat_deg7 == in.uav_lat_deg7, "UAV_ONLY phai giu vi tri UAV");
+    TEST_ASSERT(r.x_local_cm == 0, "UAV_ONLY khong duoc co offset muc tieu");
+}
+
+/* ============================================================================
+ * TEST 14: trần độ cao 800 cm vẫn hoạt động sau khi nâng MAX_FRAME_MM
+ * ============================================================================ */
+static void test_alt_range_800cm(void) {
+    KvcGeoInput in = make_input();
+    KvcGeoResult r;
+
+    printf("[TEST 14] Do cao 7 m va 8 m voi tran moi (B-7)...\n");
+
+    in.alt_cm = 700U;   /* 7 m = tran do tin cay moi */
+    r = kvc_georef_target(&in, NULL);
+    TEST_ASSERT(r.kind == KVC_GEO_POS_COMPUTED, "700 cm phai COMPUTED");
+
+    in.alt_cm = 800U;   /* 8 m = tran vat ly camera config */
+    r = kvc_georef_target(&in, NULL);
+    TEST_ASSERT(r.kind == KVC_GEO_POS_COMPUTED, "800 cm van trong ALT_MAX");
+
+    in.alt_cm = 801U;
+    r = kvc_georef_target(&in, NULL);
+    TEST_ASSERT(r.kind == KVC_GEO_POS_UAV_ONLY, "801 cm phai UAV_ONLY");
+}
+
 int main(void) {
     printf("================================================================\n");
     printf("  KVC - HOST TEST: GEOREFERENCING (MCU-GEO-001)\n");
@@ -366,6 +418,8 @@ int main(void) {
     test_latitude_lon_scale();
     test_null_safe();
     test_large_offset_saturates_cleanly();
+    test_alt_quality_poor_rejects();
+    test_alt_range_800cm();
 
     printf("\n----------------------------------------------------------------\n");
     printf("  KET QUA: %d / %d tests PASS\n", s_tests_passed, s_tests_run);

@@ -89,6 +89,28 @@ typedef struct {
 #define KVC_GEO_ALT_MAX_CM   800U
 
 /**
+ * @brief Chất lượng đo cao (KVC-B7, 31/10/2026).
+ *
+ * VÌ SAO CẦN: AJ-SR04M có vệt đo ~75° (rộng 4,6 m ở 3 m, 7,7 m ở 5 m), nên
+ * giá trị trả về là điểm phản xạ mạnh nhất TRONG VỆT, không phải khoảng cách
+ * tới mặt nước ngay dưới UAV. Trên mặt nước gợn, giá trị dao động vài cm
+ * giữa các lần đo. Ở độ cao > ~2 m, vệt đo rộng hơn vùng phủ camera, nghĩa
+ * là georef dùng một độ cao không tương ứng với pixel đang chiếu.
+ *
+ * Cách xử lý: phân loại chất lượng theo độ lệch chuẩn của N mẫu gần nhất.
+ * POOR -> từ chối georef (trả KVC_GEO_POS_UAV_ONLY), chỉ ghi Local Grid.
+ */
+typedef enum {
+    KVC_GEO_ALT_GOOD = 0,  /**< std < 2 cm — độ cao tin cậy */
+    KVC_GEO_ALT_FAIR = 1,  /**< std 2..5 cm — chấp nhận, bất định trung bình */
+    KVC_GEO_ALT_POOR = 2   /**< std > 5 cm — TỪ CHỐI georef */
+} KvcGeoAltQuality;
+
+/** Ngưỡng phân loại alt_quality (cm, độ lệch chuẩn). */
+#define KVC_GEO_ALT_STD_GOOD_CM   2.0f
+#define KVC_GEO_ALT_STD_FAIR_CM   5.0f
+
+/**
  * @brief Điền cấu hình mặc định (giá trị danh định, chưa hiệu chuẩn).
  * @param cfg Con trỏ nhận cấu hình; NULL được bỏ qua.
  */
@@ -126,7 +148,7 @@ typedef struct {
     bool     gnss_valid;      /**< UAV có vị trí GNSS 3D fix hợp lệ. */
     bool     alt_valid;       /**< Cự ly siêu âm hợp lệ trong chu kỳ này. */
     bool     yaw_valid;       /**< Yaw đáng tin (RMC 'A', ≤3 s, ≥0,5 knot). */
-    uint8_t  pad0;            /**< Đệm tường minh, tránh -Wpadded. */
+    uint8_t  alt_quality;     /**< KvcGeoAltQuality (KVC-B7). POOR -> từ chối georef. */
 } KvcGeoInput;
 
 /**

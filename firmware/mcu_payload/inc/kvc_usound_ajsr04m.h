@@ -82,9 +82,13 @@ extern "C" {
  *
  * CHI PHÍ: chỉ tốn thêm thời gian ở những chu kỳ THẤT BẠI. Khi có phản xạ,
  * `kvc_usound_measure()` thoát ngay ở khung đầu nên chu kỳ bình thường không
- * đổi. Trường hợp xấu nhất 250 ms + TX LoRa 300 ms + I2C/GNSS ~100 ms = 650 ms
- * vẫn dưới hạn 1000 ms của chu kỳ phát và dưới watchdog 6 s. */
-#define KVC_USOUND_TIMEOUT_MS         250U    /* Độ dài cửa sổ nghe RX (ms) */
+ * đổi. Trường hợp xấu nhất 350 ms + TX LoRa 300 ms + I2C/GNSS ~100 ms = 750 ms
+ * vẫn dưới hạn 1000 ms của chu kỳ phát và dưới watchdog 6 s.
+ *
+ * KVC-B7 (31/10/2026): nang 250 -> 350 ms. Ly do: tran do da nang len 700 cm,
+ * echo @7 m can ~41 ms (2*7/343) + jitter + module timeout noi bo. 250 ms
+ * khong du cho truong hop xa nhat. Chỉ tang o chu ky that bai. */
+#define KVC_USOUND_TIMEOUT_MS         350U    /* Độ dài cửa sổ nghe RX (ms) */
 
 /* ============================================================================
  * 2. HÀM TRỄ VI GIÂY (MICROSECOND) BẰNG VÒNG LẶP LỆNH CHUẨN XÁC, AN TOÀN TUYỆT ĐỐI

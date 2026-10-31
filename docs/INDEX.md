@@ -46,7 +46,7 @@ ID giao diện là **bất biến**. Đổi tên file phải giữ ID trong tiê
 
 | ID | Tài liệu | Đường dẫn | Trạng thái | Bằng chứng | Owner | Kiểm tra gần nhất | Code liên quan |
 |---|---|---|---|---|---|---|---|
-| IF-00 | MCU ↔ cảm biến | `interfaces/IF_MCU_SENSORS.md` | ACTIVE | DESIGN; **envelope 2,0–5,0 m + trần 700 cm chốt 31/10/2026** | Phong | 2026-10-31 | `inc/kvc_imu_gy87.h`, `inc/kvc_usound_ajsr04m.h`, `inc/kvc_gnss_neo_m10.h` |
+| IF-00 | MCU ↔ cảm biến | `interfaces/IF_MCU_SENSORS.md` | ACTIVE | **SIMULATED** (31/10/2026): trần 700 cm + `MAX_FRAME_MM` 8000 + `alt_quality`; test 65/65 và 64/64 PASS | Phong | 2026-10-31 | `inc/kvc_usound_decode.h`, `inc/kvc_georef.h`, `src/sensors/kvc_usound_decode.c` |
 | IF-01 | FPGA ↔ MCU UART | `interfaces/IF_FPGA_MCU_UART.md` | ACTIVE | **SIMULATED** (31/10/2026): 3 TB PASS, Fmax 100 MHz, 0 violation | Vững | 2026-10-31 | `KVC_PR/src/comm/`, `KVC_PR/verification/tb/`, `src/sensors/kvc_fpga_bbox.c` |
 | IF-02 | MCU ↔ LoRa RF 32 byte | `interfaces/IF_MCU_LORA_RF.md` | ACTIVE | APPROVED ABI (HUMAN 29/10/2026) / SOURCE-VERIFIED | Thịnh | 2026-10-29 | `inc/kvc_telemetry.h`, `firmware/gateway_esp32/src/main.cpp` |
 | IF-03 | ESP32 ↔ GCS WebSocket | `interfaces/IF_ESP32_GCS_WS.md` | ACTIVE | SOURCE-VERIFIED (ABI payload IF-02 đã duyệt 29/10/2026) | Thịnh | 2026-10-29 | `gcs/backend/esp32_ingress.py` |

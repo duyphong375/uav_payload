@@ -146,7 +146,7 @@ static void test_blind_zone(void) {
     TEST_ASSERT(mm == 100U, "mm tho phai la 100");
     TEST_ASSERT(kvc_usound_result_to_err(r) == KVC_USOUND_ERR_BLIND_ZONE, "ma loi phai BLIND_ZONE (4)");
 
-    /* Biên dưới đúng 200 mm phải là OK (dải 20..500 cm). */
+    /* Biên dưới đúng 200 mm phải là OK (dải 20..700 cm sau B-7). */
     feed_frame_ok(&dec, 0x00U, 0xC8U, &mm);
     TEST_ASSERT(mm == 200U, "200 mm phai nam trong dai");
 }
@@ -213,28 +213,35 @@ static void test_ff_checksum_frame(void) {
 }
 
 /* ============================================================================
- * TEST 7: Ngoài dải trên (> 500 cm)
+ * TEST 7: Ngoài dải trên (> 700 cm, sau khi nâng trần 31/10/2026 B-7)
  * ============================================================================ */
 static void test_out_of_range(void) {
     KvcUsoundDecoder dec;
     uint16_t mm = 0U;
     KvcUsoundFrameResult r;
 
-    printf("[7] Ngoai dai 5500 mm\n");
+    printf("[7] Ngoai dai 7500 mm (tran moi 700 cm)\n");
     kvc_usound_decode_reset(&dec);
-    r = feed_frame(&dec, 0x15U, 0x7CU, cs_of(0x15U, 0x7CU), &mm);   /* 5500 mm */
+    r = feed_frame(&dec, 0x1DU, 0x4CU, cs_of(0x1DU, 0x4CU), &mm);   /* 7500 mm */
 
     TEST_ASSERT(r == KVC_USOUND_FRAME_OUT_OF_RANGE, "phai bao OUT_OF_RANGE");
-    TEST_ASSERT(mm == 5500U, "mm tho phai la 5500");
+    TEST_ASSERT(mm == 7500U, "mm tho phai la 7500");
     TEST_ASSERT(kvc_usound_result_to_err(r) == KVC_USOUND_ERR_OUT_OF_RANGE, "ma loi phai OUT_OF_RANGE (3)");
 
-    /* Biên trên đúng 500 cm (5000 mm) phải là OK. */
-    feed_frame_ok(&dec, 0x13U, 0x88U, &mm);
-    TEST_ASSERT(mm == 5000U, "5000 mm phai nam trong dai");
+    /* Bien tren dung 700 cm (7000 mm) phai la OK. */
+    kvc_usound_decode_reset(&dec);
+    feed_frame_ok(&dec, 0x1BU, 0x58U, &mm);
+    TEST_ASSERT(mm == 7000U, "7000 mm phai nam trong dai");
+
+    /* 5500 mm (5,5 m) phai la OK sau khi nang tran — day la do cao
+     * lam viec thuc te cua UAV (envelope 2,0-5,0 m). */
+    kvc_usound_decode_reset(&dec);
+    feed_frame_ok(&dec, 0x15U, 0x7CU, &mm);
+    TEST_ASSERT(mm == 5500U, "5500 mm (5,5 m) phai nam trong dai sau B-7");
 }
 
 /* ============================================================================
- * TEST 8: Giá trị > 6000 mm bị loại dù checksum đúng
+ * TEST 8: Giá trị > MAX_FRAME_MM (8000) bị loại dù checksum đúng
  * ============================================================================ */
 static void test_above_module_max(void) {
     KvcUsoundDecoder dec;
@@ -245,8 +252,20 @@ static void test_above_module_max(void) {
     kvc_usound_decode_reset(&dec);
     r = feed_frame(&dec, 0x20U, 0x00U, cs_of(0x20U, 0x00U), &mm);
 
-    TEST_ASSERT(r == KVC_USOUND_FRAME_BAD_CHECKSUM, "vuot 6000 mm phai bi loai");
+    TEST_ASSERT(r == KVC_USOUND_FRAME_BAD_CHECKSUM, "vuot 8000 mm phai bi loai");
     TEST_ASSERT(mm == 0xFFFFU, "khong duoc ghi mm");
+
+    /* 7000 mm (7 m) phai qua checksum va la OUT_OF_RANGE, KHONG phai
+     * BAD_CHECKSUM — day la khac biet quan trong sau B-7. */
+    kvc_usound_decode_reset(&dec);
+    mm = 0xFFFFU;
+    r = feed_frame(&dec, 0x1BU, 0x58U, cs_of(0x1BU, 0x58U), &mm);
+    TEST_ASSERT(r == KVC_USOUND_FRAME_OK, "7000 mm phai qua checksum (tran tin cay 700 cm)");
+
+    kvc_usound_decode_reset(&dec);
+    mm = 0xFFFFU;
+    r = feed_frame(&dec, 0x1FU, 0x40U, cs_of(0x1FU, 0x40U), &mm);   /* 8000 mm */
+    TEST_ASSERT(r == KVC_USOUND_FRAME_OUT_OF_RANGE, "8000 mm phai OUT_OF_RANGE, khong phai BAD_CHECKSUM");
 }
 
 /* ============================================================================
@@ -364,7 +383,7 @@ static void test_range_boundaries(void) {
     uint16_t mm = 0U;
     KvcUsoundFrameResult r;
 
-    printf("[14] Bien dai do (199, 200, 5000, 5001 mm)\n");
+    printf("[14] Bien dai do (199, 200, 7000, 7001 mm)\n");
     kvc_usound_decode_reset(&dec);
 
     r = feed_frame(&dec, 0x00U, 0xC7U, cs_of(0x00U, 0xC7U), &mm);   /* 199 mm = 19 cm */
@@ -373,11 +392,12 @@ static void test_range_boundaries(void) {
     r = feed_frame(&dec, 0x00U, 0xC8U, cs_of(0x00U, 0xC8U), &mm);   /* 200 mm = 20 cm */
     TEST_ASSERT(r == KVC_USOUND_FRAME_OK, "20 cm phai OK");
 
-    r = feed_frame(&dec, 0x13U, 0x88U, cs_of(0x13U, 0x88U), &mm);   /* 5000 mm = 500 cm */
-    TEST_ASSERT(r == KVC_USOUND_FRAME_OK, "500 cm phai OK");
+    r = feed_frame(&dec, 0x1BU, 0x58U, cs_of(0x1BU, 0x58U), &mm);   /* 7000 mm = 700 cm */
+    TEST_ASSERT(r == KVC_USOUND_FRAME_OK, "700 cm phai OK (tran B-7)");
 
-    r = feed_frame(&dec, 0x13U, 0x89U, cs_of(0x13U, 0x89U), &mm);   /* 5001 mm = 500,1 cm */
-    TEST_ASSERT(r == KVC_USOUND_FRAME_OUT_OF_RANGE, "500,1 cm phai OUT_OF_RANGE");
+    kvc_usound_decode_reset(&dec);
+    r = feed_frame(&dec, 0x1BU, 0x59U, cs_of(0x1BU, 0x59U), &mm);   /* 7001 mm = 700,1 cm */
+    TEST_ASSERT(r == KVC_USOUND_FRAME_OUT_OF_RANGE, "700,1 cm phai OUT_OF_RANGE");
 }
 
 /* ============================================================================

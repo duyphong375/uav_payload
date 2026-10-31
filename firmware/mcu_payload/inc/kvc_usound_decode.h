@@ -35,17 +35,31 @@ extern "C" {
  * 1. HẰNG SỐ GIAO THỨC VÀ CHÍNH SÁCH DẢI ĐO
  * ============================================================================ */
 #define KVC_USOUND_FRAME_HEADER        0xFFU   /* Byte đồng bộ đầu khung */
-#define KVC_USOUND_NO_ECHO_MM          6000U   /* Giá trị module dùng khi không có phản xạ */
-#define KVC_USOUND_MAX_FRAME_MM        6000U   /* Module không bao giờ trả lớn hơn mức này */
+/* Gia tri module dung khi khong co phan xa (6000 mm = 6,0 m). */
+#define KVC_USOUND_NO_ECHO_MM          6000U
+/* Tran vat ly cua module. Datasheet AJ-SR04M ghi 20-800 cm.
+ *
+ * KVC-B7 (31/10/2026): nang 6000 -> 8000 mm.
+ * Truoc day = 6000 mm, trung voi NO_ECHO. Dieu nay VO TINH CHAN moi
+ * gia tri 6001..7000 mm thanh BAD_CHECKSUM, nen viec nang
+ * KVC_USOUND_MAX_RANGE_CM len 700 se KHONG co tac dung — module tra
+ * 7000 mm cho 7 m nhung firmware loai ngay o buoc checksum.
+ * Gio MAX_FRAME_MM (8000) > MAX_RANGE_CM*10 (7000) > NO_ECHO_MM (6000),
+ * ba nguong khong con chong nhau. */
+#define KVC_USOUND_MAX_FRAME_MM        8000U
 
 #define KVC_USOUND_MIN_RANGE_CM        20U     /* Vùng mù dưới 20 cm */
-#define KVC_USOUND_MAX_RANGE_CM        500U    /* Trần đo tin cậy phục vụ tải UAV cứu nạn */
+/* Tran do tin cay. Nang 500 -> 700 cm ngay 31/10/2026 (phe duyet B-7)
+ * de mo rong envelope van hanh len 2,0-5,0 m (setpoint 3,0-3,5 m).
+ * Datasheet AJ-SR04M ghi 20-800 cm; 700 la gia tri bao thu sau khi
+ * tru sai so nhiet va mat nuoc gon. */
+#define KVC_USOUND_MAX_RANGE_CM        700U
 
 /* Mã trạng thái đo đạc (giá trị được dùng trong telemetry và log [M3] err/N). */
-#define KVC_USOUND_OK                  0U      /* Đo thành công, nằm trong dải tin cậy 20–500 cm */
+#define KVC_USOUND_OK                  0U      /* Đo thành công, nằm trong dải tin cậy 20–700 cm */
 #define KVC_USOUND_ERR_TIMEOUT         1U      /* Có byte đến nhưng không đủ khung 4 byte hợp lệ */
 #define KVC_USOUND_ERR_CHECKSUM        2U      /* Checksum sai */
-#define KVC_USOUND_ERR_OUT_OF_RANGE    3U      /* Có phản xạ nhưng vượt trần 500 cm */
+#define KVC_USOUND_ERR_OUT_OF_RANGE    3U      /* Có phản xạ nhưng vượt trần 700 cm */
 #define KVC_USOUND_ERR_BLIND_ZONE      4U      /* Vật cản nằm trong vùng mù dưới 20 cm */
 #define KVC_USOUND_ERR_NO_ECHO         5U      /* Module báo 6000 mm: không có phản xạ về đầu dò */
 #define KVC_USOUND_ERR_NO_RESPONSE     6U      /* Không nhận được byte nào: module không đáp 0x01 */

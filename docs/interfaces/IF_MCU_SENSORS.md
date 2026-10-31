@@ -180,6 +180,31 @@ Với OV2640 HFOV ~60°, model input 160×160:
 
 **Hệ quả cần xử lý:** vì siêu âm chậm hơn camera 7–10×, mỗi giá trị `alt` được dùng lại cho nhiều frame. Khi UAV di chuyển nhanh, sai số georef tăng theo `v × Δt`. Cần ghi rõ trong `alt_quality` và bán kính bất định.
 
+### 5.5 Trạng thái triển khai (P5, 31/10/2026)
+
+| Hạng mục | Trạng thái | Bằng chứng |
+| :--- | :--- | :--- |
+| `KVC_USOUND_MAX_RANGE_CM` 500 → 700 | ✅ FIXED | `kvc_usound_decode.h` |
+| `KVC_USOUND_MAX_FRAME_MM` 6000 → 8000 | ✅ **FIXED — phát hiện quan trọng** | Xem ghi chú dưới |
+| `KVC_USOUND_TIMEOUT_MS` 250 → 350 | ✅ FIXED | `kvc_usound_ajsr04m.h:87` |
+| `alt_quality` (GOOD/FAIR/POOR) | ✅ THÊM MỚI | `kvc_georef.h` |
+| Từ chối georef khi POOR | ✅ THÊM MỚI | `kvc_georef.c` trả `KVC_GEO_POS_UAV_ONLY` |
+| Test | ✅ PASS | `test_kvc_usound_decode` 65/65; `test_kvc_georef` 64/64 |
+
+**Phát hiện quan trọng — nâng `MAX_RANGE_CM` một mình vô hiệu:**
+
+`KVC_USOUND_MAX_FRAME_MM` từng bằng `6000`, **trùng với `KVC_USOUND_NO_ECHO_MM`**. Vì `decode.c:89` loại mọi khung `calc_mm > MAX_FRAME_MM` thành `BAD_CHECKSUM` **trước** khi kiểm range, nâng `MAX_RANGE_CM` lên 700 sẽ **không có tác dụng**: module trả `7000 mm` cho 7 m nhưng firmware loại ngay ở bước checksum.
+
+Nay ba ngưỡng không còn chồng nhau:
+
+```
+MAX_FRAME_MM (8000) > MAX_RANGE_CM × 10 (7000) > NO_ECHO_MM (6000)
+```
+
+**Hệ quả:** `7000 mm` giờ là `OUT_OF_RANGE` (đúng — vượt trần tin cậy), không còn là `BAD_CHECKSUM` (sai — dữ liệu hợp lệ bị coi là nhiễu).
+
+**Còn mở:** chưa đo thực tế trên kit. `frame_ok ≥ 98 %` @ 3 m, `fx_px` thật, `alt_quality` từ dữ liệu thật — thuộc Gate G6 cần phần cứng.
+
 ---
 
 1. **Cường (Phần cứng):**

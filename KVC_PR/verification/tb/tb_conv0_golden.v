@@ -81,13 +81,15 @@ module tb_conv0_golden;
 
     conv_engine_dynamic_fsm #(
         .KERNEL(K), .IN_C(IN_C), .OUT_C(OUT_C),
-        .IMG_W(IMG), .IMG_H(IMG), .Q_BITS(Q_BITS)
+        .IMG_W(IMG), .IMG_H(IMG), .Q_BITS(Q_BITS),
+        .GROUPS(1)
     ) dut (
         .clk(clk), .rst_n(rst_n), .start(start),
         .p_stride(p_stride), .p_pad(p_pad),
         .p_weight_base(p_weight_base),
         .p_bias_base(p_bias_base),
         .p_quant_base(p_quant_base),
+        .p_groups(16'd0),
         .win_valid(win_valid), .win_ready(win_ready), .win_data(win_data),
         .bias_addr(bias_addr), .bias_rdata(bias_rdata), .bias_rvalid(bias_rvalid), .bias_req(bias_req),
         .mult_addr(mult_addr), .mult_rdata(mult_rdata), .mult_rvalid(mult_rvalid), .mult_req(mult_req),

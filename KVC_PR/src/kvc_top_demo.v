@@ -229,10 +229,12 @@ module kvc_top_demo
             wire        conv_out_valid, conv_done;
 
             conv_engine_dynamic_fsm #(
-                .KERNEL(KERNEL), .IN_C(IN_C), .OUT_C(32), .IMG_W(160), .IMG_H(160), .Q_BITS(Q_BITS)
+                .KERNEL(KERNEL), .IN_C(IN_C), .OUT_C(32), .IMG_W(160), .IMG_H(160), .Q_BITS(Q_BITS),
+                .GROUPS(1)
             ) u_conv (
                 .clk(clk_100m), .rst_n(rst_n), .start(letterbox_out_done),
                 .p_stride(16'd2), .p_pad(16'd1), .p_weight_base(24'h400000), .p_bias_base(24'd0), .p_quant_base(24'd0),
+                .p_groups(16'd0),
                 .win_valid(conv_win_valid), .win_ready(), .win_data(conv_win_data),
                 .bias_addr(bias_addr), .bias_rdata(bias_rdata), .bias_rvalid(bias_rvalid), .bias_req(bias_req),
                 .mult_addr(mult_addr), .mult_rdata(mult_rdata), .mult_rvalid(mult_rvalid), .mult_req(mult_req),

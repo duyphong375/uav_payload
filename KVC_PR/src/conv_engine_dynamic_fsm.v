@@ -7,7 +7,13 @@ module conv_engine_dynamic_fsm
     parameter integer OUT_C  = 32,
     parameter integer IMG_W  = 160,
     parameter integer IMG_H  = 160,
-    parameter integer Q_BITS = 8
+    parameter integer Q_BITS = 8,
+    // E-03: so nhom tich chap. GROUPS=1 -> conv thuong.
+    // GROUPS=IN_C=OUT_C -> depthwise (7 lop trong YOLO11n).
+    // Voi GROUPS>1: moi nhom chi tich luy IN_C/GROUPS kenh vao,
+    // va chi dung OUT_C/GROUPS kenh ra. Nhom cua output channel oc la
+    // g = oc / (OUT_C/GROUPS).
+    parameter integer GROUPS = 1
 )
 (
     input  wire clk,
@@ -19,6 +25,7 @@ module conv_engine_dynamic_fsm
     input  wire [23:0] p_weight_base,
     input  wire [23:0] p_bias_base,
     input  wire [23:0] p_quant_base,
+    input  wire [15:0] p_groups,     // runtime override; 0 = dung GROUPS
 
     input  wire win_valid,
     output reg  win_ready,
@@ -67,7 +74,17 @@ module conv_engine_dynamic_fsm
     reg [15:0] oc;
     reg [15:0] kx;
     reg [15:0] ky;
-    reg [15:0] ic;
+    reg [15:0] ic;      // chi so kenh TRONG NHOM (0 .. IN_C/GROUPS-1)
+    reg [15:0] ic_g;    // chi so kenh TOAN CUC = g*(IN_C/GROUPS) + ic
+
+    // E-03: so nhom hieu luc va kenh moi nhom
+    wire [15:0] eff_groups = (p_groups == 16'd0) ? GROUPS[15:0] : p_groups;
+    wire [15:0] in_c_per_g = (eff_groups == 16'd0) ? IN_C[15:0]
+                                                   : (IN_C[15:0] / eff_groups);
+    wire [15:0] out_c_per_g = (eff_groups == 16'd0) ? OUT_C[15:0]
+                                                    : (OUT_C[15:0] / eff_groups);
+    // nhom cua output channel hien tai
+    wire [15:0] cur_group = (out_c_per_g == 16'd0) ? 16'd0 : (oc / out_c_per_g);
 
     reg signed [31:0] sum_acc;
     reg signed [31:0] bias_val;
@@ -78,7 +95,9 @@ module conv_engine_dynamic_fsm
     reg [31:0] weight_addr32;
     reg [15:0] shift_val;      // so bit dich requant, tu mult_rdata[39:32] neu co
 
-    reg [7:0] win_vec [0:26];
+    // E-06: kich thuoc win_vec theo IN_C (khong co dinh 27)
+    localparam integer WIN_ELEMS = IN_C * KERNEL * KERNEL;
+    reg [7:0] win_vec [0:WIN_ELEMS-1];
     integer k;
 
     // Requantization dung (E-02 FIXED):
@@ -126,9 +145,12 @@ module conv_engine_dynamic_fsm
         end
     endfunction
 
+    // E-06 FIXED: truoc day co dinh [0:26] (3x3x3). Voi IN_C > 3 (vi du
+    // depthwise C=4) thi win_vec thieu phan tu -> X khi doc kenh 3.
+    // Nay kich thuoc theo IN_C*KERNEL*KERNEL (khai bao o tren).
     always @(*) begin
-        for (k = 0; k < 27; k = k + 1) begin
-            win_vec[k] = win_data[(k * 8) +: 8];
+        for (k = 0; k < WIN_ELEMS; k = k + 1) begin
+            win_vec[k] = win_data[(k * Q_BITS) +: Q_BITS];
         end
     end
 
@@ -202,7 +224,16 @@ module conv_engine_dynamic_fsm
                     // E-01 FIXED: giu du 24 bit dia chi flash.
                     // Truoc day `weight_addr <= weight_addr32[15:0]` cat mat 8 bit
                     // cao, bien p_weight_base=0x400000 thanh 0x0000.
-                    weight_addr32 = p_weight_base + (oc * IN_C * KERNEL * KERNEL) +
+                    //
+                    // E-03 FIXED: voi GROUPS>1, chi so kenh toan cuc la
+                    // ic_g = cur_group*(IN_C/GROUPS) + ic.
+                    // Trong so cua lop grouped xep [OUT_C][IN_C/G][K][K],
+                    // nen cong thuc dia chi dung so kenh TRONG NHOM, khong
+                    // phai IN_C day du.
+                    ic_g = cur_group * in_c_per_g + ic;
+
+                    weight_addr32 = p_weight_base +
+                                    (oc * in_c_per_g * KERNEL * KERNEL) +
                                     (ic * KERNEL * KERNEL) +
                                     (ky * KERNEL) + kx;
 
@@ -231,15 +262,18 @@ module conv_engine_dynamic_fsm
                         shift_val <= {8'd0, mult_rdata[39:32]};
                         bias_val  <= $signed(bias_rdata);
 
+                        // E-03: window chua TOAN BO IN_C kenh, nen chi so
+                        // phai la ic_g (toan cuc), khong phai ic (trong nhom).
                         sum_acc <= sum_acc +
-                            ($signed(win_vec[(ic * KERNEL * KERNEL) + (ky * KERNEL) + kx]) *
+                            ($signed(win_vec[(ic_g * KERNEL * KERNEL) + (ky * KERNEL) + kx]) *
                              $signed(weight_rdata[7:0]));
 
                         if (kx == KERNEL - 1) begin
                             kx <= 16'd0;
                             if (ky == KERNEL - 1) begin
                                 ky <= 16'd0;
-                                if (ic == IN_C - 1) begin
+                                // E-03: chi lap trong NHOM, khong phai toan bo IN_C
+                                if (ic == in_c_per_g - 16'd1) begin
                                     ic <= 16'd0;
                                     state <= ST_EMIT;
                                 end

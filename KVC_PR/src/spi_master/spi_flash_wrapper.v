@@ -149,8 +149,12 @@ module spi_flash_wrapper
                             state <= ST_WAIT_RX;
                         end
                         else if (byte_cnt == 3'd3) begin
+                            // E-05 FIXED: khong dung `rdata <= word_buf` vi
+                            // word_buf[31:24] vua duoc gan bang nonblocking o
+                            // dong tren -> rdata nhan gia tri CU (thieu byte 4).
+                            // Ghep truc tiep byte vua nhan.
                             word_buf[31:24] <= rx_data;
-                            rdata <= word_buf;
+                            rdata <= {rx_data, word_buf[23:0]};
                             rvalid <= 1'b1;
                             state <= ST_DONE;
                         end

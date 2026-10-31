@@ -208,21 +208,34 @@ Cần **4–8 MAC/cycle**. Các cách:
 
 | ID | Vấn đề | Vị trí | Trạng thái |
 | :--- | :--- | :--- | :--- |
-| E-01 | `weight_addr` cắt 16 bit | `conv_engine_dynamic_fsm.v:193` | ✅ **FIXED** — giữ 24 bit, `p_weight_base=0x400000` không còn bị cắt |
-| E-02 | Requant không shift/round | `:254` | ✅ **FIXED** — `requant()` với Q31 shift + ties-to-even |
-| E-03 | Không hỗ trợ groups | toàn module | ⏸ **MỞ** — 7 lớp depthwise vẫn fail |
-| E-04 | `out_c` luôn 0 | `rtl/gen/conv_engine_dynamic.v:103,179` | ⏸ **MỞ** — module đó không có biến `oc`; cần viết lại |
-| E-05 | SPI mất byte MSB | `spi_flash_wrapper.v:151-155` | ⏸ **MỞ** |
-| E-06 | `win_vec` cứng 3×3 | `conv_engine_dynamic_fsm.v:113` | Giới hạn thiết kế |
-| E-07 | `bias_mem`/`mult_mem` dữ liệu mẫu | `bias_mem.v`, `mult_mem.v` | ⏸ **MỞ** — đã zero hoá + tách `shift` 8 bit, chờ P4 sinh thật |
+| E-01 | `weight_addr` cắt 16 bit | `conv_engine_dynamic_fsm.v:226` | ✅ **FIXED** — giữ 24 bit |
+| E-02 | Requant không shift/round | `:302` | ✅ **FIXED** — Q31 + ties-to-even |
+| E-03 | Không hỗ trợ groups | `:11, 90-98, 218-270` | ✅ **FIXED** — thêm `GROUPS`, `p_groups`, `ic_g`; `tb_depthwise` PASS 146/146 |
+| E-04 | `conv_engine_dynamic.v` chưa hoàn chỉnh | `rtl/gen/conv_engine_dynamic.v` | ⏸ **MỞ — không phải lỗi `out_c` đơn lẻ** |
+| E-05 | SPI mất byte MSB | `spi_flash_wrapper.v:151-155` | ✅ **FIXED** — `rdata <= {rx_data, word_buf[23:0]}` |
+| E-06 | `win_vec` cứng 27 phần tử | `conv_engine_dynamic_fsm.v:98` | ✅ **FIXED** — `WIN_ELEMS = IN_C*K*K` |
+| E-07 | `bias_mem`/`mult_mem` dữ liệu mẫu | `bias_mem.v`, `mult_mem.v` | ⏸ **MỞ** — đã zero hoá + tách `shift`, chờ calibration thật |
+| E-08 | Engine dùng lại window pixel đầu | FSM `ST_EMIT` | ✅ **FIXED** |
+| E-09 | `sum_acc` không reset khi sang pixel | FSM `ST_EMIT` | ✅ **FIXED** |
 
-### Lỗi MỚI phát hiện ở P3 (không có trong review lượt 2)
+### E-04 chi tiết — vì sao không sửa được bằng cách thêm biến `oc`
 
-| ID | Vấn đề | Bằng chứng |
-| :--- | :--- | :--- |
-| **E-08** | **Engine dùng lại window của pixel đầu cho toàn ảnh** | `tb_conv0_golden`: 987 mismatch trước khi sửa; FSM chỉ vào `ST_WAIT_WIN` một lần |
-| E-09 | `sum_acc` không reset khi sang pixel mới | Sửa cùng E-08 (`sum_acc <= 0` ở cả hai nhánh) |
-| E-10 | `win_vec` chỉ rộng 8 byte trong TB ban đầu | TB của tôi, không phải RTL — đã sửa `[63:0]` → `[215:0]` |
+Review lượt 2 mô tả E-04 là "`out_c` luôn 0" ở `conv_engine_dynamic.v:103,179`. Khi kiểm tra thực tế, module này **thiếu toàn bộ cơ chế multi-channel**:
+
+| Dòng | Hiện tại | Vấn đề |
+| ---: | :--- | :--- |
+| `:139` | `bias_addr <= ox` | Địa chỉ bias phải là `oc`, không phải toạ độ X |
+| `:142` | `mult_addr <= oy` | Địa chỉ mult phải là `oc`, không phải toạ độ Y |
+| `:145` | `weight_addr <= (oy * IMG_W) + ox` | Phải là `oc*IN_C*K*K + ic*K*K + ky*K + kx` |
+| `:168-172` | Vòng lặp `i` cộng **tất cả** tap vào `acc` trong 1 chu kỳ | Không có thanh ghi `ic/ky/kx`; `acc` cộng dồn 27 lần nonblocking → chỉ giữ giá trị cuối |
+| `:169-171` | Nhân **3 toán hạng** `win * weight * mult` | Requant phải làm SAU tích lũy, không xen vào từng tap |
+| `:179` | `out_c <= 16'd0` | Hệ quả của việc không có `oc` |
+
+⇒ Module này là **khung chưa hoàn chỉnh**, không phải bản có 1 bug. Sửa đúng = viết lại theo kiến trúc của `conv_engine_dynamic_fsm.v` (đã verify).
+
+**Quan trọng:** `kvc_yolo_top.v:1073` instantiate `conv_engine_dynamic` (**bản chưa hoàn chỉnh**), KHÔNG phải `conv_engine_dynamic_fsm` (bản đã sửa và verify 1026/1026). Nghĩa là bật `USE_MOCK_BBOX=0` hiện tại sẽ dùng engine sai.
+
+**Việc cần làm ở P6:** đổi `kvc_yolo_top.v:1073` sang `conv_engine_dynamic_fsm`, hoặc port các sửa E-01/E-02/E-03/E-06 sang `conv_engine_dynamic`. Cách thứ nhất ít rủi ro hơn.
 
 ### Kết quả verify (P3/P4, 31/10/2026)
 
@@ -295,9 +308,24 @@ Mỗi TB **phải `$fatal` khi fail**.
 
 | Gate | Nội dung cập nhật |
 | :--- | :--- |
-| G4 (P3) | Điền kết quả 5 TB; xác nhận E-01→E-05 đã sửa; bảng timing thực |
-| G5 (P4) | Cập nhật số liệu weights thật (entropy, kích thước) |
+| G4 (P3) | ✅ 5 TB PASS; E-01/E-02/E-08/E-09 FIXED; bảng timing thực |
+| G5 (P4) | ✅ Weights thật từ ONNX; `tb_conv0_real` PASS 1026/1026 |
+| **P6-prep (31/10/2026)** | ✅ E-03 (groups) + E-05 (SPI MSB) + E-06 (`win_vec`) FIXED; `tb_depthwise` PASS 146/146 |
 | G7 (P6) | FPS đo được trên board; bảng cycle thực tế |
+
+### Bảng testbench hiện có
+
+| TB | Nội dung | Kết quả |
+| :--- | :--- | :--- |
+| `tb_conv0_golden` | Golden độc lập, `GROUPS=1` | **PASS 1026/1026** |
+| `tb_conv0_real` | Weights thật YOLO11n, `GROUPS=1` | **PASS 1026/1026** |
+| `tb_depthwise` | `GROUPS=C=4`, weight `[4][1][3][3]` | **PASS 146/146** |
+| `tb_uart_tx` | Framing 8N1, start bit | **PASS 29/29** |
+| `tb_bbox_packetizer` | Little-endian vs parser C MCU | **PASS 103/103** |
+| `tb_kvc_top_demo` | Top-level mock path | **PASS 4/4** |
+| `tb_async_fifo_cdc` | CDC FIFO | **PASS** (TB cũ, không assertion) |
+
+**Chưa có TB cho:** `spi_flash_wrapper` (E-05 sửa nhưng chưa verify bằng simulation — cần mô hình SPI flash slave).
 
 ---
 

@@ -1,0 +1,28 @@
+{
+  "purpose": "golden cho lop DEPTHWISE (E-03): chung minh GROUPS>1",
+  "config": {
+    "kernel": 3,
+    "channels": 4,
+    "groups": 4,
+    "in_c_per_group": 1,
+    "img": 6,
+    "pad": 1,
+    "stride": 1
+  },
+  "counts": {
+    "act": 144,
+    "weight": 36,
+    "bias": 4,
+    "expected": 144
+  },
+  "seed": 20261031,
+  "evidence_level": "SYNTHETIC_ONLY",
+  "note": "Depthwise nho (4 kenh) de chay nhanh. YOLO11n that co nhom 64/128/256 — cung co che, chi khac kich thuoc.",
+  "sha256": {
+    "weight": "eef1d343a82ea27ddd200f8a2617ee50de20b0a4ae2c6a8281c6cfe97b42088a",
+    "bias": "657379a16ef6a0de2bf8bb65fdb560c98d8fd4c2981417a60dbbd26d73bcf47d",
+    "input_act": "5dc31bdd3244644ea569797b5bd9f0bbb124529d9463ee51ecd3323209d6a32a",
+    "expected": "25aeb3039ea11dc8c684dd80d6338a72b87130bba960c4c0ba7453e6e33f6f65",
+    "quant": "05bf64ce568c5147f40e850f5e72f6577e7a80609d706d4b5e020789f55fae1c"
+  }
+}

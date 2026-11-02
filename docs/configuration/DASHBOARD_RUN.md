@@ -1,7 +1,7 @@
 # KVC — Phân hệ Trạm Giám Sát Mặt Đất (Dashboard / GCS)
 
 - **Người phụ trách:** **Đoàn Thanh Trường Thịnh**
-- **Mục tiêu:** Cung cấp giao diện trạm mặt đất (GCS) chuyên dụng để giám sát tải nhiệm vụ cứu nạn bão lũ (Bounding Box người/phao cứu sinh từ AI, hình ảnh camera, vị trí định vị WGS-84, cảm biến độ cao khí áp/siêu âm AJ-SR04M và pin).
+- **Mục tiêu:** Cung cấp giao diện trạm mặt đất (GCS) chuyên dụng để giám sát tải nhiệm vụ cứu nạn bão lũ (Bounding Box người/phao cứu sinh từ AI, hình ảnh camera quan sát qua kênh phụ IF-05, vị trí định vị WGS-84, cảm biến độ cao siêu âm AJ-SR04M).
 - **Phân định ranh giới khí tài:** KVC là hệ thống giám sát **tải nhiệm vụ cứu nạn** (Payload), **không phải Flight Controller (FC)**. Dashboard không can thiệp điều khiển bay, arm/disarm hay lập lộ trình bay waypoint của máy bay.
 - **Tài liệu căn cứ:**
   - Thiết kế kiến trúc tổng thể: [docs/architecture/KVC_ThietKeHeThong.md](file:///d:/Project_UAV_KVC/docs/architecture/KVC_ThietKeHeThong.md)
@@ -14,7 +14,9 @@
 
 ## 1. Kiến Trúc Kết Nối 2 Chặng (2-Tier Topology)
 
-Kiến trúc mục tiêu của trạm mặt đất được thiết kế phân tầng. Backend GCS chạy FastAPI hỗ trợ cả chế độ MOCK, REPLAY và Ingress thu nhận thực tế từ Gateway ESP32 (`gcs/backend/esp32_ingress.py` theo chuẩn [IF-03](file:///d:/Project_UAV_KVC/docs/interfaces/IF_ESP32_GCS_WS.md) và [IF-02](file:///d:/Project_UAV_KVC/docs/interfaces/IF_MCU_LORA_RF.md)). Xem [backend README](DASHBOARD_BACKEND.md) để biết trạng thái chi tiết.
+Kiến trúc mục tiêu của trạm mặt đất được thiết kế phân tầng. Backend GCS chạy FastAPI hỗ trợ MOCK, Ingress thu nhận thực tế từ Gateway ESP32 (`gcs/backend/esp32_ingress.py` theo chuẩn [IF-03](file:///d:/Project_UAV_KVC/docs/interfaces/IF_ESP32_GCS_WS.md) và [IF-02](file:///d:/Project_UAV_KVC/docs/interfaces/IF_MCU_LORA_RF.md)) và relay video phụ [IF-05](file:///d:/Project_UAV_KVC/docs/interfaces/IF_ESP32_CAM_GCS.md). Xem [backend README](DASHBOARD_BACKEND.md) để biết trạng thái chi tiết.
+
+> **Cập nhật 02/11/2026:** chế độ phát lại (REPLAY) **đã bỏ khỏi giao diện**. `AppHeader.tsx` chỉ còn nút MOCK và REAL; `routes.tsx` không còn route Replay. Chức năng thay thế là trang **Nhật ký phiên** (`/history`) đọc log đã commit, lọc và xuất CSV. Backend còn `replay_engine.py` + `/api/replay/*` như code dự phòng không có UI gọi.
 
 ```text
 [UAV Tải Nhiệm Vụ]
@@ -25,13 +27,14 @@ Kiến trúc mục tiêu của trạm mặt đất được thiết kế phân t
        ▼ (Wi-Fi SoftAP / WebSocket; JSON Envelope v1 IF-03)
 [gcs/backend] (Laptop Ground Station - FastAPI; module esp32_ingress.py)
   ├── MOCK: phát dữ liệu mô phỏng và ghi SQLite
-  ├── REPLAY: phát lại session đã commit
   ├── INGRESS: kết nối ESP32 ws://192.168.4.1:8080/telemetry và giải mã RF 32-byte
+  ├── VIDEO RELAY (IF-05, tùy chọn): MJPEG từ ESP32-S3-CAM → same-origin cho trình duyệt
   └── WebSocket nội bộ cho frontend: ws://127.0.0.1:8000/ws/telemetry
        │
        ▼ (Localhost WebSocket)
 [gcs/frontend] (Trình duyệt Web - React + TypeScript + Vite + Leaflet)
-  └── Hiển thị HUD bay, bản đồ cứu hộ OSM, tọa độ mục tiêu và biểu đồ cảm biến
+  └── Hiển thị HUD bay, bản đồ cứu hộ OSM, tọa độ mục tiêu, biểu đồ cảm biến
+      và trang Nhật ký phiên (đọc log, xuất CSV — KHÔNG có chế độ phát lại)
 ```
 
 > [!IMPORTANT]
@@ -49,7 +52,9 @@ Dashboard/
 │   ├── state.py              # Quản lý trạng thái xe bay/nhiệm vụ trong bộ nhớ
 │   ├── schemas.py            # Pydantic models cho gói tin telemetry, BBox, trạng thái
 │   ├── sqlite_logger.py      # Module ghi/đọc telemetry và nhật ký cứu hộ vào SQLite WAL
-│   ├── replay_engine.py      # Bộ phát lại dữ liệu bay lịch sử (Replay mode)
+│   ├── replay_engine.py      # [DỰ PHÒNG] Bộ phát lại — backend còn, UI KHÔNG còn dùng
+│   ├── video_relay.py        # Relay MJPEG IF-05 (ESP32-S3-CAM → backend → trình duyệt)
+│   ├── esp32_ingress.py      # WebSocket client nhận Transport Envelope v1 từ ESP32-C3
 │   ├── mock_source.py        # Nguồn sinh dữ liệu giả lập phục vụ kiểm thử độc lập
 │   ├── requirements.txt      # Danh mục thư viện Python phụ thuộc
 │   ├── tests/                # Bộ kiểm thử tự động pytest cho backend
@@ -106,8 +111,10 @@ npm run dev
 1. **MOCK Mode (Kiểm thử độc lập không phần cứng):**
    - Backend tự động sinh luồng tọa độ UAV bay quỹ đạo quanh khu vực lũ lụt giả lập và phát hiện người/phao giả lập.
    - Thích hợp phát triển giao diện, kiểm thử tính năng HUD, bản đồ mà không cần phần cứng.
-2. **REAL ingress (chưa triển khai):**
+2. **REAL ingress (đã có module, chưa kiểm trên thiết bị):**
    - IF-03 nêu gateway chọn mạng theo thứ tự ưu tiên: STA vào Wi-Fi 2.4 GHz trước, SoftAP `KVC_GROUND_STATION` (IP `192.168.4.1`, mật khẩu `kvc123456`) chỉ là dự phòng khi STA thất bại. Endpoint mục tiêu `ws://192.168.4.1:8080/telemetry`; chưa xác minh trên thiết bị.
-   - Backend hiện chưa kết nối gateway hoặc giải mã gói LoRa. Không dùng source hiện tại để nghiệm thu đường dữ liệu phần cứng.
-3. **REPLAY Mode (Phát lại dữ liệu lịch sử):**
-   - Đọc dữ liệu bay đã ghi trong tệp SQLite để tua lại toàn bộ phiên cứu nạn phục vụ đánh giá sau nhiệm vụ.
+   - Module `gcs/backend/esp32_ingress.py` đã viết parser WebSocket IF-03 + giải mã RF 32 byte và có test; bật bằng `$env:KVC_ENABLE_ESP32="true"`. **Chưa có capture từ Gateway ESP32-C3 thật** — không dùng source hiện tại để nghiệm thu đường dữ liệu phần cứng.
+3. **Nhật ký phiên (thay chế độ phát lại từ 02/11/2026):**
+   - Trang `/history` của frontend đọc danh sách phiên đã commit qua `GET /api/sessions`, hiển thị bảng sự kiện, lọc theo actor/mức cảnh báo/source, cho ẩn từng mục và xuất CSV.
+   - **Không có tua lại, pause, seek hay đổi tốc độ trên giao diện.** Backend vẫn giữ `replay_engine.py` và 6 route `/api/replay/*` như code dự phòng; không UI nào gọi các route này.
+   - Muốn phân tích sâu sau nhiệm vụ: dùng file SQLite trong `data/sessions/<session_id>.db` hoặc bản CSV xuất từ trang Nhật ký phiên.

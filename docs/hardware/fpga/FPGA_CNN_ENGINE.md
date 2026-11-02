@@ -233,7 +233,7 @@ Review lượt 2 mô tả E-04 là "`out_c` luôn 0" ở `conv_engine_dynamic.v:
 
 ⇒ Module này là **khung chưa hoàn chỉnh**, không phải bản có 1 bug. Sửa đúng = viết lại theo kiến trúc của `conv_engine_dynamic_fsm.v` (đã verify).
 
-**Quan trọng:** `kvc_yolo_top.v:1073` instantiate `conv_engine_dynamic` (**bản chưa hoàn chỉnh**), KHÔNG phải `conv_engine_dynamic_fsm` (bản đã sửa và verify 1026/1026). Nghĩa là bật `USE_MOCK_BBOX=0` hiện tại sẽ dùng engine sai.
+**Quan trọng:** `kvc_yolo_top.v:1073` instantiate `conv_engine_dynamic` (**bản chưa hoàn chỉnh**), KHÔNG phải `conv_engine_dynamic_fsm` (bản đã sửa và verify 1026/1026). Nghĩa là bật `BBOX_SOURCE=2` hiện tại sẽ dùng engine sai.
 
 **Việc cần làm ở P6:** đổi `kvc_yolo_top.v:1073` sang `conv_engine_dynamic_fsm`, hoặc port các sửa E-01/E-02/E-03/E-06 sang `conv_engine_dynamic`. Cách thứ nhất ít rủi ro hơn.
 
@@ -383,7 +383,7 @@ Mỗi TB **phải `$fatal` khi fail**.
 | `tb_conv0_golden` | Golden độc lập, `GROUPS=1` | **PASS 1026/1026** |
 | `tb_conv0_real` | Weights thật YOLO11n, `GROUPS=1` | **PASS 1026/1026** |
 | `tb_depthwise` | `GROUPS=C=4`, weight `[4][1][3][3]` | **PASS 146/146** |
-| `tb_uart_tx` | Framing 8N1, start bit | **PASS 29/29** |
+| `tb_uart_tx` | Framing 8N1, start bit | **PASS 30/30** |
 | `tb_bbox_packetizer` | Little-endian vs parser C MCU | **PASS 103/103** |
 | `tb_kvc_top_demo` | Top-level mock path | **PASS 4/4** |
 | `tb_async_fifo_cdc` | CDC FIFO | **PASS** |
@@ -395,8 +395,10 @@ Mỗi TB **phải `$fatal` khi fail**.
 | `tb_residual_add_int8` | **Quét toàn bộ 65.536 tổ hợp** | **PASS 65536/65536** |
 | `tb_sppf_block` | 3 maxpool + concat 4 nhánh | **PASS 64/64** |
 | `tb_line_buffer_mc` | Line buffer 3 dòng đa kênh, window packed 27 byte | **PASS 5/5** |
+| `tb_kvc_blob_detect` | Blob màu RGB565 (01/11/2026) | **PASS 12/12** |
+| `tb_kvc_top_blob` | Blob thật → IF-01 (01/11/2026) | **PASS 8/8** |
 
-**Chạy toàn bộ:** `pwsh scripts/run_fpga_tb.ps1` → **15 PASS, 0 FAIL, exit 0**.
+**Chạy toàn bộ:** `pwsh scripts/run_fpga_tb.ps1` → **22 PASS, 0 FAIL, 0 SKIP, exit 0** (01/11/2026).
 
 **Chưa có TB cho:** `spi_flash_wrapper` (E-05 đã sửa nhưng chưa verify bằng simulation — cần mô hình SPI flash slave).
 

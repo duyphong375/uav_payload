@@ -25,7 +25,7 @@
 |    Backend GCS trên Laptop (Host)  |
 |    - Kết nối Wi-Fi vào Gateway     |
 |    - Chạy Client esp32_ingress.py  | ──► Ghi nhật ký vào SQLite WAL (sqlite_logger.py)
-|    - Quản lý trạng thái State      | ──► Động cơ phát lại (replay_engine.py)
+|    - Quản lý trạng thái State      | ──► Ghi SQLite + trang Nhật ký phiên (Không còn UI phát lại)
 |    - Mở WebSocket Server nội bộ    |
 |      (ws://127.0.0.1:8000/ws/telemetry) |
 +-----------------+------------------+
@@ -43,6 +43,11 @@
 > ⚠️ **QUY TẮC CỐT LÕI:**
 > 1. Trình duyệt Web (Dashboard) **tuyệt đối không kết nối trực tiếp vào ESP32**. Trình duyệt chỉ kết nối vào Backend Python tại `ws://127.0.0.1:8000/ws/telemetry` (route chuẩn: [IF-04](IF_GCS_DATA_CONTRACT.md)).
 > 2. Backend Python trên laptop chạy module Ingress `esp32_ingress.py` để kết nối vào ESP32, giải mã RF 32 bytes và chuyển tiếp dữ liệu vào Hub hệ thống.
+> 3. **Ngoại lệ có điều kiện (01/11/2026): kênh video IF-05.** ESP32-S3-CAM phát MJPEG; **backend** là client outbound và phát lại same-origin cho trình duyệt tại `/video/stream`. Quy tắc 1 **vẫn nguyên vẹn** — trình duyệt không bao giờ gọi thẳng camera. Chi tiết: [IF_ESP32_CAM_GCS.md](IF_ESP32_CAM_GCS.md).
+
+> **Về giao thức RF:** xem [IF_MCU_LORA_RF.md](IF_MCU_LORA_RF.md) — ABI 32 byte đã được HUMAN duyệt 29/10/2026, không đổi. IF-05 là kênh Wi-Fi riêng, không đụng bảng byte này.
+>
+> **Về nhãn nguồn:** `source_mode` của telemetry và `video.source_kind` của kênh video là hai trường **độc lập**. Không suy trường này từ trường kia.
 
 ---
 

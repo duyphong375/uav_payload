@@ -37,11 +37,12 @@ KVC_PRODUCT/
 │   └── gateway_esp32/             gateway trạm đất ESP32-C3 (PlatformIO)
 │       ├── src/                   main.cpp + rf_decode + net_policy
 │       └── host_tests/            host test (g++) cho rf_decode, net_policy
+├── firmware/esp32_s3_cam/         camera quan sát phụ ESP32-S3-CAM + OV3660 (IF-05)
 ├── fpga/
 │   ├── README.md                  hướng dẫn Gowin EDA
 │   └── constraints/pins.cst       ràng buộc chân
 ├── gcs/
-│   ├── backend/                   FastAPI + WebSocket + SQLite + replay
+│   ├── backend/                   FastAPI + WebSocket + SQLite + relay video IF-05
 │   └── frontend/                  React 19 + TypeScript + Vite
 ├── ai/
 │   ├── inference/                 adapter suy luận + ontology
@@ -68,6 +69,14 @@ Dashboard:
 cd gcs\frontend
 npm ci
 npm run dev
+```
+
+Camera quan sát phụ IF-05 (tùy chọn, cần module ESP32-S3-CAM thật):
+
+```powershell
+cd firmware\esp32_s3_cam
+pio run -e esp32s3
+# Chi tiết chân, mã lỗi init và quy trình nạp: firmware/esp32_s3_cam/README.md
 ```
 
 Test:
@@ -109,6 +118,11 @@ Không đổi baud, packet layout, CRC, IRQ, pinout hay giao thức phần cứn
 hợp đồng trong `docs/interfaces/`. Packet LoRa hiện hành là 32 byte
 (`KvcTelemetryPacket32`, IF-02), ABI đã được HUMAN duyệt ngày 29/10/2026 nhưng
 chưa HARDWARE-VERIFIED. Telemetry 20 byte là kiến trúc lịch sử.
+
+Dashboard chỉ còn 2 chế độ **MOCK** và **REAL**; chế độ phát lại (Replay) đã bỏ khỏi
+UI từ 02/11/2026 — thay bằng trang **Nhật ký phiên** (đọc log, xuất CSV). Backend vẫn
+giữ `gcs/backend/replay_engine.py` và các route `/api/replay/*` như code dự phòng
+không có UI gọi.
 
 ## Bản quyền và nguồn
 

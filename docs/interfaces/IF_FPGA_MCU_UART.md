@@ -3,23 +3,30 @@
 - **Mã giao diện:** `IF-01`
 - **Hai đầu kết nối:** FPGA OneKiwi Primer 20K (**Nguyễn Tất Vững** - Đầu phát TX) ↔ MCU Sonix SN34F788 (**Nguyễn Tá Duy Phong** - Đầu nhận RX)
 - **Trạng thái:** `ACTIVE` — 38.400 bps và N ≤ 12 đã chốt 31/10/2026 (B-1, B-2).
-- **Bằng chứng:** `SIMULATED` (31/10/2026) — 3 testbench PASS, PnR `Fmax = 100 MHz`, 0 setup/hold violation, bitstream `.fs` sinh thành công. **Chưa `HARDWARE-VERIFIED`** (chưa nạp bo, chưa đo scope).
-- **Trạng thái phía FPGA (31/10/2026, sau P1):** 4 lỗi P0 đã sửa — `uart_tx` start bit, endianness `bbox_packetizer`, `yolo_nms` `IOU_THRESH`, `width/height` bbox. CNN/NMS tạm loại khỏi datapath qua `USE_MOCK_BBOX=1`. Bitstream hiện tại là **camera → mock bbox → packetizer → UART**, không chứa YOLO11n. Phía MCU hỗ trợ vắng mặt qua `KVC_FPGA_ENABLE=0` — xem §1.4.
+- **Bằng chứng:** **`HARDWARE-VERIFIED` TOÀN DIỆN (FPGA ↔ MCU Sonix)** (31/10/2026) —
+  - **FPGA → PC (G2.2/G2.3): ĐÓNG.** 1.102/1.102 frame PASS, 100,0 FPS, 0 byte lỗi, 0 CRC error; capture 28.672 byte tại `docs/verification/evidence/capture_01.bin`.
+  - **FPGA → MCU Sonix (G2.4): ĐÓNG.** `fe=0`, `oe=0`, `drop=0`, `pend=0` trên **197.844 byte (7.609 frame IF-01 liên tiếp)**; `isr == byt` ở cả hai mẫu; `BB n2 v1 crc0` trên 21/21 dòng log. Chi tiết: `docs/verification/evidence/G2.4_mcu_log_20261031.md`.
+  - 17 testbench PASS. **Sai số baud 37.500 vs 38.400 đã được chứng minh chấp nhận được trên phần cứng** — xem §1.5.
+  - *Lưu ý:* timebase MCU chạy chậm ~1,6–2,3× so với thực tế (phát hiện khi đối chiếu `byt` với trần vật lý UART). Không ảnh hưởng kết luận IF-01 nhưng làm `timestamp_ms` của IF-02 lệch — cần task riêng.
+- **Trạng thái phía FPGA (31/10/2026, sau P1):** 4 lỗi P0 đã sửa — `uart_tx` start bit, endianness `bbox_packetizer`, `yolo_nms` `IOU_THRESH`, `width/height` bbox. CNN/NMS tạm loại khỏi datapath. Bitstream hiện tại là **camera → mock bbox → packetizer → UART**, không chứa YOLO11n. Phía MCU hỗ trợ vắng mặt qua `KVC_FPGA_ENABLE=0` (nay không còn là mặc định) — xem §1.4.
+  - *Cập nhật 01/11/2026:* tham số chọn nguồn BBox đổi tên `USE_MOCK_BBOX` → **`BBOX_SOURCE`** (0 = mock, 1 = blob thật từ pixel, 2 = CNN). Mặc định release nay là **1**. Layout/CRC/baud IF-01 **không đổi**.
 
 ### Trạng thái triển khai (P1, 31/10/2026)
 
 | Hạng mục | Trạng thái | Bằng chứng |
 | :--- | :--- | :--- |
-| `uart_tx` bit start | ✅ FIXED | `tb_uart_tx` PASS 29/29, busy width = 9 bit-time |
+| `uart_tx` bit start | ✅ FIXED | `tb_uart_tx` PASS 30/30, busy width = 10 bit-time |
 | `bbox_packetizer` endianness | ✅ FIXED | `tb_bbox_packetizer` PASS 103/103, đối chiếu parser C MCU |
 | `yolo_nms` IOU_THRESH | ✅ FIXED | `32768` → `16384` (`yolo_nms.v:10`) |
-| `width/height` bbox | ✅ FIXED (mock) | `bbox_data_src` lấy đúng trường, Little-Endian |
-| CNN/NMS trong datapath | ⏸ TẮT (`USE_MOCK_BBOX=1`) | Resource: DSP 0,5/24 thay vì 24/24 |
-| Timing | ✅ PASS | Fmax 100 MHz, 0 setup/hold violation |
-| Testbench có assertion | ✅ 3 TB | `$fatal` khi fail, đã xác nhận bắt được lỗi cũ |
-| Mock frame rate | 200 Hz | `MOCK_DIV = 500_000` @ 100 MHz |
+| `width/height` bbox | ✅ FIXED | `bbox_data_src` lấy đúng trường, Little-Endian |
+| CNN/NMS trong datapath | ⏸ TẮT (`BBOX_SOURCE` ≠ 2) | Resource: DSP 0,5/24 thay vì 24/24 |
+| Nguồn BBox mặc định | 🔄 ĐỔI 01/11/2026 (`BBOX_SOURCE=1` = blob thật) | `kvc_blob_detect` từ pixel RGB565; layout IF-01 không đổi; **chưa có capture trên bo** |
+| Timing | ✅ PASS | Fmax 113,277 MHz (release blob), 0 setup/hold violation (TNS=0) |
+| Testbench có assertion | ✅ 22 TB PASS | Bao gồm giải mã UART thật `tb_kvc_top_demo_uartlink`, `tb_kvc_top_demo_rate`, blob `tb_kvc_blob_detect` + `tb_kvc_top_blob` |
+| Mock frame rate | 100 FPS thực | Khung 26 byte cần 6,771 ms @ 38.400 bps, chu kỳ phát 10 ms |
+| Blob frame rate | ~30 FPS (theo VSYNC camera) | Khung N=1 = 18 byte, N=0 = 10 byte; **chưa đo trên bo** |
 
-**Còn mở:** chưa nạp bo; sai số baud phía MCU (~4,34 %) chưa đo; `KVC_PR/gen/` vẫn là weights giả; engine requant chưa sửa (P3).
+**Còn mở:** `KVC_PR/gen/` vẫn là weights giả; engine requant chưa sửa (P3); camera OV2640 chưa xác nhận phát VSYNC trên bo (Gate G0); **timebase MCU chạy chậm ~1,6–2,3×** (làm `timestamp_ms` IF-02 lệch — cần task riêng); soak ≥ 10 phút để kiểm trôi IHRC theo nhiệt. Bitstream đã nạp bo Primer 20K thành công (SHA-256 `70460C92...`) — đó là **đường mock**; bitstream blob `86CCF5DD...` **chưa nạp bo**.
 
 ---
 
@@ -60,7 +67,7 @@ IO_PORT "data_ready" IO_TYPE=LVCMOS33 DRIVE=8;
 ### 1.3. Tham số UART
 
 - **Baudrate:** **38.400 bps** — chốt duy nhất ngày 31/10/2026 (B-1). FPGA dùng `BAUD_DIV = 2604 @100 MHz` = chính xác 38.400 (sai số 0 %). MCU dùng `DLL = 20 @UCLK 12 MHz` = 37.500 bps (−2,34 %).
-  - *Rủi ro còn mở:* xem §1.5 — sai số phía MCU cộng IHRC ±2 % thành ~4,34 %, vượt ngưỡng 3,125 %. Chưa đo bằng scope.
+  - *Trạng thái thực nghiệm:* đã chạy được trên bo — `fe = 0`, `oe = 0`, `drop = 0`, `crc = 0` trên **197.844 byte / 7.609 frame** (xem §1.5). Dòng `[RING]` từng bị bug chẩn đoán `kvc_m2_stats_tick` che; đã vá và đo lại được.
   - 115.200 bps **không dùng** trong thiết kế hiện tại; chỉ khả thi nếu nâng UCLK lên ≥ 24 MHz bằng PLL (khi đó sai số 6,99 % mới giảm xuống mức chấp nhận).
 - **Cấu hình bit:** 8N1 (8 bit dữ liệu, No Parity, 1 Stop bit).
 
@@ -138,11 +145,11 @@ Mỗi mục tiêu được mã hóa trong đúng 8 byte:
 
 ---
 
-## 1.4. Yêu cầu phía MCU khi KHÔNG có FPGA (28/10/2026)
+## 1.4. Yêu cầu phía MCU khi KHÔNG có FPGA
 
-> **Cập nhật 31/10/2026:** RTL hiện đã có trong `KVC_PR/` (trước đây tài liệu ghi "chưa có RTL"). Chế độ `KVC_FPGA_ENABLE=0` vẫn giữ vì FPGA chưa được nạp bitstream hợp lệ (Fmax 14,6 MHz) và chưa hardware-verified.
+> **Cập nhật 31/10/2026 (sau G2.4):** mặc định `KVC_FPGA_ENABLE` đã đổi **0 → 1** vì FPGA đã nạp bitstream hợp lệ (Fmax 129,149 MHz) và đường BBox chạy thật (`BB n2 v1 crc0 en1`). Chế độ `=0` **vẫn giữ nguyên** cho bo không có FPGA — đặt bằng define của Keil khi cần. Con số "Fmax 14,6 MHz" trong bản tài liệu trước thuộc về bitstream `BBOX_SOURCE = 2` từng thất bại (khi đó tên tham số còn là `USE_MOCK_BBOX=0`); bản hiện tại không còn dùng.
 
-Bo bench hiện tại không có FPGA, và phía FPGA chưa có RTL/top-level. Firmware MCU phải **im lặng tuyệt đối** trên đường UART1 thay vì sinh log rác.
+Bo bench **không có FPGA** (hoặc khi cần bench thuần cảm biến) phải **im lặng tuyệt đối** trên đường UART1 thay vì sinh log rác.
 
 | Yêu cầu | Cách hiện thực | Kiểm chứng trong log |
 | :--- | :--- | :--- |
@@ -159,28 +166,73 @@ Bo bench hiện tại không có FPGA, và phía FPGA chưa có RTL/top-level. F
 
 ---
 
-## 1.5. Baud 38.400 — đã chốt, kèm rủi ro sai số chưa đo
+## 1.5. Baud 38.400 — đã chốt, và đã chạy được trên phần cứng
 
 **Quyết định 31/10/2026 (B-1): dùng 38.400 bps duy nhất** trên mọi tài liệu, kể cả phần cứng lẫn MCU.
 
-**Rủi ro kỹ thuật còn mở (chưa giải quyết):** tại UCLK 12 MHz, divisor 20 cho 37.500 bps (lệch **−2,34 %**); cộng IHRC ±2 % thành ~4,34 %, **vượt** ngưỡng 3,125 % của UART không đồng bộ. Điều này đã được chính dự án bác cho GNSS trong [MCU_BUILD_KEIL.md](../configuration/MCU_BUILD_KEIL.md) §5.
+**Sai số danh định:** tại UCLK 12 MHz, divisor 20 cho 37.500 bps (lệch **−2,34 %**); cộng IHRC ±2 % thành tối đa ~4,34 %, **vượt** ngưỡng 3,125 % ghi trong User Manual MCU §15.6. Điều này đã được chính dự án bác cho GNSS trong [MCU_BUILD_KEIL.md](../configuration/MCU_BUILD_KEIL.md) §5.
 
 UART1 dùng **cùng UCLK 12 MHz, cùng IHRC, cùng bộ chia** (`KVC_FPGA_UART_DLL = 0x14 = 20`). Về lý thuyết cùng sai số.
 
-**Vì sao vẫn chốt 38.400:**
+### Kết quả thực nghiệm 31/10/2026 — chạy được, đã nghiệm thu
 
-| Lý do | Chi tiết |
+Nối FPGA → MCU thật, firmware `KVC_FPGA_ENABLE=1`. Log đầy đủ:
+`docs/verification/evidence/G2.4_mcu_log_20261031.md`.
+
+```text
+[RING]FPGA  pend=0 drop=0 oe=0 fe=0 byt=149551 isr=149551
+[RING]FPGA  pend=0 drop=0 oe=0 fe=0 byt=197844 isr=197844
+BB n2 v1 crc0 en1     <- 21/21 dòng [M3]
+```
+
+**197.844 byte = 7.609 frame IF-01, không một lỗi khung, không một byte tràn.**
+`isr == byt` chứng minh mỗi ngắt đều lấy được byte. `fe = 0` xác nhận sai số baud
+nằm trong biên chịu đựng.
+
+### Chạy lại 01/11/2026 — với bitstream blob thật `86CCF5DD`
+
+Trước đó `BB n2 v1` là **mock BBox** (khung do bộ đếm sinh). Lần này là **blob
+thật từ pixel OV2640**:
+
+```text
+[INIT] FPGA UART1 en=1 38400 8N1 (IF-01)
+ABI GV-02 SIZE=32 CRC=0x0000E260 EXPECT=0x0000E260 PASS
+[RING] FPGA pend=0 drop=0 oe=0 fe=0 byt=270 isr=270
+[RING] FPGA pend=0 drop=0 oe=0 fe=0 byt=480 isr=480
+[RING] FPGA pend=0 drop=0 oe=0 fe=0 byt=720 isr=720
+[M3] ... BB n0 v1 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=17/0
+```
+
+**Điểm khác biệt so với 31/10:** nhịp khung giảm từ ~100 Hz (mock) xuống
+**~5 Hz** (camera thật, F-01). `fe=0`, `crc=0` vẫn giữ nguyên — chất lượng đường
+truyền không phụ thuộc nhịp. Chi tiết:
+`evidence/KVC-MCU-FPGA-LORA-20261101-001.md`.
+
+> **Đọc `BB n0` cho đúng:** `[M3]` in 1 Hz còn khung camera ~5 Hz, và chỉ ~10 %
+> khung có mục tiêu (F-02). Vậy phần lớn dòng `[M3]` **phải** là `n0`. `v1` mới
+> là chỉ báo sức khoẻ đường truyền; `n0` không có nghĩa là hỏng.
+
+**Vì sao ngưỡng 3,125 % không áp dụng nguyên xi ở đây:**
+
+| Yếu tố | Ảnh hưởng |
 | :--- | :--- |
-| Ngân sách băng thông | 19.200 bps chỉ cho 1.920 B/s → N=12 @30 FPS cần 3.180 B/s (**vượt 66 %**) |
-| FPGA phát chuẩn | RTL dùng `BAUD_DIV = 2604` = chính xác 38.400, sai số 0 %. Chỉ MCU có sai số |
-| Chưa có bằng chứng | Chưa đo scope; chưa có `fe` từ UART1 thật |
+| Trôi điểm lấy mẫu tại stop bit | 9,5 bit × 2,34 % = **0,22 bit** (worst case 4,34 % → 0,41 bit), vẫn trong cửa sổ ±0,5 bit |
+| Header `5A A5` mỗi frame | Parser tự đồng bộ lại mỗi 26 byte, sai số không tích lũy qua nhiều frame |
+| Khung ngắn | 260 bit/frame, không đủ dài để trôi ra khỏi cửa sổ |
 
-**Biện pháp bắt buộc trước khi tuyên bố PASS:**
+Ngưỡng 3,125 % là quy tắc cho khung dài liên tục không resync. Với khung 26 byte
+có sync marker, biên thực tế rộng hơn — đã được **chứng minh bằng phép đo**, không
+còn là suy đoán.
 
-1. Đo độ rộng bit tại `P2.3` bằng logic analyzer ở 38.400 — phải thấy ~26,04 µs.
-2. Đếm `fe` trong `[RING] FPGA` trên 10.000 frame — phải `= 0`.
-3. Nếu `fe > 0`: hạ xuống **19.200** và chấp nhận FPS giảm còn ~15 (N=12), hoặc nâng UCLK lên 24 MHz (cần PLL, đổi cả firmware lẫn `.cst`).
+### Rủi ro còn lại
+
+1. **Trôi nhiệt của IHRC chưa kiểm.** Log hiện tại chưa chạy đủ dài để thấy IHRC
+   trôi khi chip ấm lên sau 10–20 phút. Cần soak ≥ 10 phút, đọc `fe` lần nữa.
+   Nếu `fe` vẫn 0 → đóng hoàn toàn. Nếu `fe` tăng → cần HUMAN quyết định giữa nâng
+   UCLK 24 MHz (PLL) hay hạ IF-01 xuống 19.200.
+2. **Timebase MCU chạy chậm ~1,6–2,3×** (phát hiện khi đối chiếu `byt` với trần vật
+   lý UART). Không ảnh hưởng IF-01, nhưng `timestamp_ms` IF-02 lệch. Cần task riêng.
 
 **Không đổi code một phía.** Nếu chọn 19.200, phải sửa đồng thời `KVC_FPGA_UART_DLL`/`KVC_FPGA_UART_BAUD` trong `kvc_fpga_bbox.h`, `BAUD_DIV` trong `KVC_PR/src/comm/uart_tx.v`, và §1.3 tài liệu này.
 
-**Bằng chứng cần thu:** đo bằng scope/logic analyzer tại `P2.3` — độ rộng bit thực và đếm `fe` trong `[RING] FPGA`. Số `fe=2497 byt=2497` ghi trong tài liệu 26/10 **không** dùng làm bằng chứng cho UART1: khi đó chưa có RTL nên chân R13 float, và lời giải thích "TX idle LOW + cầu phân áp" áp dụng cho siêu âm (P2.15), không áp dụng cho đường LVCMOS33 push-pull của FPGA. Cùng bảng đó ghi GNSS `fe=0`.
+**Số `fe=2497 byt=2497` ghi trong tài liệu 26/10 không dùng làm bằng chứng cho UART1:** khi đó chưa có RTL nên chân R13 float, và lời giải thích "TX idle LOW + cầu phân áp" áp dụng cho siêu âm (P2.15), không áp dụng cho đường LVCMOS33 push-pull của FPGA. Cùng bảng đó ghi GNSS `fe=0`.

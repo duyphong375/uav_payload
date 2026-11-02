@@ -109,7 +109,7 @@ Tất cả macro dưới đây dùng `#ifndef` nên **truyền được qua `-D`
 
 | Macro | Mặc định | Ý nghĩa / khi nào đổi |
 | :--- | :---: | :--- |
-| `KVC_FPGA_ENABLE` | **0** | **0** = không khởi tạo UART1, đặt P2.3/P0.12 về mức xác định. Đúng cho bo **không có FPGA**. **1** = bật IF-01 (khi có RTL hoặc chạy `scripts/manual/mock_fpga_bbox.py`). Không đổi layout/baud/IRQ của IF-01. |
+| `KVC_FPGA_ENABLE` | **1** | **1** = bật IF-01: cấu hình UART1 ngắt + ring, poll BBox. Đúng khi có FPGA đã nạp bitstream (hoặc chạy `scripts/manual/mock_fpga_bbox.py`). **0** = không khởi tạo UART1, đặt P2.3/P0.12 về mức xác định — dùng cho bo **không có FPGA** hoặc bench thuần cảm biến. Không đổi layout/baud/IRQ của IF-01. <br>*Đổi mặc định 0→1 ngày 31/10/2026 sau khi G2.4 PASS trên bo thật.* |
 | `KVC_GNSS_SKIP_AUTOBAUD` | **0** | **1** = bỏ dò baud, mở UART3 thẳng ở `KVC_GNSS_BAUD_RATE`. Boot nhanh hơn 11–15 s. **Chỉ bật khi chắc chắn module đã ở 9600**, nếu không GNSS sẽ im lặng không fix. |
 | `KVC_M1_CLOCK_DIAG` | **0** | Chẩn đoán cây xung nhịp (đọc thanh ghi SCU). **Code tạm thời — phải = 0 khi phát hành.** |
 | `KVC_M2_RX_STATS_DIAG` | **1** | Công bố `[RING]` (drop/oe/fe/byt/isr) mỗi ~5 s. Giữ =1 để nghiệm thu. |
@@ -122,23 +122,28 @@ Tất cả macro dưới đây dùng `#ifndef` nên **truyền được qua `-D`
 | `KVC_GNSS_BAUD_RATE` | 9600 | Tốc độ UART3 đích. Không đổi nếu chưa nâng UCLK bằng PLL (xem §5). |
 | `KVC_FPGA_UART_BAUD` | 38400 | Baud UART1 theo IF-01. **Còn câu hỏi mở:** tại UCLK 12 MHz cho 37 500 bps (−2,34 %), vượt ngưỡng 3,125 % — xem IF_FPGA_MCU_UART.md. |
 
-### 6.1 Cấu hình cho bo bench hiện tại (không FPGA, không ESP32)
+### 6.1 Cấu hình cho bo có FPGA OneKiwi (hiện tại)
 
 Không cần truyền gì — giá trị mặc định đã đúng:
 
 ```text
-KVC_FPGA_ENABLE        = 0     (mặc định)
+KVC_FPGA_ENABLE        = 1     (mặc định — FPGA đã nạp bitstream)
 KVC_M1_CLOCK_DIAG      = 0     (mặc định)
 KVC_M2_RX_STATS_DIAG   = 1     (mặc định)
 KVC_M3_VALUE_DIAG      = 1     (mặc định)
 KVC_GNSS_SKIP_AUTOBAUD = 0     (mặc định — dò baud, boot chậm 11-15 s)
 ```
 
+**Bo không có FPGA:** thêm vào Define `KVC_FPGA_ENABLE=0`. Nếu để =1 trên bo không
+có FPGA, `P2.3` float sẽ sinh byte rác và `[RING] FPGA fe` tăng liên tục.
+
 Nếu muốn boot nhanh và đã chắc module ở 9600, thêm vào Define: `KVC_GNSS_SKIP_AUTOBAUD=1`.
 
-### 6.2 Khi có FPGA hoặc muốn chạy mock
+### 6.2 Chạy mock thay cho FPGA thật
 
-Thêm vào Define: `KVC_FPGA_ENABLE=1`, rồi nạp `scripts/manual/mock_fpga_bbox.py --baud 38400` qua USB-TTL vào P2.3.
+`KVC_FPGA_ENABLE` đã mặc định 1, nên chỉ cần nạp
+`scripts/manual/mock_fpga_bbox.py --baud 38400` qua USB-TTL vào P2.3 (GND chung).
+Dùng khi không có bo FPGA trên bàn nhưng vẫn muốn kiểm đường BBox → telemetry.
 
 ---
 

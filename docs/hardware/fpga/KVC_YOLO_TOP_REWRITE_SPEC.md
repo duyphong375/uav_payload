@@ -183,7 +183,7 @@ Cần sinh thêm một bảng `op_type[0..87]` từ graph ONNX.
 | Sửa instantiation cũ để khớp port `conv_engine_dynamic` | Sẽ phải viết lại engine — dùng `_fsm` đã verify |
 | Bỏ testbench vì "đã có 6 TB toán tử" | 6 TB đó test từng module, không test **top-level** |
 | Đánh dấu `HARDWARE-VERIFIED` khi mới `SIMULATED` | Vi phạm `AGENTS.md` |
-| Bật `USE_MOCK_BBOX=0` trước khi top mới PASS | Không có đường dữ liệu |
+| Bật `BBOX_SOURCE=2` (CNN) trước khi top mới PASS | Không có đường dữ liệu |
 
 ---
 

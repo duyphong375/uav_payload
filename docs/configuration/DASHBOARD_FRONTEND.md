@@ -2,7 +2,7 @@
 
 Frontend trạm giám sát tải nhiệm vụ cứu nạn bão lũ KVC hiện có source **React + TypeScript + Vite + Tailwind CSS + các component UI**. Phiên bản dependency cụ thể lấy từ package.json và package-lock.json.
 
-Cập nhật 14/10/2026: backend FastAPI MOCK, SQLite logger và replay đã có source và kiểm thử ứng dụng. Parser hardware/serial chưa triển khai; frontend MOCK không chứng minh chuỗi phần cứng. [Thiết kế hệ thống](../../docs/architecture/KVC_ThietKeHeThong.md) là nguồn kiến trúc/BOM/nghiệm thu, [GCS plan](../../docs/architecture/KVC_GCS_PLAN.md) (stub DEPRECATED, bản đầy đủ ở archive (không có trong bản sản phẩm)), [route API chuẩn](../interfaces/IF_GCS_DATA_CONTRACT.md) và [data contract](../interfaces/KVC_GCS_DATA_CONTRACT.md) quy định dữ liệu ứng dụng.
+Cập nhật 02/11/2026: backend FastAPI MOCK, SQLite logger, relay video IF-05 và trang **Nhật ký phiên** đã có source và kiểm thử ứng dụng. **Chế độ phát lại (REPLAY) đã bỏ khỏi UI** — `AppHeader.tsx` chỉ còn MOCK/REAL, `routes.tsx` chỉ còn 6 route. Parser hardware/serial chưa triển khai; frontend MOCK không chứng minh chuỗi phần cứng. [Thiết kế hệ thống](../../docs/architecture/KVC_ThietKeHeThong.md) là nguồn kiến trúc/BOM/nghiệm thu, [GCS plan](../../docs/architecture/KVC_GCS_PLAN.md) (stub DEPRECATED, bản đầy đủ ở archive (không có trong bản sản phẩm)), [route API chuẩn](../interfaces/IF_GCS_DATA_CONTRACT.md) và [data contract](../interfaces/KVC_GCS_DATA_CONTRACT.md) quy định dữ liệu ứng dụng.
 
 > **Phân định ranh giới khí tài:**
 > KVC là trạm giám sát tải nhiệm vụ cứu nạn (camera, AI phát hiện người/phao, cảm biến siêu âm AJ-SR04M, telemetry cảm biến và định vị vị trí). **Không phải Flight Controller, không can thiệp điều khiển bay, arm/disarm hay lập lộ trình waypoint.**
@@ -52,7 +52,7 @@ VITE_VIDEO_STREAM_URL=
 VITE_MAP_TILE_URL=https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png
 VITE_MAP_ATTRIBUTION=&copy; OpenStreetMap contributors
 
-# Nguồn Dữ Liệu Khởi Tạo (MOCK / REAL / REPLAY)
+# Nguồn Dữ Liệu Khởi Tạo (MOCK / REAL — không còn REPLAY)
 VITE_DEFAULT_SOURCE_MODE=MOCK
 
 # LOCAL: generator trình duyệt; BACKEND: FastAPI MOCK + SQLite
@@ -100,13 +100,13 @@ Cấu hình mục tiêu theo [thiết kế hệ thống](../../docs/architecture
 - Khi mất GPS fix, tọa độ WGS-84 hiển thị `—` hoặc `N/A`, không tự lấy tọa độ sa bàn thay thế vào.
 
 ### 5.3. Giới Hạn Video Stream và Telemetry
-- Video là nguồn tham chiếu tùy chọn trên PC; chưa có bằng chứng camera IMX219 hoặc kênh video riêng đã được triển khai. Camera payload theo quyết định G1 trong thiết kế.
-- LoRa chỉ truyền metadata, **không truyền video**. RF payload 32 byte là ABI đã được HUMAN duyệt ngày 29/10/2026 (IF-02), nhưng chưa HARDWARE-VERIFIED. Wi-Fi SoftAP/WebSocket v1 là transport mục tiêu giữa ESP32 và laptop nhưng chưa có REAL ingress. USB envelope 48 byte thuộc kiến trúc cũ; telemetry 20 byte là ghi nhận source lịch sử. Frontend hiện chưa hỗ trợ các ABI phần cứng này.
-- Bounding Box overlay chỉ được vẽ lên khung video khi có dữ liệu đồng bộ; nếu thiếu liên kết đồng bộ frame, hệ thống thông báo overlay chưa khả dụng thay vì vẽ sai lệch.
+- Video: panel IF-05 nhận MJPEG từ **ESP32-S3-CAM + OV3660** qua backend relay (`/video/stream`), bật bằng `KVC_ENABLE_VIDEO_RELAY=1`. Firmware S3 đã build nhưng **chưa nạp bo**; khi chưa cấu hình, panel hiển thị "Chưa có nguồn video" thay vì khung giả. Camera payload chính là OV2640 DVP + FPGA (quyết định G1/B-4).
+- LoRa chỉ truyền metadata, **không truyền video**. RF payload 32 byte là ABI đã được HUMAN duyệt ngày 29/10/2026 (IF-02), nhưng chưa HARDWARE-VERIFIED. Wi-Fi SoftAP/WebSocket v1 là transport mục tiêu giữa ESP32 và laptop; backend đã có module ingress `esp32_ingress.py` nhưng **chưa có capture từ Gateway thật**. USB envelope 48 byte thuộc kiến trúc cũ; telemetry 20 byte là ghi nhận source lịch sử.
+- Bounding Box overlay **không được vẽ** lên khung video IF-05: hai camera khác cảm biến/FOV và không có đồng hồ chung (lệch thực tế 100–500 ms). `has_overlay` mặc định `false` và reducer ép `false` mỗi lần nhận `VIDEO_STATUS`. Muốn bật phải có cơ chế ghép cặp khung riêng và quyết định của nhóm.
 
 ### 5.4. Bản Đồ Offline
 - Source/CSS Leaflet được import từ dependency npm và đóng gói qua Vite. Không có thư mục `public/assets/leaflet/`; không coi thư viện cục bộ là bằng chứng tile map khả dụng offline.
-- Dữ liệu bản đồ nền (Map Tiles) phụ thuộc nguồn tile server nội bộ hoặc kết nối internet. Khi không có tile mạng, không cam kết bản đồ nền khả dụng. Mục tiêu MVP là radar sa bàn/log/replay offline; cần kiểm bằng cold cache, WAN off và đúng bản build.
+- Dữ liệu bản đồ nền (Map Tiles) phụ thuộc nguồn tile server nội bộ hoặc kết nối internet. Khi không có tile mạng, không cam kết bản đồ nền khả dụng. Mục tiêu MVP là radar sa bàn + nhật ký phiên offline; cần kiểm bằng cold cache, WAN off và đúng bản build.
 
 ### 5.5. Phân Biệt Hai Tầng Kết Nối
 1. **Tầng Trình duyệt ↔ Backend:** Kiểm soát qua trạng thái kết nối WebSocket (`ws_connected`).
@@ -117,7 +117,7 @@ Cấu hình mục tiêu theo [thiết kế hệ thống](../../docs/architecture
 
 ## 6. Kiểm tra và trạng thái bằng chứng
 
-Audit KVC-MAINT-20261014-001 ngày 14/10/2026 chạy baseline 14 test files / 76 tests PASS, lint exit 0 với 8 cảnh báo Fast Refresh và production build PASS. Lệnh typecheck cũ chỉ chạy root config rỗng; đã sửa để kiểm cả app và Vite config. Kết quả sau sửa cùng log nằm trong báo cáo cục bộ (không có trong bản sản phẩm); đây là SELF-REVIEW, không phải nghiệm thu.
+Audit KVC-MAINT-20261014-001 ngày 14/10/2026 chạy baseline 14 test files / 76 tests PASS, lint exit 0 với 8 cảnh báo Fast Refresh và production build PASS. Cập nhật 01/11/2026 (`KVC-S3CAM-20261101-001`): **173 tests / 27 file PASS**, typecheck exit 0, lint exit 0 với 10 warning có sẵn ở file không sửa, build exit 0 (`✓ built in 652ms`). Lệnh typecheck cũ chỉ chạy root config rỗng; đã sửa để kiểm cả app và Vite config. Kết quả sau sửa cùng log nằm trong báo cáo cục bộ (không có trong bản sản phẩm); đây là SELF-REVIEW, không phải nghiệm thu.
 
 ~~~powershell
 npm run typecheck
@@ -130,8 +130,12 @@ Build có cảnh báo chunk JS khoảng 821 kB trước gzip. Chưa dùng cảnh
 
 Các script Playwright ở tests/ dùng URL/port và thư mục evidence cố định theo task cũ; không chạy chúng để ghi đè evidence. Browser E2E/ảnh chụp, cold-cache/WAN-off và đo tải dài hạn chưa được chạy lại trong audit này. Unit tests/build không thay thế các phép thử đó.
 
-## 7. Dùng backend MOCK và replay
+## 7. Dùng backend MOCK và nhật ký phiên
 
-Đọc [backend README](DASHBOARD_BACKEND.md) để chạy server, kiểm trạng thái logger và API replay. Trong terminal Vite đặt VITE_MOCK_TRANSPORT=BACKEND trước khi chạy dev/build, giữ source MOCK và cổng 5173 để khớp CORS. LOCAL là mặc định, không mở WS, không lưu SQLite. BACKEND không tự fallback LOCAL khi mất socket; ingress REAL từ ESP32 qua Wi-Fi/WebSocket chưa có. REPLAY cần session đã commit trong backend, không phải timeline của generator trình duyệt.
+Đọc [backend README](DASHBOARD_BACKEND.md) để chạy server, kiểm trạng thái logger và các API hiện hành. Trong terminal Vite đặt VITE_MOCK_TRANSPORT=BACKEND trước khi chạy dev/build, giữ source MOCK và cổng 5173 để khớp CORS. LOCAL là mặc định, không mở WS, không lưu SQLite. BACKEND không tự fallback LOCAL khi mất socket; ingress REAL từ ESP32 qua Wi-Fi/WebSocket đã có module `esp32_ingress.py` nhưng chưa thử trên thiết bị.
+
+**Nhật ký phiên (từ 02/11/2026):** route `/history` (`EventLogPage`) đọc phiên đã commit, lọc theo actor/mức/source, ẩn mục và xuất CSV. Giao diện **không còn chế độ phát lại**: không có nút start/pause/seek/speed/stop và không có route Replay. Backend vẫn còn `replay_engine.py` cùng 6 route `/api/replay/*` như code dự phòng; nếu gọi trực tiếp qua HTTP thì semantics mục 7.4 của data contract vẫn đúng, nhưng đó không phải tính năng của Dashboard.
+
+**Video phụ IF-05 (tùy chọn):** panel video nhận MJPEG từ backend relay, không gọi trực tiếp camera. `has_overlay` luôn `false` — BBox của FPGA không được vẽ lên khung S3 (khác hình học và khác đồng hồ).
 
 Tiêu chí đo ở mục VII của [thiết kế](../../docs/architecture/KVC_ThietKeHeThong.md); bản hiện tại không chứa lịch 21 ngày. Công việc theo checklist 5 người; không tự đánh dấu gate hoàn thành chỉ vì có source hoặc test PASS.

@@ -32,7 +32,7 @@ Tài liệu này quản lý tập trung toàn bộ các giao diện kết nối 
 > **LƯU Ý QUAN TRỌNG VỀ TOPOLOGY:**
 > - ESP32 trạm đất phát Wi-Fi SoftAP và chạy WebSocket Server.
 > - **Backend Python trên laptop kết nối tới WebSocket Server của ESP32** để thu nhận dữ liệu thô, giải mã và ghi vào SQLite.
-> - **Dashboard trên trình duyệt web kết nối với Backend Python trên laptop**, **TUYỆT ĐỐI KHÔNG** kết nối trực tiếp từ trình duyệt tới ESP32 nhằm tránh quá tải tài nguyên vi điều khiển và bảo đảm 100% dữ liệu được ghi log phục vụ tính năng Replay.
+> - **Dashboard trên trình duyệt web kết nối với Backend Python trên laptop**, **TUYỆT ĐỐI KHÔNG** kết nối trực tiếp từ trình duyệt tới ESP32 nhằm tránh quá tải tài nguyên vi điều khiển và bảo đảm 100% dữ liệu đi qua logger SQLite (phục vụ trang Nhật ký phiên).
 > - Endpoint mục tiêu theo mục IV.4 thiết kế và IF-03 là `ws://192.168.4.1:8080/telemetry`. Đây là baseline DESIGN, chưa có firmware/capture để xác minh; không coi là endpoint đã chạy.
 
 ---
@@ -47,6 +47,7 @@ Tài liệu này quản lý tập trung toàn bộ các giao diện kết nối 
 | **IF-02** | Gói tin telemetry vô tuyến cứu nạn | MCU Sonix (**Phong**) | ESP32 Trạm Đất (**Thịnh**) | Sóng vô tuyến LoRa 433 MHz (SX1278 Ra-02, SPI) | [IF_MCU_LORA_RF.md](IF_MCU_LORA_RF.md) |
 | **IF-03** | Luồng telemetry từ Trạm đất sang Host | ESP32 Trạm Đất (**Thịnh**) | Backend GCS Laptop (**Thịnh**) | Wi-Fi 802.11 b/g/n (SoftAP) + WebSocket Protocol | [IF_ESP32_GCS_WS.md](IF_ESP32_GCS_WS.md) |
 | **IF-04** | Dữ liệu ứng dụng GCS Host nội bộ | Backend GCS FastAPI | Frontend Dashboard Web | Localhost HTTP / WebSocket (`ws://127.0.0.1:8000/ws/telemetry`) | [IF_GCS_DATA_CONTRACT.md](IF_GCS_DATA_CONTRACT.md) — **nguồn chuẩn route**; semantics tại [KVC_GCS_DATA_CONTRACT.md](KVC_GCS_DATA_CONTRACT.md) |
+| **IF-05** | Video quan sát MJPEG (kênh phụ, không sinh tọa độ) | ESP32-S3-CAM + OV3660 (**Kilo**) | Backend GCS relay → trình duyệt | Wi-Fi 2.4 GHz `multipart/x-mixed-replace`; backend là client outbound | [IF_ESP32_CAM_GCS.md](IF_ESP32_CAM_GCS.md) |
 
 ---
 

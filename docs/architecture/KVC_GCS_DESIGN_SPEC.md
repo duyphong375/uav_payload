@@ -22,7 +22,7 @@
 * **Cảm hứng & Ngôn ngữ tạo hình:** Lấy cảm hứng từ hệ sinh thái giao diện y tế/chiến thuật cao cấp **SortiX-Med**:
   - Giao diện **phẳng, bề mặt đặc** (flat field-ops). Không dùng glassmorphism nhiều lớp, không glow, không `shadow-2xl`. Tối đa **một** lớp phủ bán trong suốt trên bản đồ (thanh điều khiển Mission).
   - Tương phản cao, bố cục mô-đun hóa (Card-based Layout) giúp người vận hành không bị quá tải thông tin trong điều kiện thời tiết khắc nghiệt.
-  - Phân biệt MOCK, REAL và REPLAY; ghi riêng thiết bị inference. Backend hiện hỗ trợ MOCK/REPLAY, REAL ingress còn thiếu.
+  - Phân biệt MOCK và REAL; ghi riêng thiết bị inference. Backend hỗ trợ MOCK, ingress ESP32 (chưa kiểm trên thiết bị) và relay video IF-05. **Chế độ phát lại đã bỏ khỏi UI từ 02/11/2026** — thay bằng trang Nhật ký phiên (đọc log, xuất CSV).
   - Ràng buộc thi hành: xem `KVC_GCS_DESIGN_CONTRACT.md` (token `--kvc-*`, deny-list DL-1…DL-9).
 
 ---
@@ -85,7 +85,7 @@
 * **Vị trí:** Thanh cố định trên cùng (`h-14` / `h-16`).
 * **Trái:** Biểu tượng khiên bảo vệ `ShieldCheck` Cyan, Logo `KVC · GCS`, nhãn phụ `Payload Monitor`.
 * **Giữa:** Bộ chuyển trạng thái **Segmented Pill Mode Switcher**:
-  - Nút `MOCK` dùng `var(--kvc-mock)`; `REAL` dùng `var(--kvc-ok)` hoặc `var(--kvc-crit)` tuỳ trạng thái; `REPLAY` dùng `var(--kvc-accent)`.
+  - **Chỉ còn 2 nút:** `MOCK` dùng `var(--kvc-mock)`; `REAL` dùng `var(--kvc-ok)` hoặc `var(--kvc-crit)` tuỳ trạng thái. Nút `REPLAY` **đã bỏ** cùng chế độ phát lại (02/11/2026).
   - Không dùng glow/shadow màu; chỉ đổi nền và viền theo token.
 * **Phải:** Các Widget chỉ số nhanh:
   - Trạng thái kết nối: `WS BACKEND OK` / `MẤT WS BACKEND`. Khi `source_mode === 'MOCK'` và `MOCK_TRANSPORT === 'LOCAL'`, hiển thị `MOCK OFFLINE` thay vì báo mất kết nối.

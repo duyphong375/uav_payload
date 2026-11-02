@@ -33,7 +33,7 @@ flowchart TD
 
     subgraph GCS_LAPTOP ["TẦNG 4: HỆ THỐNG GCS TRÊN LAPTOP CỦA THỊNH"]
         direction TB
-        BACKEND["Backend Python GCS (:8000)<br/>Nhận WebSocket, ghi SQLite WAL, điều phối Replay"]
+        BACKEND["Backend Python GCS (:8000)<br/>Nhận WebSocket, ghi SQLite WAL, phục vụ Nhật ký phiên"]
         FRONTEND["Web Dashboard GCS (:5173)<br/>Bản đồ OSM 100% tràn viền, Radar sa bàn, Cảnh báo"]
     end
 
@@ -264,6 +264,21 @@ flowchart TD
 ### GIAI ĐOẠN 5: BẮT SÓNG VÔ TUYẾN THẬT TỪ UAV (PHASE C: REAL RF INGRESS)
 *Mục tiêu: Lắp ăng-ten 433MHz, đón gói sóng thật từ tải nhiệm vụ Sonix trên UAV, giải mã và đẩy lên Web.*
 
+> **TRẠNG THÁI 01/11/2026 — `NOT RUN` (BLOCKED: thiếu bo).**
+>
+> Phía phát đã sẵn sàng và **`HARDWARE-VERIFIED`**: chuỗi
+> `OV2640 → FPGA → MCU Sonix → SX1278 TX` chạy thật, `tx=17/0` (17 gói phát
+> thành công, 0 lỗi), ABI GV-02 PASS.
+>
+> Bước thu sóng **chưa chạy được** vì bo Gateway ESP32 đang ở chỗ Thịnh và
+> **chưa bàn giao** sang bàn lab của Phong. Ghi `NOT RUN`, **không** phải FAIL.
+>
+> **Owner của giai đoạn này: Thịnh.** Quy trình thao tác + tiêu chí PASS/FAIL đã
+> viết sẵn tại `TRACK_B_RUNBOOK.md` §6. Cấu hình RF hai phía đã đối chiếu khớp
+> cả 6 tham số — **không** chỉnh thông số RF khi chạy giai đoạn này.
+>
+> Bằng chứng phía phát: `evidence/KVC-MCU-FPGA-LORA-20261101-001.md`.
+
 #### A. Các bước thực hiện & Lệnh kiểm tra:
 1. Vặn chặt ăng-ten 433MHz vào đầu nối SMA của module Ra-02.
 2. Cấu hình tham số vô tuyến chuẩn xác theo đặc tả `IF-02`:
@@ -399,12 +414,33 @@ Dùng bảng này để theo dõi tiến độ công việc hàng ngày:
 
 | Giai đoạn | Nội dung công việc | Tiêu chí nghiệm thu trực quan | Trạng thái |
 | :---: | :--- | :--- | :--- |
-| **G1** | Wi-Fi (STA/SoftAP) & WebSocket | Laptop ping ESP32 < 2ms; Handshake WebSocket thành công | `[x]` **HOÀN TẤT** |
-| **G2** | Gói 32-byte & Thẩm định CRC-16 | CRC kiểm tra khớp chuẩn; chuỗi Hex xuất ra đủ 64 ký tự; bắt lỗi nhiễu 1-bit | `[x]` **HOÀN TẤT** |
-| **G3** | Thông luồng Self-Mock lên Web | Firmware ESP32 tự sinh 3 kịch bản mỗi 1.0s; Backend giải mã; Dashboard hiển thị Người/Phao cứu sinh/Siêu âm | `[x]` **HOÀN TẤT** |
+| **G1** | Wi-Fi (STA/SoftAP) & WebSocket | Laptop ping ESP32 < 2ms; Handshake WebSocket thành công | `[ ]` **CHƯA CÓ LOG TRÊN CHIP** |
+| **G2** | Gói 32-byte & Thẩm định CRC-16 | CRC kiểm tra khớp chuẩn; chuỗi Hex xuất ra đủ 64 ký tự; bắt lỗi nhiễu 1-bit | `[ ]` **CHƯA CÓ LOG TRÊN CHIP** |
+| **G3** | Thông luồng Self-Mock lên Web | Firmware ESP32 tự sinh 3 kịch bản mỗi 1.0s; Backend giải mã; Dashboard hiển thị Người/Phao cứu sinh/Siêu âm | `[ ]` **CHƯA CÓ LOG TRÊN CHIP** |
 | **G4** | SPI Check LoRa Ra-02 | Đọc thanh ghi `RegVersion (0x42)` qua SPI trả về đúng `0x12` | `[ ]` **TIẾP THEO** |
-| **G5** | Thu sóng LoRa 433MHz thật | Bắt gói RF từ UAV, Serial in RSSI/SNR thật, Dashboard cập nhật mượt | `[ ]` CHỜ TEST |
+| **G5** | Thu sóng LoRa 433MHz thật | Bắt gói RF từ UAV, Serial in RSSI/SNR thật, Dashboard cập nhật mượt | `[ ]` **NOT RUN — BLOCKED: bo chưa bàn giao từ Thịnh** (01/11/2026). Phía phát đã `HARDWARE-VERIFIED` (`tx=17/0`) |
 | **G6** | Độ bền & Chống rớt mạng | Tắt/bật Wi-Fi tự phục hồi trong 2 giây; gói sai CRC tự động bị loại | `[ ]` CHỜ TEST |
+
+> **Chặn hiện tại (01/11/2026):** toàn bộ G1–G6 **chưa chạy** vì bo Gateway ESP32
+> chưa có trên bàn lab. Đây là chặn **phần cứng**, không phải chặn phần mềm.
+> Riêng G5 có thêm số liệu phía phát: `evidence/KVC-MCU-FPGA-LORA-20261101-001.md`.
+
+> [!IMPORTANT]
+> **G1–G3 hạ từ `[x] HOÀN TẤT` về `CHƯA CÓ LOG TRÊN CHIP` ngày 01/11/2026.**
+>
+> Lý do: cả ba đều là hành vi **trên thiết bị thật** (ping từ laptop tới ESP32,
+> handshake WebSocket, dashboard nhận dữ liệu self-mock), nhưng repo không có
+> log Serial nào kèm SHA firmware cho ba mục này. Thứ duy nhất đã có là
+> `test_rf_decode` / `test_net_policy` chạy **host** (xem `KVC_PROJECT_STATUS.md`
+> dòng "Chuỗi REAL": *"PlatformIO build 0 error"*, *"host C++ tests PASS"*).
+> Host test chứng minh logic, **không** chứng minh mạng/SPI/WebSocket trên chip.
+>
+> Điều này **không** phủ nhận đã có người chạy thử. Nó chỉ nói chưa có bằng chứng
+> lưu lại. Muốn đóng G1–G3: dán log Serial + SHA firmware vào mục 5 của tài liệu
+> này, rồi đổi lại `[x]`.
+>
+> Đây là cùng một loại lỗi đã sửa cho G2.7 soak ở `BRINGUP_CHECKLIST.md`:
+> tuyên bố PASS dựa trên xác nhận, không dựa trên log.
 
 ---
 

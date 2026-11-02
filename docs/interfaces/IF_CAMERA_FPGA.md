@@ -15,11 +15,20 @@
 | Gray pointer lệch 1 | ✅ FIXED | `wr_ptr_gray <= bin2gray(wr_ptr_next_bin)` cùng nhịp với bin |
 | Timestamp đơn vị ms | ✅ FIXED | `kvc_top_demo.v` chia 100.000 (`MS_DIV`) thay vì đếm tick |
 | Header comment OV5640 | ✅ FIXED | `camera_rx.v:5` ghi OV2640 |
-| `line_buffer` ADDR_W ≥ 17 | ⏸ HOÃN sang P3 | Nằm trong CNN path đang tắt (`USE_MOCK_BBOX=1`) |
+| `line_buffer` ADDR_W ≥ 17 | ⏸ HOÃN sang P3 | Nằm trong CNN path đang tắt (`BBOX_SOURCE` ≠ 2) |
 | `ov2640_config` RGB565 | ⏸ CHƯA KIỂM CHỨNG | `0xDA=0x08` có thể đã đúng; cần đo màu thật |
 | PCLK routing (PR1014) | ⏸ MỞ | Cần `IO_LOC ... CLOCK` hoặc BUFG; đo skew trước |
+| `kvc_blob_detect` dùng pixel thật | ✅ SIMULATED (01/11/2026) | `tb_kvc_blob_detect` 12/12 + `tb_kvc_top_blob` 8/8 PASS; 0 BSRAM, 0 DSP. **Chưa chạy trên bo** |
 
-**Bằng chứng:** `SIMULATED` cho FIFO và timestamp; `BUILT` (Fmax 100 MHz, 0 violation). **Chưa `HARDWARE-VERIFIED`** — chưa có ảnh capture thật.
+**Bằng chứng:** `SIMULATED` cho FIFO, timestamp và blob detect; `BUILT`
+(Fmax `clk_100m` 113,277 MHz, TNS = 0). **Chưa `HARDWARE-VERIFIED`** — chưa có
+ảnh capture thật, camera chưa được xác nhận phát VSYNC trên bo.
+
+> **Lưu ý về `frame_valid` (01/11/2026):** `camera_rx.frame_valid` chỉ cao trong
+> lúc VSYNC cao (duty < 2 %), **không** cao suốt thời gian pixel chạy. Mọi module
+> tiêu thụ pixel phải chốt tín hiệu này tại **cạnh xuống VSYNC** thành cờ giữ
+> suốt frame — `kvc_blob_detect` làm đúng như vậy (`frame_active`). Dùng trực
+> tiếp làm cổng tích lũy sẽ đếm được 0 pixel.
 
 > **Task:** `KVC-CAM-CANDIDATE-20261019-001` · Owner: Codex · Scope: cập nhật lựa chọn camera PoC và đối chiếu thông tin bộ nhớ OneKiwi giữa tài liệu · Allowed files: `docs/interfaces/IF_CAMERA_FPGA.md`, `docs/architecture/KVC_ThietKeHeThong.md`, `docs/architecture/KVC_PROJECT_STATUS.md`, `docs/hardware/fpga/CHIP_ONEKIWI_20K_GOWIN_GW2A.md` · Acceptance: phân biệt PoC giá thấp với candidate cho UAV chuyển động; ghi rõ DDR3 còn mâu thuẫn giữa trang hãng và schematic cục bộ; không chốt pinout/rail hoặc tuyên bố hardware-verified · Status: `DOC UPDATE COMPLETE` · Verification: đối chiếu Markdown/nguồn hoàn tất; `git diff --check` PASS (exit 0; chỉ cảnh báo chuẩn hóa LF/CRLF); build/test và kiểm tra camera trên board `NOT RUN` vì task chỉ cập nhật tài liệu.
 
@@ -50,7 +59,7 @@
 | **VSYNC / HREF** | Camera ➔ FPGA | Theo DOVDD/VCCIO đã xác minh | Đồng bộ khung và dòng ảnh |
 | **D[7:0]** | Camera ➔ FPGA | Theo DOVDD/VCCIO đã xác minh | Bus dữ liệu DVP 8-bit; nội dung pixel tùy format sensor đã cấu hình |
 | **PCLK** | Camera ➔ FPGA | Theo DOVDD/VCCIO đã xác minh | Clock pixel do camera phát |
-| **XCLK / MCLK** | FPGA ➔ camera | Theo carrier/VCCIO đã xác minh | Clock tham chiếu camera; tần số chốt theo datasheet/module và bring-up |
+| **XCLK / MCLK** | FPGA ➔ camera | Theo carrier/VCCIO đã xác minh | Clock tham chiếu camera (24 MHz); nối vào pin 18 trên module MINI-200W kèm dây GND |
 
 ---
 
@@ -58,7 +67,10 @@
 
 1. **Khởi tạo và cấu hình (I2C / SCCB):**
     - Với OV2640 hoặc OV9782, xác minh địa chỉ SCCB và register sequence theo đúng sensor, module và datasheet trước khi triển khai; không dùng cấu hình của module khác như bằng chứng tương thích.
-    - Bring-up ban đầu ở **VGA (640 × 480)**. Crop/resize sang kích thước tensor AI là bước xử lý riêng; không giả định sensor xuất trực tiếp 640 × 640.
+    - **Lưu ý module OV2640 MINI-200W (27×27 mm, bo đỏ 18 pin):** Bo không có thạch anh onboard (chỉ có 2 IC LDO 2.8V và 1.2V). Chân 18 là chân XVCLK/XCLK cấp nhịp tim cho chip (không phải NC). Bắt buộc cấp 24 MHz từ FPGA J1-12 (B13) vào pin 18 thì sensor mới phản hồi SCCB và phát xung DCLK/VSYNC.
+    - SCL cấu hình Push-Pull từ FPGA master (100 kHz) để đảm bảo sườn xung 3.3V, không phụ thuộc điện trở kéo ngoài.
+    - FSM `ov2640_config.v` có cờ chốt `cfg_attempted` để chỉ chạy đúng 1 lần khi PLL lock, ngăn ngừa vòng lặp vô hạn và dập tắt nhiễu xuyên kênh sang VSYNC.
+    - Bring-up ban đầu ở **VGA (640 × 480)** RGB565 (224 thanh ghi từ esp32-camera).
     - Chưa chốt tốc độ khung hình; đo theo timing, tài nguyên và pipeline thực tế trước khi ghi KPI.
 2. **Định dạng dữ liệu Pixel:**
    - OV2640 có thể cấu hình RGB565/YUV/JPEG theo module/tài liệu tương ứng; ưu tiên kiểm tra RGB565/YUV cho pipeline thử nghiệm, không mặc định chế độ JPEG dùng trực tiếp cho AI.

@@ -20,7 +20,7 @@ Khi cần lập task GCS mới, dùng các nguồn hiện hành:
 | Kiến trúc, BOM, tiêu chí nghiệm thu | [Thiết kế hệ thống](KVC_ThietKeHeThong.md) |
 | Thứ tự công việc hiện hành | Checklist 5 người (không có trong bản sản phẩm) |
 | Route REST/WebSocket của GCS | [IF-04](../interfaces/IF_GCS_DATA_CONTRACT.md) |
-| Semantics dữ liệu, schema, replay invariant | [Data contract](../interfaces/KVC_GCS_DATA_CONTRACT.md) |
+| Semantics dữ liệu, schema, lưu trữ nhật ký | [Data contract](../interfaces/KVC_GCS_DATA_CONTRACT.md) |
 | UI/UX mục tiêu | [Thiết kế GCS](KVC_GCS_DESIGN_SPEC.md) |
 | Trạng thái thực tế của dự án | [Tiến độ dự án](KVC_PROJECT_STATUS.md) |
 

@@ -33,12 +33,14 @@ flowchart LR
     end
 
     subgraph LAPTOP_GCS ["TRẠM ĐIỀU HÀNH LAPTOP"]
-        WS_CLIENT["Backend Python GCS<br/>(Ingress Client)"] --> SQLITE["Ghi SQLite WAL<br/>& Replay Engine"]
+        WS_CLIENT["Backend Python GCS<br/>(Ingress Client)"] --> SQLITE["Ghi SQLite WAL<br/>(Nhật ký phiên)"]
         SQLITE --> DASHBOARD["Web Dashboard GCS<br/>(Bản đồ OSM, Radar)"]
+        VIDEO_RELAY["Relay video IF-05<br/>(MJPEG, tùy chọn)"] --> DASHBOARD
     end
 
     LORA_TX -. "Sóng RF 433 MHz" .-> LORA_RX
     WS_SRV -- "Wi-Fi SoftAP<br/>(192.168.4.1)" --> WS_CLIENT
+    CAM_S3["ESP32-S3-CAM<br/>(kênh quan sát phụ)"] -. "Wi-Fi 2.4 GHz / MJPEG<br/>KHÔNG sinh tọa độ" .-> VIDEO_RELAY
 ```
 
 ---

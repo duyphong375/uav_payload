@@ -11,6 +11,10 @@
 | Bằng chứng | DESIGN (chưa có log thực thi) |
 | Tài liệu liên quan | Kế hoạch dài hạn `KVC_GCS_Dashboard_Redesign_Plan.md` (hiện chỉ có bản local ở `review/Codex/`, sẽ chép vào thư mục này ở P0 bước 7), `KVC_GCS_DESIGN_SPEC.md`, `../interfaces/KVC_GCS_DATA_CONTRACT.md` |
 
+> **Ghi chú hiệu lực (02/11/2026):** các mục liên quan **chế độ phát lại (Replay)** trong kế
+> hoạch này — "Logic Replay", phân loại cảnh báo replay cũ, R4 — **không còn hiệu lực**.
+> Dashboard đã bỏ Replay từ 02/11/2026; giữ nguyên nội dung gốc để tra cứu lịch sử.
+
 ---
 
 ## 1. Mục tiêu

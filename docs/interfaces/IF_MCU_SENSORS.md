@@ -40,7 +40,7 @@
 
 * **Chuẩn truyền thông:** UART 9.600 bps, 8 bit dữ liệu, No Parity, 1 Stop bit (8N1) (chế độ xuất nối tiếp Serial). Có thể dùng chế độ xung Trigger/Echo qua GPIO.
 * **Dải đo danh định phần cứng:** 20 cm – 800 cm (0,2 m – 8,0 m) theo datasheet AJ-SR04M.
-* **Trần firmware hiện tại:** `KVC_USOUND_MAX_RANGE_CM = 500` (5,0 m) — **đang được nâng lên 700 cm** theo phê duyệt B-7 ngày 31/10/2026 để mở rộng envelope vận hành 2,0–5,0 m.
+* **Trần firmware hiện tại:** `KVC_USOUND_MAX_RANGE_CM = 700` (7,0 m) — đã nâng từ 500 cm theo phê duyệt B-7 ngày 31/10/2026 để mở rộng envelope vận hành 2,0–5,0 m. Đi kèm `KVC_USOUND_MAX_FRAME_MM = 8000` và `KVC_USOUND_TIMEOUT_MS = 350`.
 * **Độ chính xác:** $\pm 1\text{ cm}$, độ phân giải 1 mm. Tần số sóng siêu âm: 40 kHz.
 * **Góc mở:** ~75° (−3 dB) → vệt đo 4,6 m đường kính ở 3 m; 7,7 m ở 5 m. Giá trị trả về là **điểm phản xạ mạnh nhất trong vệt**, không phải khoảng cách tới điểm ngay dưới UAV.
 * **Định dạng khung dữ liệu UART 4 byte:**
@@ -56,9 +56,10 @@
   * $\text{Distance (cm)} = \text{Distance (mm)} / 10$
   * $\text{Checksum} = (0\text{xFF} + \text{Data\_H} + \text{Data\_L}) \ \& \ 0\text{xFF}$
 * **Các ngưỡng cự ly trong hệ thống (Đồng bộ toàn chuỗi):**
-  * **Ngưỡng phần cứng danh định (Datasheet):** $20\text{ cm} \le \text{Distance} \le 600\text{ cm}$.
-  * **Ngưỡng cờ hợp lệ Firmware MCU (`ALT_VALID`):** $20\text{ cm} \le \text{Distance} \le 500\text{ cm}$ (định nghĩa trong `kvc_usound_ajsr04m.h`, ngoài dải này trả lỗi cự ly).
-  * **Ngưỡng thẩm định Backend GCS (`lidar_position_valid`):** $20\text{ cm} \le \text{Distance} \le 800\text{ cm}$ (định nghĩa trong `esp32_ingress.py` và `schemas.py` nhằm dự phòng dung sai đỉnh).
+  * **Ngưỡng phần cứng danh định (Datasheet):** $20\text{ cm} \le \text{Distance} \le 800\text{ cm}$.
+  * **Ngưỡng cờ hợp lệ Firmware MCU (`ALT_VALID`):** $20\text{ cm} \le \text{Distance} \le 700\text{ cm}$ (định nghĩa trong `kvc_usound_decode.h:56`, B-7 31/10/2026; ngoài dải này trả lỗi cự ly).
+  * **Ngưỡng thẩm định Backend GCS (`lidar_position_valid`):** $20\text{ cm} \le \text{Distance} \le 800\text{ cm}$ (định nghĩa trong `esp32_ingress.py:126` và `schemas.py`, nhằm dự phòng dung sai đỉnh; **rộng hơn** trần firmware 700 cm nên không che được lỗi cảm biến).
+  * **Sentinel không phản xạ:** module trả `6000 mm` khi không có echo. Firmware ánh xạ thành `KVC_USOUND_ERR_NO_ECHO` (mã 5), **không** phải một phép đo 6 m hợp lệ.
   * Checksum khung dữ liệu đúng.
   * **Lưu ý góc mở chùm sóng (~75°):** Khi thử nghiệm bể bơi, cho UAV bay cách mép bờ kè/thành bể tối thiểu 1,5 m để tránh sóng âm bắt nhầm tiếng vọng từ thành bờ.
 
@@ -204,6 +205,14 @@ MAX_FRAME_MM (8000) > MAX_RANGE_CM × 10 (7000) > NO_ECHO_MM (6000)
 **Hệ quả:** `7000 mm` giờ là `OUT_OF_RANGE` (đúng — vượt trần tin cậy), không còn là `BAD_CHECKSUM` (sai — dữ liệu hợp lệ bị coi là nhiễu).
 
 **Còn mở:** chưa đo thực tế trên kit. `frame_ok ≥ 98 %` @ 3 m, `fx_px` thật, `alt_quality` từ dữ liệu thật — thuộc Gate G6 cần phần cứng.
+
+> [!WARNING]
+> **Gate G6.2 hiện `BLOCKED` — đầu dò AJ-SR04M hỏng (xác nhận 31/10/2026).**
+> Driver trả `KVC_USOUND_ERR_NO_RESPONSE` (`err/6`), `KVC_FLAG_ALT_VALID` luôn `= 0`,
+> nên `alt_dist_cm` trong gói IF-02 bằng `0` và **toàn bộ nhánh georef dùng siêu âm
+> không chạy**. Đây là fail-safe đúng thiết kế (không báo khoảng cách giả), không phải
+> lỗi firmware. Các ngưỡng 700 cm / `alt_quality` phía trên vẫn là `SIMULATED` cho tới
+> khi thay đầu dò và chạy lại G6.2.
 
 ---
 

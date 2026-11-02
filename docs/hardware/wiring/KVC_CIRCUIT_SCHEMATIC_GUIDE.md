@@ -1,7 +1,7 @@
 # KVC — Hướng Dẫn Thiết Kế Sơ Đồ Mạch Chuẩn & Đấu Nối Toàn Hệ Thống (Master Circuit Schematic & Wiring Guide)
 
 - **Mã tài liệu:** `KVC-HW-SCHEMATIC-GUIDE-01`
-- **Phiên bản:** `1.2.0 (HIGH-CONTRAST DARK/LIGHT & ZERO-CROSSING WIRING)`
+- **Phiên bản:** `1.3.0 (DUAL-CAMERA ARCHITECTURE: OV2640/FPGA + ESP32-S3-CAM & ZERO-CROSSING WIRING)`
 - **Dự án:** KVC — Tải nhiệm vụ UAV tìm kiếm cứu nạn bão lũ
 - **Tài liệu tham chiếu chuẩn:**
   - [`docs/hardware/wiring/KVC_MASTER_PINOUT_WIRING.md`](./KVC_MASTER_PINOUT_WIRING.md)
@@ -9,6 +9,8 @@
   - [`docs/interfaces/IF_MCU_SENSORS.md`](../../interfaces/IF_MCU_SENSORS.md)
   - [`docs/interfaces/IF_MCU_LORA_RF.md`](../../interfaces/IF_MCU_LORA_RF.md)
   - [`docs/interfaces/IF_FPGA_MCU_UART.md`](../../interfaces/IF_FPGA_MCU_UART.md)
+  - [`docs/interfaces/IF_ESP32_CAM_GCS.md`](../../interfaces/IF_ESP32_CAM_GCS.md)
+  - [`docs/architecture/KVC_DUAL_CAMERA_DESIGN_PROPOSAL.md`](../../architecture/KVC_DUAL_CAMERA_DESIGN_PROPOSAL.md)
 
 > ### 📌 MỤC LỤC ĐIỀU HƯỚNG NHANH
 > 1. [Sơ Đồ Khối Tổng Thể Hệ Thống (Signal Map & Power Flow)](#1-sơ-đồ-khối-tổng-thể-hệ-thống-system-master-architecture)
@@ -20,6 +22,7 @@
 >    - [3.4. Module Truyền Thông Vô Tuyến Tầm Xa LoRa Ra-02 (SX1278 433MHz)](#34-module-truyền-thông-vô-tuyến-tầm-xa-lora-ra-02-sx1278-433mhz)
 >    - [3.5. Mạch Cầu Phân Áp Đo Điện Áp Pin LiPo (ADC)](#35-mạch-cầu-phân-áp-đo-điện-áp-pin-lipo-sar-adc-12-bit)
 >    - [3.6. Cụm Giao tiếp AI FPGA OneKiwi GW2A](#36-cụm-giao-tiếp-ai-fpga-onekiwi-gw2a-thị-giác-bounding-box)
+>    - [3.7. Module Camera Quan Sát ESP32-S3-CAM (Kênh Video Phụ IF-05)](#37-module-camera-quan-sát-esp32-s3-cam-kênh-video-phụ-if-05)
 > 4. [Danh Mục Linh Kiện (BOM) & Hướng Dẫn Cắm Nối Từng Chân](#4-danh-mục-linh-kiện-bom--hướng-dẫn-cắm-nối-từng-chân)
 >    - [4.1. Bảng Danh Mục Vật Tư Linh Kiện (BOM)](#41-bảng-danh-mục-vật-tư-linh-kiện-bill-of-materials---bom)
 >    - [4.2. Bảng Hướng Dẫn Nối Chân Chi Tiết Từng Linh Kiện (Pin-to-Pin Netlist)](#42-bảng-hướng-dẫn-nối-chân-chi-tiết-từng-linh-kiện-bom-pin-to-pin-wiring-netlist)
@@ -31,7 +34,7 @@
 ## 1. SƠ ĐỒ KHỐI TỔNG THỂ HỆ THỐNG (SYSTEM MASTER ARCHITECTURE)
 
 Để giải quyết triệt để vấn đề **màu sắc khó nhìn trên nền tối (Dark Theme)** và **đường dây chạy lòng vòng chồng chéo**, hệ thống được thể hiện bằng 2 sơ đồ phân tách rõ ràng:
-* **Sơ đồ 1.1:** Bản đồ kết nối tín hiệu trung tâm (MCU ở giữa, không có dây chạy vòng).
+* **Sơ đồ 1.1:** Bản đồ kết nối tín hiệu trung tâm (MCU ở giữa, không có dây chạy vòng; Camera quan sát phụ độc lập vật lý).
 * **Sơ đồ 1.2:** Cây phân phối điện năng từ trên xuống dưới (Power Distribution Flow).
 
 Tất cả các khối đều được thiết lập màu tương phản cao (High-Contrast), chữ luôn màu trắng/sáng rõ nét trên cả nền Dark Mode lẫn Light Mode.
@@ -40,7 +43,7 @@ Tất cả các khối đều được thiết lập màu tương phản cao (Hi
 
 ### 1.1. Bản Đồ Kết Nối Tín Hiệu Trung Tâm (Central MCU Signal Map)
 
-Bố cục đặt **MCU Sonix ở trung tâm**, cụm cảm biến ở bên trái và cụm truyền thông/AI ở bên phải. Toàn bộ các đường tín hiệu đi thẳng trực tiếp, không đan chéo:
+Bố cục đặt **MCU Sonix ở trung tâm**, cụm cảm biến ở bên trái và cụm truyền thông/AI ở bên phải. Module **ESP32-S3-CAM (kênh video phụ IF-05)** hoạt động hoàn toàn độc lập, không kết nối đường tín hiệu vào MCU Sonix:
 
 ```mermaid
 flowchart LR
@@ -65,9 +68,14 @@ flowchart LR
     subgraph RIGHT_SIDE ["CỤM TRUYỀN THÔNG VÔ TUYẾN, AI VÀ GỠ LỖI"]
         LORA_MOD["Module LoRa Ra-02 (SX1278 433MHz)<br/>- Nguồn: 3.3V trực tiếp + Tụ 100uF/100nF bù dòng<br/>- Giao tiếp bus SPI0 tốc độ cao<br/>- Công suất phát +16dBm<br/>- BẮT BUỘC gắn ăng-ten trước khi bật nguồn"]
 
-        FPGA_MOD["Bo AI FPGA OneKiwi GW2A 20K<br/>- Kèm Camera DVP OV2640 / OV9782<br/>- Nguồn: 5V Buck<br/>- Gửi khung nhận diện BBox qua UART1<br/>- Xung ngắt DATA_READY báo khung ảnh"]
+        FPGA_MOD["Bo AI FPGA OneKiwi GW2A 20K<br/>- Kèm Camera DVP OV2640 (Trinh sát AI)<br/>- Nguồn: 5V Buck<br/>- Gửi khung nhận diện BBox qua UART1<br/>- Xung ngắt DATA_READY báo khung ảnh"]
 
         DEBUG_MOD["Cổng Mạch Nạp SWD và Debug PC<br/>- Xuất log UART5 tốc độ 9600 8N1 (hoặc 115200 khi có PLL)<br/>- Nhận lệnh cấu hình gỡ lỗi từ PC"]
+    end
+
+    %% KHỐI ĐỘC LẬP: CAMERA QUAN SÁT PHỤ
+    subgraph S3_SIDE ["CỤM CAMERA QUAN SÁT ĐỘC LẬP (KÊNH PHỤ IF-05)"]
+        S3CAM_MOD["Bo Camera ESP32-S3-CAM<br/>(OV3660 / OV2640)<br/>- Nguồn: 5V Buck + Tụ 100uF/100nF<br/>- Stream MJPEG qua Wi-Fi 2.4GHz<br/>- ĐỘC LẬP VẬT LÝ — Không nối chân Sonix"]
     end
 
     %% ĐƯỜNG KẾT NỐI TÍN HIỆU TỪ TRÁI VÀO MCU
@@ -85,10 +93,12 @@ flowchart LR
     classDef mcuBox fill:#064e3b,stroke:#34d399,stroke-width:3px,color:#ffffff;
     classDef leftBox fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#ffffff;
     classDef rightBox fill:#31102f,stroke:#f43f5e,stroke-width:2px,color:#ffffff;
+    classDef s3Box fill:#451a03,stroke:#f97316,stroke-width:2px,color:#ffffff;
 
     class MCU mcuBox;
     class BAT_DIV,US_MOD,IMU_MOD,GPS_MOD leftBox;
     class LORA_MOD,FPGA_MOD,DEBUG_MOD rightBox;
+    class S3CAM_MOD s3Box;
 ```
 
 ---
@@ -129,11 +139,19 @@ flowchart TD
         US_DEV["Cảm biến siêu âm AJ-SR04M (~30mA)"]
         GPS_DEV["Bo GNSS u-blox M10 (~45mA) - Cấp vào chân 5V"]
         FPGA_DEV["Bo AI FPGA OneKiwi GW2A (~400mA - 800mA)"]
+        S3_DEV["Bo ESP32-S3-CAM (~300mA - 500mA, Đỉnh Wi-Fi 800mA)"]
     end
 
     BUCK_STAGE ==>|"Rail 5.0V Công Suất"| US_DEV
     BUCK_STAGE ==>|"Rail 5.0V Công Suất"| GPS_DEV
     BUCK_STAGE ==>|"Rail 5.0V Công Suất"| FPGA_DEV
+    BUCK_STAGE ==>|"Rail 5.0V Công Suất"| S3_DEV
+
+    %% BÙ DÒNG CHO ESP32-S3-CAM
+    subgraph S3_FILTER_STAGE ["MẠCH BÙ DÒNG TỨC THỜI CHO ESP32-S3-CAM"]
+        CAP_S3_TANK["Cặp tụ lọc: Tụ hóa 100uF + Tụ gốm 100nF<br/>(Cắm sát chân 5V/GND ESP32-S3 chống sụt áp khi phát Wi-Fi)"]
+    end
+    CAP_S3_TANK -.->|"Bù dòng đỉnh Wi-Fi"| S3_DEV
 
     %% TẦNG LDO 3.3V
     subgraph LDO_STAGE ["TẦNG 2: LDO TUYẾN TÍNH 3.3V / 800mA (IC AMS1117-3.3)"]
@@ -169,11 +187,13 @@ flowchart TD
     classDef buckNode fill:#b45309,stroke:#fde047,stroke-width:2px,color:#ffffff;
     classDef ldoNode fill:#047857,stroke:#6ee7b7,stroke-width:2px,color:#ffffff;
     classDef devNode fill:#1e293b,stroke:#94a3b8,stroke-width:2px,color:#ffffff;
+    classDef s3Node fill:#451a03,stroke:#f97316,stroke-width:2px,color:#ffffff;
 
     class PIN,FUSE,DIODE,CAP_IN pwrNode;
     class LM buckNode;
-    class LDO,CAP_TANK ldoNode;
+    class LDO,CAP_TANK,CAP_S3_TANK ldoNode;
     class US_DEV,GPS_DEV,FPGA_DEV,MCU_DEV,IMU_DEV,LORA_DEV devNode;
+    class S3_DEV s3Node;
 ```
 
 ---
@@ -216,6 +236,9 @@ Bảng dưới đây tổng hợp cô đọng toàn bộ các chân kết nối 
 | | | `DATA_READY` | **Pin 3 (`P0.12`)** | `JP1` Pin 11 hoặc 12 | Nối trực tiếp (Xung ngắt khung hình) | 3.3 V Logic (EXTI) |
 | **9** | **Debug Console PC** | `TX` | Cáp USB-UART chân RX | Đầu cắm Debug | Nối trực tiếp | 3.3 V Logic (UART5_TX - Pin 6) |
 | | | `RX` | Cáp USB-UART chân TX | Đầu cắm Debug | Nối trực tiếp | 3.3 V Logic (UART5_RX - Pin 5) |
+| **10**| **ESP32-S3-CAM (Video)**| `5V` (VCC) | Rail 5.0V Buck LM2596 | Ngõ ra 5V Buck | Cặp tụ 100µF Low-ESR + 100nF kẹp chân nguồn | 5.0 V DC (~500mA) |
+| | | `GND` | Header `J5` (Mass chung) | `J5` Chân 1..4 | Nối mass chung | 0 V |
+| | | `Video RF` | Không nối Sonix | Ăng-ten Wi-Fi | Phát trực tiếp Wi-Fi 2.4GHz về GCS (IF-05) | RF 2.4 GHz |
 
 ---
 
@@ -638,6 +661,77 @@ flowchart LR
 
 ---
 
+### 3.7. Module Camera Quan Sát ESP32-S3-CAM (Kênh Video Phụ IF-05)
+
+Module ESP32-S3-CAM (trang bị cảm biến 3 MP OV3660 hoặc 2 MP OV2640, vi điều khiển ESP32-S3 N16R8) đóng vai trò là **Camera quan sát thời gian thực** cung cấp hình ảnh trực quan cho người vận hành tại GCS Dashboard theo đề xuất kiến trúc [SYS-007](../../architecture/KVC_DUAL_CAMERA_DESIGN_PROPOSAL.md) và giao diện kênh video [IF-05](../../interfaces/IF_ESP32_CAM_GCS.md).
+
+```mermaid
+flowchart LR
+    subgraph S3_DEV ["Module ESP32-S3-CAM (OV3660 / OV2640)"]
+        VCC_S3["Chân 5V (Tải ~500mA, Đỉnh 800mA)"]
+        GND_S3["Chân GND"]
+        WIFI_ANT["Ăng-ten Wi-Fi 2.4 GHz"]
+        UART0_S3["Chân U0TXD / U0RXD (Header Nạp Riêng)"]
+    end
+
+    subgraph PWR_SUPPLY ["Tầng Nguồn 5.0V Buck & Lọc Bù Dòng"]
+        BUCK_5V["Rail 5.0V Buck LM2596"]
+        C_S31["Tụ hóa C_S31: 100µF/16V Low-ESR"]
+        C_S32["Tụ gốm C_S32: 100nF MLCC"]
+        STAR_GND["Header J5 / Star Ground"]
+    end
+
+    subgraph GCS_STATION ["Trạm Mặt Đất (GCS Backend)"]
+        GCS_BACKEND["Backend FastAPI Relay (IF-05)<br/>URL: http://&lt;ip-s3&gt;:81/stream"]
+    end
+
+    BUCK_5V ==>|"5.0V Công Suất"| VCC_S3
+    VCC_S3 --- C_S31
+    VCC_S3 --- C_S32
+    C_S31 ==> STAR_GND
+    C_S32 ==> STAR_GND
+    GND_S3 ==> STAR_GND
+
+    WIFI_ANT -.->|"Wi-Fi MJPEG Stream (IF-05)"| GCS_BACKEND
+
+    classDef pwr fill:#b45309,stroke:#fde047,color:#ffffff;
+    classDef s3 fill:#451a03,stroke:#f97316,color:#ffffff;
+    classDef gcs fill:#1e293b,stroke:#38bdf8,color:#ffffff;
+    classDef filt fill:#334155,stroke:#94a3b8,color:#ffffff;
+
+    class BUCK_5V pwr;
+    class S3_DEV,VCC_S3,GND_S3,WIFI_ANT,UART0_S3 s3;
+    class GCS_STATION,GCS_BACKEND gcs;
+    class C_S31,C_S32,STAR_GND filt;
+```
+
+#### 3.7.1. Nguyên lý phân vai kiến trúc và độc lập vật lý
+* **Hai camera — Hai nhiệm vụ độc lập:**
+  * **Camera trinh sát (OV2640 + FPGA OneKiwi GW2A):** Chịu trách nhiệm phát hiện BBox, gửi qua UART1 (IF-01) sang Sonix MCU để tính toạ độ WGS-84/Local Grid và phát telemetry qua LoRa (IF-02). Đây là **nguồn toạ độ cứu nạn duy nhất**.
+  * **Camera quan sát (ESP32-S3-CAM):** Chịu trách nhiệm nén MJPEG và phát trực tiếp qua sóng Wi-Fi 2.4 GHz về GCS Backend (IF-05). **Module này không bao giờ tham gia tính toán toạ độ hay georef**.
+* **Độc lập vật lý tuyệt đối:**
+  * Mất kết nối Wi-Fi hoặc tắt module ESP32-S3-CAM **hoàn toàn không ảnh hưởng đến telemetry và thuật toán định vị**.
+  * Hai camera không có đồng hồ chung (lệch 100ms–500ms) và góc nhìn (FOV) khác nhau. Do đó, hệ thống mặc định cấm vẽ chồng BBox của FPGA lên khung hình video ESP32-S3 (`has_overlay = false`).
+* **Zero GPIO Connection:** Module không kết nối bất kỳ chân tín hiệu nào vào Sonix MCU hay FPGA, tránh hoàn toàn nguy cơ tranh chấp tài nguyên GPIO hoặc xung đột mức điện áp.
+
+#### 3.7.2. Đặc tính dòng tải và yêu cầu tụ bù dòng Wi-Fi
+> [!WARNING]
+> **BẮT BUỘC KẸP CẶP TỤ 100µF Low-ESR + 100nF TẠI CHÂN NGUỒN ESP32-S3:**
+> * Khi khởi động và phát các khung hình video qua sóng Wi-Fi công suất cao, dòng tiêu thụ tức thời của ESP32-S3 có thể vọt từ mức trung bình ~350mA lên **600mA – 800mA** trong các xung burst.
+> * Nội trở dây dẫn từ bo nguồn Buck đến module có thể gây sụt áp tức thời (voltage sag) xuống dưới 4.5V, dẫn đến hiện tượng ESP32-S3 bị reset (Brownout Detector) hoặc nhiễu xung ngược sang rail 5V của FPGA GW2A.
+> * Cặp tụ `C_S31` (100µF Low-ESR) và `C_S32` (100nF) cắm song song sát chân 5V và GND của module đóng vai trò tích trữ năng lượng xả tức thời, triệt tiêu hoàn toàn sụt áp.
+
+#### 3.7.3. Bảng tra cứu chân nối ESP32-S3-CAM
+| Chân Module ESP32-S3 | Điểm kết nối trên bo / hệ thống | Vị trí Header | Mức điện áp | Hướng tín hiệu | Chức năng kỹ thuật |
+| :--- | :--- | :---: | :---: | :---: | :--- |
+| **5V / VCC** | Rail 5.0V Buck LM2596 | Ngõ ra 5V Buck / Jack `J_S3CAM` | `5.0 V DC` | Nguồn vào | Cấp nguồn công suất nuôi ESP32-S3 và sensor camera |
+| **GND** | Header `J5` (Mass chung) | `J5` Pin 1..4 / Star Ground | `0 V` | Mass | Nối mass chung toàn hệ thống |
+| **U0TXD (GPIO43)** | Header nạp / Debug riêng của S3 | Header riêng | `3.3 V Logic` | S3 $\to$ PC | Xuất log gỡ lỗi hoặc nạp firmware; **KHÔNG nối vào Sonix** |
+| **U0RXD (GPIO44)** | Header nạp / Debug riêng của S3 | Header riêng | `3.3 V Logic` | PC $\to$ S3 | Nhận lệnh nạp firmware; **KHÔNG nối vào Sonix** |
+| **ANT (Wi-Fi)** | Ăng-ten dán 2.4GHz qua cáp IPEX | Cọc Ăng-ten | RF 2.4 GHz | Sóng RF | Phát luồng MJPEG về trạm mặt đất GCS qua chuẩn IF-05 |
+
+---
+
 ## 4. DANH MỤC LINH KIỆN (BOM) & HƯỚNG DẪN CẮM NỐI TỪNG CHÂN
 
 ### 4.1. Bảng Danh Mục Vật Tư Linh Kiện (Bill of Materials - BOM)
@@ -682,6 +776,10 @@ flowchart LR
 | **30**| **J_SONAR**| Jack cắm khóa JST-XH 2.54mm 4-Pin | JST-XH-4P thẳng | 1 | Cổng nối cảm biến siêu âm AJ-SR04M |
 | **31**| **J_FPGA** | Jack cắm JST-GH 1.25mm 6-Pin | JST-GH-6P thẳng | 1 | Cổng nối bo AI FPGA OneKiwi GW2A |
 | **32**| **J_DEBUG**| Đầu cắm đực 1x4 Pin 2.54mm | Header đực 1x4 | 1 | Cổng cắm cáp USB-UART gỡ lỗi về máy tính |
+| **33**| **DEV_S3CAM**| Module ESP32-S3 N16R8 kèm Camera OV3660/OV2640 | Module Dev Kit | 1 | Camera quan sát thời gian thực cho người vận hành (IF-05) |
+| **34**| **C_S31** | Tụ hóa nhôm 100uF / 16V Low-ESR | Chân cắm / SMD | 1 | Tụ bù dòng xả tức thời chống sụt áp khi ESP32-S3 phát Wi-Fi |
+| **35**| **C_S32** | Tụ gốm MLCC 100nF / 16V (mã 104) | SMD 0805 / Tụ đĩa | 1 | Lọc khử nhiễu cao tần cắm song song sát chân nguồn ESP32-S3 |
+| **36**| **J_S3CAM**| Jack cắm JST-XH 2.54mm 2-Pin (hoặc JST-GH) | JST-XH-2P thẳng | 1 | Cổng cấp nguồn công suất 5V và GND cho ESP32-S3-CAM |
 
 ---
 
@@ -721,6 +819,10 @@ Bảng này hướng dẫn kỹ thuật viên cách cắm/hàn từng chân củ
 | **J_SONAR**| Jack JST-XH 4P | Chân 1 (`5V`)<br/>Chân 2 (`GND`)<br/>Chân 3 (`TX`)<br/>Chân 4 (`RX`) | Nối rail `5.0V Công Suất`<br/>Nối xuống `GND_SIGNAL`<br/>Nối vào Đầu 1 của điện trở `R_US1`<br/>Nối vào Pin 30 Sonix (`P2.14 - UTXD2`) | Cổng cắm module siêu âm chống nước AJ-SR04M |
 | **J_FPGA**| Jack JST-GH 6P | Chân 1 (`5V`)<br/>Chân 2 (`GND`)<br/>Chân 3 (`TX`)<br/>Chân 4 (`RX`)<br/>Chân 5 (`INT`) | Nối rail `5.0V Công Suất` (Tải 400mA - 800mA)<br/>Nối xuống `GND_SIGNAL`<br/>Nối vào Pin 17 Sonix (`P2.3 - URXD1`)<br/>Nối vào Pin 16 Sonix (`P2.2 - UTXD1`)<br/>Nối vào Pin 3 Sonix (`P0.12 - EXTI`) | Cổng cắm bo xử lý AI FPGA OneKiwi GW2A |
 | **J_DEBUG**| Header đực 1x4 | Chân 1 (`GND`)<br/>Chân 2 (`TX`)<br/>Chân 3 (`RX`)<br/>Chân 4 (`NC`) | Nối xuống `GND_SIGNAL`<br/>Nối vào Pin 6 Sonix (`P0.15 - UART5_TX`)<br/>Nối vào Pin 5 Sonix (`P0.14 - UART5_RX`)<br/>Bỏ trống (Không cấp điện để tránh xung đột nguồn USB) | Cắm cáp USB-UART gỡ lỗi về PC (9600 bps mặc định / 115200 bps) |
+| **DEV_S3CAM**| Module ESP32-S3-CAM | Chân `5V` (VCC)<br/>Chân `GND`<br/>Chân `U0TXD`/`U0RXD` | Nối rail `5.0V Công Suất` (Từ `J_S3CAM`)<br/>Nối xuống `GND_SIGNAL`<br/>Nối ra Header nạp riêng / cáp USB riêng | **BẮT BUỘC:** Kẹp tụ `C_S31` // `C_S32` sát chân nguồn module; KHÔNG nối UART vào Sonix MCU |
+| **C_S31** | Tụ hóa 100uF/16V | Cực `(+)`<br/>Cực `(-)` (Vạch xám) | Nối trực tiếp vào chân `5V` của ESP32-S3<br/>Nối xuống `GND_SIGNAL` | Đặt sát chân nguồn module ESP32-S3 |
+| **C_S32** | Tụ gốm 100nF | 2 đầu | 1 đầu nối chân 5V ESP32-S3, 1 đầu nối `GND_SIGNAL` | Lọc khử nhiễu cao tần chân nguồn ESP32-S3 |
+| **J_S3CAM**| Jack JST-XH 2P | Chân 1 (`5V`)<br/>Chân 2 (`GND`) | Nối rail `5.0V Công Suất`<br/>Nối xuống `GND_SIGNAL` | Cổng cấp nguồn 5V cho module ESP32-S3-CAM |
 
 ---
 
@@ -738,25 +840,7 @@ flowchart TD
 
     STEP4["BƯỚC 4: Cắm Kit Vi Điều Khiển Sonix SN34F788 (Chưa cắm cảm biến)<br/>• Cấu hình Jumper J4 đóng 2-3 (3V3_EXT), J1 đóng short, JP9 mở<br/>• Cắm Kit vào J_KIT và J_PWR<br/>• Cắm cáp Debug vào J_DEBUG, mở Terminal 9600 8N1 (hoặc 115200 khi có PLL): Xem log [INIT]"]
 
-    STEP5["BƯỚC 5: Cắm Lần Lượt Từng Cảm Biến & Thiết Bị Ngoại Vi<br/>• Cắm LoRa Ra-02 (Đã gắn ăng-ten): Log báo [INIT] LORA ver=0x12<br/>• Cắm IMU GY-87: Log báo [INIT] IMU OK addr=0x68<br/>• Cắm GNSS M10: Log báo [INIT] GNSS baud=9600<br/>• Cắm Siêu âm AJ-SR04M (Củ loa chuẩn ~2nF): Log báo US=...cm ok<br/>• Cắm Bo FPGA OneKiwi: Log nhận diện khung BBox hoạt động"]
-
-    STEP1 ==>|"Đo chuẩn 5.0V"| STEP2
-    STEP2 ==>|"Đo chuẩn 3.3V"| STEP3
-    STEP3 ==>|"Áp phân áp an toàn"| STEP4
-    STEP4 ==>|"Kit boot bình thường"| STEP5
-
-    classDef s1 fill:#b45309,stroke:#fde047,color:#ffffff;
-    classDef s2 fill:#047857,stroke:#6ee7b7,color:#ffffff;
-    classDef s3 fill:#334155,stroke:#94a3b8,color:#ffffff;
-    classDef s4 fill:#064e3b,stroke:#34d399,color:#ffffff;
-    classDef s5 fill:#1e293b,stroke:#38bdf8,color:#ffffff;
-
-    class STEP1 s1;
-    class STEP2 s2;
-    class STEP3 s3;
-    class STEP4 s4;
-    class STEP5 s5;
-```
+    STEP5["BƯỚC 5: Cắm Lần Lượt Từng Cảm Biến & Thiết Bị Ngoại Vi<br/>• Cắm LoRa Ra-02 (Đã gắn ăng-ten): Log báo [INIT] LORA ver=0x12<br/>• Cắm IMU GY-87: Log báo [INIT] IMU OK addr=0x68<br/>• Cắm GNSS M10: Log báo [INIT] GNSS baud=9600<br/>• Cắm Siêu âm AJ-SR04M (Củ loa chuẩn ~2nF): Log báo US=...cm ok<br/>• Cắm Bo FPGA OneKiwi: Log nhận diện khung BBox hoạt động<br/>• Cắm Bo ESP32-S3-CAM: Kiểm tra luồng MJPEG tại GCS Backend /video/stream"]
 
     STEP1 ==>|"Đo chuẩn 5.0V"| STEP2
     STEP2 ==>|"Đo chuẩn 3.3V"| STEP3

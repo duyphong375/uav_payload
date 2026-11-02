@@ -10,6 +10,15 @@
 > [IF-04](IF_GCS_DATA_CONTRACT.md) quy định. Tài liệu này giữ
 > semantics trường, mô hình dữ liệu ứng dụng, schema SQLite và replay invariant.
 > Không chép lại bảng route ở đây.
+>
+> **Cập nhật 02/11/2026 — phạm vi replay:** UI Dashboard đã bỏ chế độ phát lại
+> (`routes.tsx` không còn route Replay, `AppHeader.tsx` chỉ còn MOCK/REAL). Trang
+> thay thế là **Nhật ký phiên** đọc log đã commit và xuất CSV. Các mục 4.2
+> (`REPLAY_TICK`), 5.2 (replay invariant) và 7.4 (semantics replay) trong tài liệu
+> này **vẫn đúng ở tầng backend** (`replay_engine.py` còn tồn tại và có test), nhưng
+> **không có UI nào kích hoạt chúng**. Không dùng các mục này để tuyên bố Dashboard
+> có chức năng phát lại; `source_mode = REPLAY` chỉ còn xuất hiện khi gọi
+> `/api/replay/*` trực tiếp hoặc đọc bản ghi cũ.
 
 
 ---
@@ -18,11 +27,11 @@
 
 ### 1.1. Hiện trạng giao thức và mức bằng chứng — 15/10/2026
 
-- Source telemetry 20 byte cũ chỉ còn là ghi nhận lịch sử; layout không thể khôi phục (xem [IF-02](IF_MCU_LORA_RF.md)). Snapshot hiện có frontend React/TypeScript và backend FastAPI MOCK/logger/replay; không có parser serial/legacy và không suy đoán layout 20 byte. MVP không đặt mục tiêu hỗ trợ giao thức cũ.
+- Source telemetry 20 byte cũ chỉ còn là ghi nhận lịch sử; layout không thể khôi phục (xem [IF-02](IF_MCU_LORA_RF.md)). Snapshot hiện có frontend React/TypeScript và backend FastAPI MOCK/logger; không có parser serial/legacy và không suy đoán layout 20 byte. MVP không đặt mục tiêu hỗ trợ giao thức cũ.
 - RF 32 byte (IF-02) là **ABI đã được HUMAN duyệt ngày 29/10/2026** cho cả hai owner MCU và Gateway, không còn là DRAFT. Duyệt ABI không đồng nghĩa đã nạp/chạy trên bo: chưa có capture REAL giữa MCU ↔ ESP32. Transport ESP32–laptop mục IV.4 đã chốt Wi-Fi SoftAP/WebSocket v1 nhưng cũng chưa có bằng chứng firmware, ingress hoặc capture REAL.
 - Endpoint ứng dụng hiện hành có trong gcs/backend/main.py và backend README; schemas/state, logger và replay đã có tests. Wi-Fi/WebSocket ingress từ ESP32 là mục tiêu tích hợp; owner đối chiếu types/adapter/reducer và golden vectors theo task. Khác biệt source/contract phải được ghi nhận, không đổi hardware để vừa UI.
 - Vector review/KVC-PLAN-002_reference_vectors.json là tham chiếu thiết kế lịch sử nếu còn, không phải phép thử sản phẩm. C+D tạo bộ golden C/Python có version/hash trong gcs/backend/fixtures theo task được giao; không phụ thuộc duy nhất file Git ignored.
-- REAL ingress chưa có thiết bị/capture thì BLOCKED; tiếp tục MOCK độc lập có nhãn. Tiêu chí hệ thống ở mục VII thiết kế; mốc G1/G2/G3 trong kế hoạch cũ là lịch sử, không phải lịch hiện hành. Replay ứng dụng đã có, ingress REAL chưa có.
+- REAL ingress chưa có thiết bị/capture thì BLOCKED; tiếp tục MOCK độc lập có nhãn. Tiêu chí hệ thống ở mục VII thiết kế; mốc G1/G2/G3 trong kế hoạch cũ là lịch sử, không phải lịch hiện hành. Ingress REAL có module `esp32_ingress.py` nhưng chưa thử trên Gateway thật; **phát lại đã bỏ khỏi UI** (xem ghi chú đầu tài liệu).
 
 ---
 
@@ -30,7 +39,7 @@
 
 Các bảng mục 2–6 mô tả contract mục tiêu, không phải toàn bộ schema runtime hiện tại. **Mục 7** mô tả phần đã triển khai; source `gcs/backend/schemas.py` hiện chấp nhận source_mode MOCK/REPLAY và original_source_mode REAL/MOCK/UNKNOWN. Không gửi REAL hoặc sao chép fixture thiết kế rồi mặc định backend chấp nhận. Wire flags/sentinel phía dưới chưa có decoder hardware.
 
-LOCAL_GRID là hệ tọa độ đã hiệu chuẩn; cách gọi “sa bàn” cũ không yêu cầu sa bàn tại cuộc thi. Dải cự ly siêu âm AJ-SR04M 20–500 cm (danh định 600 cm, schema lịch sử biểu diễn tới 800 cm) là miền biểu diễn, không đủ xác nhận phép đo mặt nước hợp lệ.
+LOCAL_GRID là hệ tọa độ đã hiệu chuẩn; cách gọi “sa bàn” cũ không yêu cầu sa bàn tại cuộc thi. Dải cự ly siêu âm AJ-SR04M: firmware chấp nhận **20–700 cm** (B-7, 31/10/2026), backend GCS thẩm định tới 800 cm theo schema lịch sử — đây là miền biểu diễn, không đủ xác nhận phép đo mặt nước hợp lệ.
 
 Toàn bộ dữ liệu trao đổi giữa Backend và Frontend được chuẩn hóa dưới dạng JSON (UTF-8). Mỗi trường dữ liệu đều được định nghĩa rõ kiểu dữ liệu, đơn vị, nguồn tạo và quy tắc xử lý khi thiếu hoặc ngoài miền giá trị.
 
@@ -40,7 +49,7 @@ Toàn bộ dữ liệu trao đổi giữa Backend và Frontend được chuẩn 
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | `schema_version` | Phiên bản schema dữ liệu | `string` | SemVer (VD: `"1.0.0"`) | Có | Backend | Cố định `"1.0.0"`. Frontend từ chối nếu khác major version. |
 | `session_id` | Định danh phiên làm việc của GCS | `string` | UUID hoặc `SES-YYYYMMDD-HHMMSS` | Có | Backend | Tạo khi khởi động Backend hoặc khi người dùng tạo phiên mới. Không được rỗng. |
-| `source_mode` | Chế độ nguồn dữ liệu của phiên xem | `string` | Enum: `REAL`, `MOCK`, `REPLAY` | Có | Backend | Khởi tạo tường minh. `REAL` không tự động fallback sang `MOCK`. |
+| `source_mode` | Chế độ nguồn dữ liệu của phiên xem | `string` | Enum: `REAL`, `MOCK`, `REPLAY` | Có | Backend | Khởi tạo tường minh. `REAL` không tự động fallback sang `MOCK`. **UI chỉ phát sinh `MOCK`/`REAL`; `REPLAY` chỉ xuất hiện khi gọi API `/api/replay/*` trực tiếp hoặc đọc bản ghi cũ.** |
 | `original_source_mode` | Nguồn dữ liệu gốc của gói tin | `string` | Enum: `REAL`, `MOCK`, `REPLAY`, `UNKNOWN` | Có | Thiết bị / Log | Trích xuất từ bits 4–5 của trường Flags phần cứng (hoặc từ log file). |
 | `inference_device` | Thiết bị thực hiện suy luận AI | `string` | Enum: `FPGA_GW2A`, `PC_REFERENCE`, `SIMULATED`, `UNKNOWN` | Có | Backend Manifest | Ánh xạ từ cấu hình Preflight. Chưa đối chiếu manifest thì bắt buộc ghi `UNKNOWN`. |
 | `sender_session_id` | Định danh phiên nguồn từ MCU tải | `integer` hoặc `null` | uint32 (1 .. $2^{32}-1$) | Tùy chọn | Thiết bị MCU | Bằng `null` nếu là nguồn MOCK không có phần cứng hoặc chưa nhận được gói. |
@@ -128,7 +137,7 @@ Mục này chỉ mô tả ý nghĩa nghiệp vụ của các nhóm endpoint, kh�
 
 - **Trạng thái/chẩn đoán:** kiểm tra sống, trạng thái hub và snapshot trạng thái tích luỹ.
 - **Phiên ghi:** liệt kê phiên đã ghi và tạo phiên nhật ký mới.
-- **Replay:** start / pause / resume / seek / speed / stop theo virtual clock.
+- **Phát lại (backend-only):** start / pause / resume / seek / speed / stop theo virtual clock. Không có lối vào từ UI từ 02/11/2026.
 - **Ingress thủ công:** nạp envelope hoặc telemetry trực tiếp để test, đánh dấu `REAL`.
 - **Điều khiển ESP32:** xem trạng thái link, đổi URL gateway, gửi lệnh tới gateway.
 
@@ -156,12 +165,12 @@ Xem bảng route, body request và mã lỗi tại
 | `TARGET_UPDATE` | Khi nhận gói tin Mục tiêu mới (Type 0x02) | Vị trí mục tiêu local, track_id, độ tin cậy, lớp đối tượng. |
 | `ALERT_EVENT` | Khi phát sinh sự kiện quan trọng (Phát hiện mục tiêu, lỗi) | Mức độ cảnh báo (INFO/WARN/CRITICAL), thông điệp, timestamp. |
 | `LINK_STATUS` | Khi trạng thái kết nối phần cứng thay đổi hoặc STALE | Cờ kết nối phần cứng, tuổi dữ liệu, cảnh báo STALE. |
-| `REPLAY_TICK` | Mỗi nhịp phát lại trong chế độ REPLAY | Vị trí con trỏ thời gian ảo, tiến độ %, trạng thái play/pause. |
+| `REPLAY_TICK` | Mỗi nhịp phát lại khi API `/api/replay/*` được gọi trực tiếp | Vị trí con trỏ thời gian ảo, tiến độ %, trạng thái play/pause. **UI không phát sinh sự kiện này.** |
 | `SYSTEM_DIAGNOSTICS`| Định kỳ 1 lần mỗi 2 giây | Bộ đếm gói tin, bộ đếm lỗi giải mã, bộ đếm drop, trạng thái đĩa. |
 
 ---
 
-## 5. Quy chuẩn Lưu trữ và Phát lại (Log & Replay Schema)
+## 5. Quy chuẩn Lưu trữ và Nhật ký (Log Schema)
 
 ### 5.1. Cấu trúc Bảng SQLite Lưu trữ Nhật ký (`telemetry_records`)
 Cơ sở dữ liệu SQLite lưu trữ tại `data/sessions/<session_id>.db`, cấu hình `PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;`.
@@ -194,13 +203,18 @@ CREATE INDEX IF NOT EXISTS idx_records_time ON telemetry_records(pc_rx_monotonic
 CREATE INDEX IF NOT EXISTS idx_records_session ON telemetry_records(session_id);
 ```
 
-### 5.2. Nguyên tắc Bất biến của Trình phát lại (Replay Engine)
+### 5.2. Nguyên tắc Bất biến của Trình phát lại (Replay Engine) — backend-only, UI không dùng
+
+> **Phạm vi (02/11/2026):** các nguyên tắc dưới đây mô tả `replay_engine.py` ở tầng
+> backend. Dashboard **không còn lối vào** chế độ phát lại; chỉ caller bên ngoài gọi
+> `/api/replay/*` mới kích hoạt. Trang `/history` (Nhật ký phiên) không tua lại.
+
 1. **Tách biệt Đồng hồ Ảo (Virtual Clock):** Khi phát lại, thời gian hiển thị là thời gian ảo được tái hiện theo khoảng cách thời gian `pc_rx_monotonic_ms` gốc trong bản ghi log. Tuyệt đối không đồng nhất thời gian phát lại với đồng hồ thực tế của máy tính.
-2. **Tái lập Trạng thái Tuyệt đối khi Tua (Seek State Reset):** Khi người dùng kéo thanh trượt tua thời gian về mốc $T_{seek}$:
+2. **Tái lập Trạng thái Tuyệt đối khi Tua (Seek State Reset):** Khi caller gọi seek về mốc $T_{seek}$:
    - State Reducer **bắt buộc phải xóa sạch trạng thái hiện tại**.
    - Thực hiện truy vấn phục hồi trạng thái từ đầu phiên (hoặc từ điểm checkpoint gần nhất) đến đúng mốc $T_{seek}$.
    - Tuyệt đối **không giữ lại mục tiêu hoặc cảnh báo của tương lai** ($T > T_{seek}$) trên màn hình.
-3. **Cách ly Tuyệt đối Kết nối Phần cứng:** Khi chế độ Replay kích hoạt, WebSocket ingress từ ESP32 bị đóng hoàn toàn. Không gửi lệnh hoặc bất kỳ gói tin nào ra thiết bị.
+3. **Cách ly Tuyệt đối Kết nối Phần cứng:** Khi replay kích hoạt qua API, WebSocket ingress từ ESP32 bị đóng hoàn toàn. Không gửi lệnh hoặc bất kỳ gói tin nào ra thiết bị.
 
 ---
 
@@ -530,8 +544,8 @@ CREATE INDEX IF NOT EXISTS idx_records_session ON telemetry_records(session_id);
 
 ---
 
-### Ví dụ 7: Chế độ REPLAY — Phát lại Nhật ký từ Cơ sở Dữ liệu Cũ
-*Mô tả:* Người dùng đang mở xem lại phiên `rec_20261011_demo.db`. Đồng hồ ảo đang ở giây thứ 45 của phiên.
+### Ví dụ 7: Chế độ REPLAY — mẫu backend-only (không còn trên UI)
+*Mô tả:* Ví dụ minh hoạ semantics khi gọi trực tiếp `/api/replay/start` cho phiên `rec_20261011_demo.db`; đồng hồ ảo ở giây thứ 45. **Không có màn hình nào trong Dashboard tạo ra sự kiện này từ 02/11/2026.**
 
 ```json
 {
@@ -597,7 +611,7 @@ CREATE INDEX IF NOT EXISTS idx_records_session ON telemetry_records(session_id);
 
 ## 7. Application MOCK slice — KVC-PRE-GCS-BACKEND-001
 
-Phần này bổ sung semantics ứng dụng đã triển khai cho backend MOCK và frontend hiện hữu. RF/flags/sentinel vẫn là DESIGN; WebSocket ingress ESP32 cũng chưa được triển khai hoặc kiểm REAL trong backend. Logger và replay đã được bổ sung bởi KVC-PRE-GCS-LOGGER-001 / KVC-PRE-GCS-REPLAY-001. Các fixture thiết kế cũ ở mục 6 không tự chứng minh code đang chạy; patch hiện hành chỉ mang field thuộc domain của event.
+Phần này bổ sung semantics ứng dụng đã triển khai cho backend MOCK và frontend hiện hữu. RF/flags/sentinel vẫn là DESIGN; WebSocket ingress ESP32 có module `esp32_ingress.py` nhưng chưa kiểm REAL trên thiết bị. Logger đã được bổ sung bởi KVC-PRE-GCS-LOGGER-001; engine phát lại còn trong source (`KVC-PRE-GCS-REPLAY-001`) nhưng **UI đã bỏ chế độ này từ 02/11/2026**. Các fixture thiết kế cũ ở mục 6 không tự chứng minh code đang chạy; patch hiện hành chỉ mang field thuộc domain của event.
 
 ### 7.1. Nguồn, phiên, socket và storage
 
@@ -644,6 +658,10 @@ Ví dụ reconnect: target được nhận 10 giây trước và telemetry 1 gi�
 
 `alerts` trong snapshot là tối đa 50 alert theo code, gồm level/code/message/condition_status/timestamp_iso. Reconnect phục hồi condition history của phiên; ACK cục bộ không được server lưu bền. New-session snapshot có alerts rỗng và target/camera null trước khi scenario mới phát dữ liệu.
 
-### 7.4. Replay phiên đã commit
+### 7.4. Replay phiên đã commit — API dự phòng, không có UI
 
-Backend có start/pause/resume/seek/speed/stop qua HTTP; xem [backend README](../../docs/configuration/DASHBOARD_BACKEND.md) cho request/response. Replay đọc SQLite read-only, giữ original_source_mode và inference_device, phát source REPLAY với phiên ứng dụng riêng, không ghi lại playback vào logger và không gọi WebSocket ingress ESP32. Clock ảo dừng khi pause; seek tái dựng từ đầu, rồi phát full snapshot. Stop tạo phiên MOCK sạch. Đây là semantics ứng dụng đã có tests, không phải chứng nhận chuỗi RF/ESP32/GCS. Phần tải phiên hiện nạp toàn bộ records vào RAM và seek duyệt từ đầu; cần đo session dài trước mở rộng.
+Backend có start/pause/resume/seek/speed/stop qua HTTP; xem [backend README](../../docs/configuration/DASHBOARD_BACKEND.md) cho request/response. **Từ 02/11/2026 không có màn hình nào gọi các route này**; chỉ test/CLI bên ngoài mới kích hoạt được. Replay đọc SQLite read-only, giữ original_source_mode và inference_device, phát source REPLAY với phiên ứng dụng riêng, không ghi lại playback vào logger và không gọi WebSocket ingress ESP32. Clock ảo dừng khi pause; seek tái dựng từ đầu, rồi phát full snapshot. Stop tạo phiên MOCK sạch. Đây là semantics ứng dụng đã có tests, không phải chứng nhận chuỗi RF/ESP32/GCS. Phần tải phiên hiện nạp toàn bộ records vào RAM và seek duyệt từ đầu; cần đo session dài trước mở rộng.
+
+### 7.5. Nhật ký phiên (thay thế UI replay)
+
+Frontend route `/history` (`EventLogPage`) gọi `GET /api/sessions` để lấy danh sách phiên đã commit, dựng bảng sự kiện theo ngày, lọc theo actor/mức cảnh báo/source, cho ẩn từng mục và xuất CSV phía trình duyệt. Trang này **chỉ đọc**: không gọi `/api/replay/*`, không giữ đồng hồ ảo, không thay đổi trạng thái phiên. `source_mode` của dữ liệu hiển thị vẫn là giá trị gốc đã lưu (`MOCK`/`REAL`), không bị đổi thành `REPLAY`.

@@ -4,7 +4,9 @@
 *Dự án:* **Hệ thống tích hợp cho UAV hỗ trợ phát hiện, theo dõi và định vị người bị cuốn trôi trong bão lũ sử dụng FPGA và MCU (KVC)**<br>
 ---
 
-> Cập nhật nội dung: **15/10/2026**. Bo đã có: **OneKiwi Primer 20K V1.1** theo xác nhận của nhóm. Tài liệu mô tả **thiết kế mục tiêu**, không xác nhận các khối phần cứng đã chạy. Gateway trạm đất chọn họ SoC **ESP32-C3** để chạy Wi-Fi SoftAP/WebSocket và dùng nguồn riêng; mã kit/board, module, flash và pinout cụ thể còn chờ xác minh phần cứng. Hiện trạng xem [báo cáo tiến độ](KVC_PROJECT_STATUS.md); công việc xem phân công (không có trong bản sản phẩm) và checklist (không có trong bản sản phẩm).
+> Cập nhật nội dung: **02/11/2026**. Bo đã có: **OneKiwi Primer 20K V1.1** theo xác nhận của nhóm. Tài liệu mô tả **thiết kế mục tiêu**, không xác nhận các khối phần cứng đã chạy. Gateway trạm đất chọn họ SoC **ESP32-C3** để chạy Wi-Fi SoftAP/WebSocket và dùng nguồn riêng; mã kit/board, module, flash và pinout cụ thể còn chờ xác minh phần cứng. Hiện trạng xem [báo cáo tiến độ](KVC_PROJECT_STATUS.md); công việc xem phân công (không có trong bản sản phẩm) và checklist (không có trong bản sản phẩm).
+>
+> **Thay đổi 02/11/2026:** (a) **Bỏ chế độ phát lại (Replay) khỏi UI** — Dashboard chỉ còn `MOCK`/`REAL`, thay bằng trang **Nhật ký phiên** (`EventLogPage`) có lọc và xuất CSV; (b) bổ sung **kênh quan sát phụ IF-05** dùng **ESP32-S3-CAM + OV3660**, độc lập vật lý với kênh LoRa và **không sinh tọa độ**; (c) đồng bộ lại trạng thái kỹ thuật: bỏ byte pin khỏi IF-02, trần siêu âm 700 cm, top demo đã đạt timing.
 >
 > Cách đọc: mục III là linh kiện/cấu hình cần xác minh; mục IV gồm nhiệm vụ và **giao thức** — ABI RF 32 byte (IF-02) đã được HUMAN duyệt ngày 29/10/2026, các giao thức khác còn dự thảo; mục VII là nghiệm thu; mục VIII là nguồn tham chiếu. Bản này không chứa lịch 21 ngày; ngày/gate trong kế hoạch cũ là tham chiếu lịch sử.
 
@@ -31,15 +33,16 @@ Kiến trúc mục tiêu sử dụng **xử lý tại biên**. Các khối dư�
 - **Phát hiện tại chỗ trên UAV:** Camera quang học thu hình ảnh mặt nước → FPGA OneKiwi Primer 20K tiền xử lý và chạy mạng nơ-ron tích chập (CNN) tăng tốc phần cứng để phát hiện người trôi dạt (`person`) và phao cứu sinh (`lifebuoy`).
 - **Định vị không gian:** MCU Sonix SN34F788 nhận kết quả Bounding Box từ FPGA qua UART, đọc đồng bộ các cảm biến đo đạc (cảm biến siêu âm chống nước AJ-SR04M, GY-87 IMU 10-DOF, GNSS NEO-M10-0-10) và giải bài toán giao điểm tia quang học với mặt phẳng nước để xác định tọa độ thực tế.
 - **Truyền tin vô tuyến tầm xa:** Thay vì truyền video, hệ thống chỉ đóng gói các thông tin cứu nạn quan trọng thành các gói tin nhị phân siêu nhỏ (**32 byte/gói**) và truyền metadata qua **LoRa 433 MHz**. ABI RF 32 byte đã được duyệt (IF-02, 29/10/2026); cự ly, tỷ lệ nhận và độ trễ vẫn chưa được xác nhận bằng phép đo.
-- **Trạm giám sát mặt đất (GCS):** ESP32-C3 trạm đất giải mã gói LoRa, đọc RSSI/SNR và gửi dữ liệu sang laptop qua **Wi-Fi SoftAP/WebSocket**. ESP32 có nguồn riêng và hoạt động độc lập với laptop. Laptop chạy Dashboard web và dịch vụ GCS để nhận dữ liệu, hiển thị, lưu log và replay; không tham gia xử lý nhiệm vụ trên UAV hay điều khiển ESP32.
+- **Trạm giám sát mặt đất (GCS):** ESP32-C3 trạm đất giải mã gói LoRa, đọc RSSI/SNR và gửi dữ liệu sang laptop qua **Wi-Fi SoftAP/WebSocket**. ESP32 có nguồn riêng và hoạt động độc lập với laptop. Laptop chạy Dashboard web và dịch vụ GCS để nhận dữ liệu, hiển thị và lưu log; không tham gia xử lý nhiệm vụ trên UAV hay điều khiển ESP32.
+- **Kênh quan sát phụ (IF-05, bổ sung 01–02/11/2026):** ESP32-S3-CAM + OV3660 3 MP phát MJPEG qua Wi-Fi 2.4 GHz tới backend GCS; backend relay **same-origin** cho trình duyệt. Kênh này **chỉ để người vận hành nhìn**, **không sinh tọa độ**, không đi qua LoRa và không thay thế camera OV2640/FPGA. Chưa nạp bo nên hiện chỉ ở mức `SOURCE-VERIFIED` + `BUILT` (xem [IF-05](../interfaces/IF_ESP32_CAM_GCS.md), [đề xuất hai camera](KVC_DUAL_CAMERA_DESIGN_PROPOSAL.md)).
 
 #### 2. Ranh giới kỹ thuật và phạm vi nghiệm thu PoC
 - **Bản chất hệ thống:** KVC là **tải nhiệm vụ (payload)** gắn trên UAV, độc lập với bộ điều khiển bay an toàn (flight controller). MCU không can thiệp điều khiển cân bằng bay hay cánh lái.
 - **Phạm vi ưu tiên trong PoC:** Nhận diện người/phao trên video lũ lụt có sẵn; thử nghiệm và quay video tổng quan tại bể bơi để chứng minh luồng hệ thống–Dashboard; test trực tiếp thiết bị tại cuộc thi không dùng sa bàn. Khi đo định vị ở bể bơi, ưu tiên 1 mục tiêu, camera có pose và hệ local đã hiệu chuẩn (cm). WGS-84 ngoài trời là phép kiểm riêng khi có GNSS 3D fix; tại gian thi thiếu điều kiện định vị phải hiển thị INVALID/N/A.
-- **Phân định 3 chế độ nguồn dữ liệu ở mức thiết kế:**
+- **Phân định nguồn dữ liệu ở mức thiết kế (cập nhật 02/11/2026 — còn 2 chế độ trên UI):**
   - `REAL`: Dữ liệu thu nhận và suy luận thực tế từ phần cứng trên UAV.
   - `MOCK`: Dữ liệu giả lập. Source hiện có sinh MOCK trong trình duyệt hoặc backend PC; MOCK từ FPGA/MCU là bước tích hợp dự kiến.
-  - `REPLAY`: Dữ liệu phát lại từ log SQLite trên máy tính phục vụ phân tích sau chuyến bay.
+  - **`REPLAY` đã bỏ khỏi UI:** `AppHeader.tsx` chỉ còn nút MOCK/REAL và `routes.tsx` không còn route phát lại; chức năng thay thế là trang **Nhật ký phiên** (`features/history/EventLogPage.tsx`) đọc log đã commit, lọc theo actor/mức/source và xuất CSV. Backend vẫn giữ `gcs/backend/replay_engine.py` cùng các route `/api/replay/*` như **code dự phòng chưa dùng**; `SourceMode` vẫn khai báo `'REPLAY'` để parser không crash khi gặp bản ghi cũ. Không được trình bày đây là tính năng đang hoạt động.
 - **Ngoài phạm vi PoC:** Chế tạo khung bay UAV, chứng nhận hàng không DO-254/DO-178C, chứng nhận chống nước IP67.
 - **Kết nối GCS:** Thiết kế chọn họ SoC ESP32-C3 làm gateway trạm đất. Kit phát triển/module cụ thể cần được xác minh trước khi khóa board ID, nguồn, flash và pinout. ESP32 tạo Wi-Fi SoftAP nội bộ, backend GCS trên laptop chạy WebSocket client qua mạng này, browser Dashboard chỉ kết nối backend local. Transport v1, reconnect và buffer mục IV.4 là baseline để triển khai; chúng chưa phải bằng chứng phần mềm hoặc phần cứng đã chạy. Bluetooth và USB chỉ dùng cho nạp/debug khi cần, không là đường telemetry mục tiêu.
 
@@ -50,8 +53,8 @@ Nhóm trình bày **ba hoạt động theo thứ tự**: (1) video lũ lụt có
 | Hoạt động | Mục đích trước giám khảo | Đầu vào và nội dung trình bày | Bằng chứng cần chuẩn bị |
 | :--- | :--- | :--- | :--- |
 | **1. Video lũ lụt có sẵn — nhận diện AI** | Cho thấy AI phát hiện đối tượng trong bối cảnh lũ lụt | Video nguồn đã có; hiển thị khung nhận diện, tên lớp và confidence của person/lifebuoy khi xuất hiện. Có đoạn không mục tiêu để quan sát báo động giả. Có thể chạy inference trên file hoặc chiếu bản kết quả đã ghi, phải giới thiệu đúng cách thực hiện. | Video gốc/nguồn sử dụng, file kết quả, model/config/hash và log chạy; ghi PC_REFERENCE nếu suy luận trên laptop. Video chọn để trình diễn không thay đánh giá locked-test. |
-| **2. Video bể bơi — tổng quan hệ thống và Dashboard** | Cho thấy cách lắp đặt và luồng dữ liệu từ quan sát tới màn hình giám sát | Quay toàn cảnh bể bơi, vị trí camera/tải, phần cứng thực dùng, trạm đất ESP32 có nguồn riêng, laptop hiển thị Dashboard web; xen màn hình nhận diện, trạng thái link/cảm biến, thông tin mục tiêu và log/replay trên Dashboard. | Video toàn cảnh + screen recording + session/capture cùng phiên; sơ đồ chỉ rõ phần đã chạy thật, phần MOCK hoặc PC_REFERENCE. Tọa độ chỉ trình bày khi có calibration và dữ liệu hợp lệ. |
-| **3. Test trực tiếp tại cuộc thi — không sa bàn** | Chứng minh hệ thống đang vận hành và có thể thao tác trước giám khảo | Khởi động bộ thiết bị mang tới, kết nối Dashboard, đưa đầu vào thử, quan sát cập nhật/cảnh báo, kiểm ngắt–khôi phục link và lưu/phát lại phiên. Cấu hình đầu vào cụ thể được chốt khi tổng duyệt. | Checklist live, cấu hình/candidate cố định, log phiên mới tại cuộc thi và kết quả từng bước. Nếu dùng MOCK hoặc log cũ dự phòng phải ghi đúng nhãn, không ghi đã kiểm chuỗi REAL. |
+| **2. Video bể bơi — tổng quan hệ thống và Dashboard** | Cho thấy cách lắp đặt và luồng dữ liệu từ quan sát tới màn hình giám sát | Quay toàn cảnh bể bơi, vị trí camera/tải, phần cứng thực dùng, trạm đất ESP32 có nguồn riêng, laptop hiển thị Dashboard web; xen màn hình nhận diện, trạng thái link/cảm biến, thông tin mục tiêu và nhật ký phiên trên Dashboard; nếu có, xen khung hình từ nhánh **ESP32-S3-CAM (IF-05)** và ghi rõ đây là kênh quan sát, không sinh tọa độ. | Video toàn cảnh + screen recording + session/capture cùng phiên; sơ đồ chỉ rõ phần đã chạy thật, phần MOCK hoặc PC_REFERENCE; nhãn `RELAY` cho video S3 và ghi rõ `has_overlay = false`. Tọa độ chỉ trình bày khi có calibration và dữ liệu hợp lệ. |
+| **3. Test trực tiếp tại cuộc thi — không sa bàn** | Chứng minh hệ thống đang vận hành và có thể thao tác trước giám khảo | Khởi động bộ thiết bị mang tới, kết nối Dashboard, đưa đầu vào thử, quan sát cập nhật/cảnh báo, kiểm ngắt–khôi phục link và mở nhật ký phiên. Cấu hình đầu vào cụ thể được chốt khi tổng duyệt. | Checklist live, cấu hình/candidate cố định, log phiên mới tại cuộc thi và kết quả từng bước. Nếu dùng MOCK hoặc log cũ dự phòng phải ghi đúng nhãn, không ghi đã kiểm chuỗi REAL. |
 
 ##### 3.1. Video lũ lụt có sẵn
 
@@ -62,23 +65,23 @@ Nhóm trình bày **ba hoạt động theo thứ tự**: (1) video lũ lụt có
 
 ##### 3.2. Video tổng quan tại bể bơi
 
-1. Quay cảnh bố trí thử nghiệm và giải thích camera → nơi suy luận thực tế → MCU tải → LoRa → ESP32 trạm đất → Wi-Fi SoftAP/WebSocket → laptop/Dashboard web theo cấu hình đã hoàn thiện. Mỗi đoạn chỉ thể hiện thành phần thực sự có trong lần thử.
+1. Quay cảnh bố trí thử nghiệm và giải thích camera → nơi suy luận thực tế → MCU tải → LoRa → ESP32 trạm đất → Wi-Fi SoftAP/WebSocket → laptop/Dashboard web theo cấu hình đã hoàn thiện. Nếu dùng **ESP32-S3-CAM** cho hình ảnh quan sát, vẽ nó thành nhánh Wi-Fi riêng vào backend relay (IF-05) và ghi rõ nhánh này **không** đi qua LoRa, **không** sinh tọa độ. Mỗi đoạn chỉ thể hiện thành phần thực sự có trong lần thử.
 2. Quay mục tiêu trong bể bơi và màn hình Dashboard cùng phiên, có mốc thời gian/sự kiện chung để đối chiếu. Chỉ số link, trạng thái cảm biến, lớp/confidence và tọa độ được giải thích theo dữ liệu thật của phiên.
-3. Thể hiện lúc có/không có mục tiêu, thay đổi quan sát, mất dữ liệu hoặc mất link và khôi phục nếu đã kiểm; kết thúc bằng mở log/replay của đúng phiên thử.
-4. **LoRa chỉ truyền metadata, không truyền video.** Dashboard web trên laptop nhận telemetry từ ESP32 qua Wi-Fi SoftAP/WebSocket v1. Hình video/camera (nếu có) dùng kênh riêng như file cục bộ hoặc screen recording; không vẽ luồng video đi qua LoRa.
+3. Thể hiện lúc có/không có mục tiêu, thay đổi quan sát, mất dữ liệu hoặc mất link và khôi phục nếu đã kiểm; kết thúc bằng mở **Nhật ký phiên** của đúng phiên thử và xuất CSV để đối chiếu.
+4. **LoRa chỉ truyền metadata, không truyền video.** Dashboard web trên laptop nhận telemetry từ ESP32 qua Wi-Fi SoftAP/WebSocket v1. Hình video/camera (nếu có) dùng kênh riêng như file cục bộ, screen recording, hoặc **kênh IF-05** (ESP32-S3-CAM → backend relay → trình duyệt, xem [IF_ESP32_CAM_GCS.md](../interfaces/IF_ESP32_CAM_GCS.md)); không vẽ luồng video đi qua LoRa.
 5. Nếu cần chứng minh định vị, đo/hiệu chuẩn hệ local của khu vực bể bơi trước khi ghi hình, lưu origin/pose/ground truth và log. Không mang các mốc này tới nơi thi; thiếu điều kiện định vị thì để INVALID/N/A và chỉ trình bày nhận diện/truyền dữ liệu.
 
 ##### 3.3. Checklist test trực tiếp tại địa điểm thi
 
-- **Chuẩn bị:** bộ phần cứng đã được kiểm, nguồn/cáp/anten theo cấu hình, laptop có ứng dụng và assets offline, hai video đã quay và bản sao log/cấu hình. Không cần sa bàn hoặc bể nước tại gian thi.
+- **Chuẩn bị:** bộ phần cứng đã được kiểm, nguồn/cáp/anten theo cấu hình, laptop có ứng dụng và assets offline, hai video đã quay, **ảnh chụp Nhật ký phiên** và bản sao log/cấu hình. Không cần sa bàn hoặc bể nước tại gian thi.
 - **Bước 1 — Khởi động:** cấp nguồn riêng cho ESP32 và LoRa trạm đất, mở Dashboard web trên laptop, kết nối qua Wi-Fi SoftAP/WebSocket v1; kiểm session mới và trạng thái từng thành phần có thật. ESP32 không cần laptop để khởi động hoặc tiếp tục thu LoRa. Kiểm hoạt động local khi không có Internet.
 - **Bước 2 — Đầu vào thử:** phương án ưu tiên để tổng duyệt là camera đang chạy với người/phao trong không gian thử phù hợp tại gian thi; nếu không phù hợp với camera/cấu hình đã chọn, chốt phương án chạy video file làm đầu vào trước ngày thi. Phải thử được đường đưa đầu vào tới nơi inference thực tế, không mặc định laptop có thể nạp file thẳng vào FPGA.
 - **Bước 3 — Quan sát chuỗi:** đối chiếu sự kiện đầu vào với nhận diện, dữ liệu truyền, trạng thái link và Dashboard. Nếu chỉ kiểm một đoạn (ví dụ ESP32→Dashboard hoặc FPGA mock→MCU tải→GCS), ghi rõ phạm vi và nhãn MOCK/PC_REFERENCE; không suy ra toàn chuỗi đã hoạt động.
 - **Bước 4 — Phục hồi:** thực hiện thao tác ngắt/kết nối lại Wi-Fi SoftAP/WebSocket hoặc link đã được thử trong tổng duyệt; Dashboard báo mất link/stale rồi khôi phục đúng session/state, không tiếp tục hiển thị dữ liệu cũ như dữ liệu mới.
-- **Bước 5 — Lưu và phát lại:** kết thúc phiên test, mở log/replay của phiên vừa tạo và chỉ rõ nhãn REPLAY. Nếu live thất bại, có thể mở log bể bơi làm dự phòng nhưng phải công bố đó là phiên đã ghi trước.
+- **Bước 5 — Lưu và đối chiếu:** kết thúc phiên test, mở **Nhật ký phiên** vừa tạo, đối chiếu số sự kiện/timestamp với các mốc đã thao tác và xuất CSV. Nếu live thất bại, có thể mở **ảnh chụp nhật ký + video screen recording** của phiên bể bơi làm dự phòng nhưng phải công bố đó là phiên đã ghi trước; không có chế độ phát lại trong UI.
 - **Tọa độ tại nơi thi:** không giả định có GNSS 3D fix, mặt phẳng nước hoặc pose/origin đã hiệu chuẩn. Khi thiếu điều kiện, hiển thị INVALID/N/A; nhận diện và kiểm link vẫn tiếp tục. BBox trên ảnh không tự chứng minh tọa độ cứu nạn ngoài thực địa.
 
-Ba hoạt động này là kịch bản **PLANNED**. Việc đổi cách trình diễn không xác nhận hardware đã chạy và không tự thay baud, ABI, CRC, IRQ, pinout hoặc mô hình. Nhãn nguồn REAL/MOCK/REPLAY của telemetry và provenance inference được giữ độc lập với việc **chiếu một video**; chiếu file MP4 không tự trở thành chế độ REPLAY của log SQLite.
+Ba hoạt động này là kịch bản **PLANNED**. Việc đổi cách trình diễn không xác nhận hardware đã chạy và không tự thay baud, ABI, CRC, IRQ, pinout hoặc mô hình. Nhãn nguồn `REAL`/`MOCK` của telemetry và provenance inference được giữ độc lập với việc **chiếu một video**; chiếu file MP4 không tự trở thành dữ liệu `REAL` và cũng không phải chế độ phát lại (đã bỏ khỏi UI).
 
 #### 4. Sơ đồ kiến trúc hệ thống chi tiết
 
@@ -87,17 +90,18 @@ Sơ đồ mô tả luồng tín hiệu, bus vật lý và sự phân định ran
 ```mermaid
 flowchart TB
     subgraph AIR["TẢI NHIỆM VỤ TRÊN UAV (AIR UNIT PAYLOAD)"]
-        CAM["Camera OV2640 DVP 8-bit<br/>(chốt 31/10/2026)"]
+        CAM["Camera trinh sát OV2640 DVP 8-bit<br/>(chốt 31/10/2026) — nguồn tọa độ DUY NHẤT"]
         subgraph FPGA_BOX["FPGA OneKiwi Primer 20K (GW2A-LV18PG256)"]
             RX["Camera RX & Tiền xử lý<br/>(Letterbox / Resize 160×160)"]
             MEM["BSRAM nội 828 Kbit<br/>(line buffer + bias/quant)"]
-            AI["YOLO11n INT8 Engine<br/>(stream weights từ SPI flash, 2–4 FPS)"]
+            AI["Đường phát hiện hiện hành: kvc_blob_detect<br/>(BBox từ pixel thật, 0 BSRAM / 0 DSP)<br/>YOLO11n INT8: DESIGN, chưa trong bitstream"]
             TX["Bộ đệm FIFO & UART TX<br/>(Ứng viên BBox: X, Y, W, H, Conf, Class)"]
             RX --- MEM
             RX --> AI
             AI --- MEM
             AI --> TX
         end
+        CAM_S3["Camera quan sát phụ ESP32-S3-CAM + OV3660 3 MP<br/>(IF-05) — KHÔNG sinh tọa độ"]
         subgraph MCU_AIR["MCU Sonix SN34F788 (Cortex-M4F 192 MHz)"]
             FUSION["Parser UART, Ước lượng tư thế AHRS & Đồng bộ Timestamp"]
             GEOREF["Thuật toán Chiếu tia định vị 3D (Ray-Plane Intersection)"]
@@ -107,7 +111,7 @@ flowchart TB
         subgraph SENSORS["CẢM BIẾN ĐỊNH VỊ & KHÔNG GIAN"]
             ULTRASONIC["AJ-SR04M Siêu âm chống nước<br/>(Cự ly mặt nước — UART 9600 bps, trần 700 cm sau B-7)"]
             IMU["GY-87 IMU<br/>(MPU-6050 Accel+Gyro — I2C0 400 kHz)<br/>HMC5883L hoãn, BMP180 loại bỏ"]
-            GNSS["GNSS u-blox NEO-M10-0-10<br/>(Tọa độ WGS-84 — UART 9600/38400 bps NMEA/UBX, 1–10 Hz)"]
+            GNSS["GNSS u-blox NEO-M10-0-10<br/>(Tọa độ WGS-84 — UART 9600 bps NMEA/UBX, 1–10 Hz)"]
         end
         RF1["LoRa Ra-02 (Air TX)<br/>SX1278 433 MHz (SPI)"]
         LED_STATUS["LED Chỉ báo Trạng thái (PWR / GNSS / Ready)<br/>& Serial Debug (SN-LINK Lite)"]
@@ -119,6 +123,7 @@ flowchart TB
         GNSS -->|UART 9600 bps UBX/NMEA| FUSION
         PACKET -->|SPI Bus + DIO0| RF1
         FUSION -.->|GPIO / UART| LED_STATUS
+        CAM_S3 -.->|"Wi-Fi 2.4 GHz — MJPEG (kênh phụ, KHÔNG qua LoRa)"| VIDEO
     end
 
     subgraph GROUND["TRẠM ĐIỀU KHIỂN MẶT ĐẤT (GROUND STATION)"]
@@ -129,10 +134,12 @@ flowchart TB
 
         subgraph PC["LAPTOP — OFFLINE DASHBOARD GCS"]
             INGRESS["Local Ingress<br/>(Wi-Fi SoftAP + WebSocket v1)"]
+            VIDEO["Video Relay IF-05<br/>(MJPEG → same-origin cho trình duyệt)"]
             DB["SQLite Data Logger<br/>(WAL Mode, PRAGMA synchronous=FULL)"]
-            UI["Dashboard GCS Web UI<br/>(Radar Local, Bản đồ Leaflet WGS-84, Replay)"]
+            UI["Dashboard GCS Web UI<br/>(Radar Local, Bản đồ Leaflet WGS-84,<br/>Nhật ký phiên + xuất CSV)"]
             INGRESS --> DB
             INGRESS --> UI
+            VIDEO --> UI
         end
 
         RF2 -->|SPI + Đọc thanh ghi RSSI/SNR| MCU_GND
@@ -157,16 +164,15 @@ Kênh truyền LoRa (Long Range) đóng vai trò là xương sống thông tin l
 2. **Nguyên tắc "Zero-Video" — Chỉ truyền Metadata:**
    - Trong bối cảnh cứu nạn mưa lũ, việc truyền luồng video số trực tiếp (RTSP/H.264) qua sóng vô tuyến đòi hỏi băng thông hàng Megabit/giây (Mbps), rất dễ bị mất tín hiệu hoặc nhiễu trắng khi bay xa hoặc thời tiết xấu.
    - KVC triệt để loại bỏ việc truyền video qua LoRa: toàn bộ dữ liệu ảnh thô từ camera được thu nhận và chạy suy luận AI ngay trên FPGA tại UAV.
-   - LoRa chỉ đảm nhiệm truyền tải các gói tin **Metadata nhị phân siêu nhỏ (32 byte/gói)** chứa thông tin cứu nạn quan trọng: ID mục tiêu, tọa độ địa lý nạn nhân (WGS-84 / Local), mức độ tin cậy AI, cự ly siêu âm, mức pin và các cờ trạng thái hệ thống.
+   - LoRa chỉ đảm nhiệm truyền tải các gói tin **Metadata nhị phân siêu nhỏ (32 byte/gói)** chứa thông tin cứu nạn quan trọng: ID mục tiêu, tọa độ địa lý nạn nhân (WGS-84 / Local), mức độ tin cậy AI, cự ly siêu âm, cờ trạng thái cảm biến và Session ID. Không truyền pin (byte 25 là `status_reserved`, luôn `0`).
 
 3. **Cấu trúc gói tin nhị phân và kiểm tra toàn vẹn:**
-   - Chiều dài gói tin cố định đúng **32 byte** (đặc tả wire v1 tại mục IV.3):
+   - Chiều dài gói tin cố định đúng **32 byte** (đặc tả wire v1 đầy đủ tại mục IV.3):
      - Byte 0–1: Sync Header (`0xAA 0x55`).
-     - Byte 2: Protocol Version (`1`).
-     - Byte 3: Packet Type (`0x01` Telemetry tải, `0x02` Target phát hiện, `0x03` Boot/Status chẩn đoán).
-     - Byte 4–5: Sequence Number (tăng đơn điệu chống trùng lặp/mất gói).
-     - Byte 6–29: Tải dữ liệu hữu ích (Track ID, Timestamp, Tọa độ X/Y hoặc Lat/Lon, cự ly siêu âm, Confidence, Mức pin, System Flags 16-bit, Session ID).
-     - Byte 30–31: **CRC-16/CCITT-FALSE** (Poly `0x1021`, Init `0xFFFF`) tính trên 30 byte đầu.
+     - Byte 2: Message ID (`0x01` Telemetry mục tiêu, `0x02` Heartbeat/Ping).
+     - Byte 3: Sequence Number (0..255, xoay vòng, phát hiện mất gói).
+     - Byte 4–29: Tải dữ liệu hữu ích (Timestamp, Lat/Lon WGS-84, X/Y local, cự ly siêu âm, Class ID, Confidence, Sensor Status Flags, `status_reserved`, Reserved/IMU Angle).
+     - Byte 30–31: **CRC-16/CCITT-FALSE** (Poly `0x1021`, Init `0xFFFF`) tính trên 30 byte đầu (offset 0–29).
    - Gói tin chỉ được phía nhận chấp nhận nếu vượt qua kiểm tra CRC-16; gói sai CRC lập tức bị drop để bảo vệ dữ liệu Dashboard không bị nhảy tọa độ rác.
 
 4. **Chiến lược chu kỳ và tần suất phát (Duty Cycle & Time-on-Air):**
@@ -207,7 +213,8 @@ Kênh truyền LoRa (Long Range) đóng vai trò là xương sống thông tin l
 | **Trạm Mặt Đất — Module thu LoRa (RX)** | **Ai-Thinker Ra-02 (SX1278)** | Dải 410–525 MHz, SPI, nguồn 3,3V; datasheet V1.1: độ nhạy tới -141 dBm tại 433 MHz, SF12, BW 125 kHz | Thu payload RF 32 byte theo ABI IF-02 đã duyệt (29/10/2026), kiểm CRC và đo chất lượng liên kết RF. |
 | **Trạm Mặt Đất — Màn hình hiện trường** | **OLED SSD1306 0.96 inch I2C** | Độ phân giải 128×64 pixel, giao tiếp I2C 400 kHz, nguồn 3,3V | Hiển thị tức thời RSSI/SNR, số gói nhận được và tọa độ nạn nhân độc lập ngoài trời không cần laptop. |
 | **Trạm Mặt Đất — Khối nguồn độc lập** | **Pin Li-ion 18650 2S (7.4V) + Buck MP1584** | Mạch hạ áp Buck DC-DC MP1584 hạ về rail 5V ổn định + Tụ hóa 220 µF chống sụt áp tức thời | Cung cấp nguồn riêng biệt cho trạm đất, đảm bảo vận hành liên tục khi laptop tắt hoặc mất kết nối. |
-| **Trạm Giám Sát — Laptop GCS Offline** | **Laptop Windows/Linux** | Web Dashboard (React/TypeScript/Vite) + Backend Python FastAPI + SQLite Logger (WAL mode) | Nhận dữ liệu qua WebSocket nội bộ, hiển thị radar local, vẽ vị trí nạn nhân trên bản đồ WGS-84, lưu và phát lại log. |
+| **Trạm Giám Sát — Laptop GCS Offline** | **Laptop Windows/Linux** | Web Dashboard (React/TypeScript/Vite) + Backend Python FastAPI + SQLite Logger (WAL mode) | Nhận dữ liệu qua WebSocket nội bộ, hiển thị radar local, vẽ vị trí nạn nhân trên bản đồ WGS-84, lưu log và mở **Nhật ký phiên** (lọc/xuất CSV). |
+| **Camera quan sát phụ (kênh IF-05)** | **ESP32-S3 N16R8 + OV3660 3 MP** | ESP32-S3-WROOM-1, 16 MB flash + 8 MB PSRAM, camera 3 MP; Wi-Fi 2.4 GHz; firmware PlatformIO (`firmware/esp32_s3_cam/`) | Phát MJPEG cho người vận hành qua backend relay. **Không sinh tọa độ**, không đi qua LoRa, không thay OV2640. Nguồn 5 V riêng (LM2596 600–800 mA). Chưa nạp bo — mức `BUILT`. |
 
 ---
 
@@ -218,7 +225,7 @@ Danh mục dưới đây phân loại chính xác linh kiện theo 5 phân hệ 
 ##### A. Phân hệ 1: Trạm Tải trên UAV (Air Unit) — Khối Xử lý Ảnh & AI trên FPGA
 | STT | Tên linh kiện cụ thể | Số lượng | Điện áp / Bus | Chức năng trong KVC | In — Đầu vào | Out — Đầu ra | Yêu cầu kỹ thuật thực tế |
 | :---: | :--- | :---: | :---: | :--- | :--- | :--- | :--- |
-| **A1** | **OneKiwi Primer 20K V1.1** | 1 bo | Nguồn/IO theo schematic và board thực tế | Bo FPGA hiện có; pipeline camera/AI đã có RTL trong `KVC_PR/` nhưng chưa đạt timing. | Nguồn và cấu hình theo board; camera OV2640 DVP đã chốt. | BBox qua UART 38.400 bps và `DATA_READY` theo IF-01. | Không có DDR3 ngoài theo hardware notes; weights stream từ SPI flash W25Q128 (16 MiB). BSRAM nội 828 Kbit dùng cho line buffer + bias/quant. |
+| **A1** | **OneKiwi Primer 20K V1.1** | 1 bo | Nguồn/IO theo schematic và board thực tế | Bo FPGA hiện có; pipeline camera/AI đã có RTL trong `KVC_PR/`. Top demo đã đóng timing (Fmax 129,149 MHz, TNS=0); đường blob đóng timing ở 113,277 MHz; **YOLO11n chưa nằm trong bitstream**. | Nguồn và cấu hình theo board; camera OV2640 DVP đã chốt. | BBox qua UART 38.400 bps và `DATA_READY` theo IF-01. | Không có DDR3 ngoài theo hardware notes; weights stream từ SPI flash W25Q128 (16 MiB). BSRAM nội 828 Kbit dùng cho line buffer + bias/quant. |
 | **A2** | **Camera OV2640 DVP 8-bit** (chốt 31/10/2026) | 1 module | 3,3 V rail từ Buck; logic 3,3 V | Thu nhận hình ảnh quang học bề mặt nước ở 2,0–5,0 m. | Rolling shutter — hạn chế bay ngang > 1 m/s. HFOV ~60°. | DVP 8-bit + SCCB, 14 chân Header J1 pin 5–20. | Pin map đã khoá `KVC_PR/src/KVC_FPGA.cst:58-98`; chưa hardware-verified. |
 | **A3** | Cáp/adapter Camera–OneKiwi | 1 bộ | Theo module OV2640 đã chọn | Nối camera DVP với Header J1. | Connector 2.54 mm trên module breakout. | Tín hiệu theo pin map §3.5.1 của `KVC_MASTER_PINOUT_WIRING.md`. | Không dùng module FPC 24-pin hoặc MIPI; chỉ dùng breakout DVP 2.54 mm. |
 
@@ -241,13 +248,14 @@ Danh mục dưới đây phân loại chính xác linh kiện theo 5 phân hệ 
 | **C3** | **Anten râu LoRa 433 MHz + Cáp IPEX** | 1 bộ | RF 433 MHz | Thu nhận tín hiệu sóng điện từ 433 MHz tại trạm mặt đất. | Sóng điện từ từ tải UAV truyền tới. | Tín hiệu RF dẫn vào chân anten module Ra-02 qua cáp IPEX. | Anten râu 433 MHz gain 3 dBi, đặt thẳng đứng ở vị trí thoáng, không bị che chắn bởi kim loại. |
 | **C4** | **OLED SSD1306 0.96" I2C (Ground)**| 1 module | 3.3V / I2C 400 kHz | Hiển thị tức thời RSSI, SNR, tần số gói nhận và tọa độ mục tiêu ngay ngoài hiện trường. | Nguồn 3.3V; Dữ liệu hiển thị từ ESP32 qua I2C. | Màn hình hiển thị 128×64 pixel. | Giúp đội cứu nạn theo dõi được kết quả ngay cả khi laptop bị hết pin hoặc chưa kịp mở ứng dụng. |
 | **C5** | **Khối Pin 18650 2S (7.4V) / Sạc dự phòng** | 1 bộ | 7.4V DC / 5V USB | Cung cấp nguồn điện độc lập cho trạm đất ngoài thực địa. | Năng lượng hóa học từ 2 cell pin 18650 mắc nối tiếp (hoặc pin sạc dự phòng 5V). | Điện áp DC cấp cho mạch hạ áp Buck MP1584. | Đảm bảo trạm đất hoạt động độc lập ≥ 4 giờ; không lấy nguồn từ cổng USB laptop khi vận hành. |
+| **C6** | **ESP32-S3-CAM + OV3660 3 MP** (kênh IF-05) | 1 module | 5 V riêng / Wi-Fi 2.4 GHz | Camera quan sát phụ, phát MJPEG cho người vận hành qua backend relay. **Không sinh tọa độ.** | Cảnh quang học; lệnh HTTP từ backend | Luồng MJPEG `multipart/x-mixed-replace` tại `/stream` | Board N16R8 (16 MB flash + 8 MB PSRAM); rail 5 V LM2596 600–800 mA, gá chống rung, **không câu GPIO**. Chưa nạp bo — `BUILT`, không `HARDWARE-VERIFIED`. |
 
 ##### D. Phân hệ 4: Trạm Giám Sát Mặt Đất (Laptop GCS Offline)
 | STT | Tên thành phần | Số lượng | Giao tiếp | Chức năng trong KVC | In — Đầu vào | Out — Đầu ra | Yêu cầu kỹ thuật thực tế |
 | :---: | :--- | :---: | :---: | :--- | :--- | :--- | :--- |
 | **D1** | **Laptop cá nhân (GCS)** | 1 máy | Wi-Fi 802.11 | Thiết bị giám sát, hiển thị bản đồ trực quan, quản lý cảnh báo và ghi log dữ liệu. | Wi-Fi SoftAP/WebSocket từ ESP32. | Dashboard web và file cơ sở dữ liệu SQLite. | Chạy hệ điều hành Windows/Linux; cài sẵn trình duyệt Chrome/Edge và môi trường Python 3.10+. |
 | **D2** | **Web Dashboard KVC (Offline App)**| 1 bản | WebSocket Local | Giao diện trực quan hóa: Radar BBox, Bản đồ Leaflet WGS-84, đồ thị cự ly độ cao, bảng mục tiêu. | Backend GCS local (`ws://127.0.0.1:8000/ws/telemetry`); route chuẩn tại IF-04. | Trực quan hóa dữ liệu cứu nạn trên màn hình; phát âm thanh cảnh báo. | Đóng gói toàn bộ assets thư viện offline (Leaflet JS/CSS, fonts local); không gọi API từ CDN Internet. |
-| **D3** | **Backend Python & SQLite Logger** | 1 gói | Localhost / WAL | Dịch vụ tiếp nhận luồng dữ liệu, lưu trữ bền vững vào SQLite và phát lại phiên (Replay). | Luồng dữ liệu telemetry từ Ingress. | File log `kvc_telemetry.db` chế độ WAL (`PRAGMA synchronous=FULL`). | Chạy ngầm trên laptop; đảm bảo commit dữ liệu tức thời, chống hỏng file khi mất nguồn đột ngột. |
+| **D3** | **Backend Python & SQLite Logger** | 1 gói | Localhost / WAL | Dịch vụ tiếp nhận luồng dữ liệu và lưu trữ bền vững vào SQLite; phục vụ trang Nhật ký phiên đọc lại log đã commit. | Luồng dữ liệu telemetry từ Ingress. | File log `kvc_telemetry.db` chế độ WAL (`PRAGMA synchronous=FULL`). | Chạy ngầm trên laptop; đảm bảo commit dữ liệu tức thời, chống hỏng file khi mất nguồn đột ngột. Module `replay_engine.py` và route `/api/replay/*` còn tồn tại nhưng **không có UI gọi** (dự phòng, không phải tính năng đang dùng). |
 
 ##### E. Phân hệ 5: Khối Nguồn, Gá Cơ Khí & Linh Kiện Kết Nối Phụ Trợ Dùng Chung
 | STT | Tên linh kiện cụ thể | Số lượng | Thông số kỹ thuật | Chức năng trong KVC | Lưu ý lắp đặt và thi công |
@@ -267,7 +275,7 @@ Danh mục dưới đây phân loại chính xác linh kiện theo 5 phân hệ 
 
 #### 1. Phân chia nhiệm vụ xử lý giữa các phân hệ
 
-**Hiện có trong workspace:** frontend React/TypeScript, backend FastAPI MOCK, SQLite logger/replay, AI tham chiếu PC và module WebSocket Ingress client (`gcs/backend/esp32_ingress.py`) tiếp nhận và giải mã khung nhị phân 32-byte Little-Endian từ ESP32. Bảng sau là nhiệm vụ cần hoàn thiện; SDK mẫu không tính là KVC đã chạy.
+**Hiện có trong workspace:** frontend React/TypeScript, backend FastAPI MOCK, SQLite logger, trang Nhật ký phiên, relay video IF-05, AI tham chiếu PC và module WebSocket Ingress client (`gcs/backend/esp32_ingress.py`) tiếp nhận và giải mã khung nhị phân 32-byte Little-Endian từ ESP32. Bảng sau là nhiệm vụ cần hoàn thiện; SDK mẫu không tính là KVC đã chạy.
 
 **Trạng thái giao thức:** Giao thức vô tuyến RF 32-byte chuẩn hóa đã được đồng bộ thống nhất giữa Firmware MCU Sonix (`kvc_telemetry.h`), Gateway ESP32 (`main.cpp`), Backend Ingress (`esp32_ingress.py`) và hợp đồng [IF-02](../interfaces/IF_MCU_LORA_RF.md). Giao thức telemetry 20 byte là lịch sử trước đây. Transport ESP32–laptop qua Wi-Fi SoftAP/WebSocket v1 tuân thủ [IF-03](../interfaces/IF_ESP32_GCS_WS.md).
 
@@ -278,7 +286,7 @@ Danh mục dưới đây phân loại chính xác linh kiện theo 5 phân hệ 
 | **FPGA** | Camera RX OV2640 DVP, letterbox/resize về **160×160**, YOLO11n INT8 engine stream weights từ SPI flash, NMS trên RTL (`MAX_BOXES=12`), FIFO và UART TX 38.400 bps; có chế độ BBox giả (Mock) phục vụ kiểm thử. | Tăng MAC song song 4→8; kiểm tra khả năng DDR3 nếu xác minh được; pipeline song song kép. |
 | **MCU Tải (Sonix)**| Bộ giải mã UART từ FPGA, thu thập cảm biến có timestamp (Cảm biến siêu âm, IMU, GNSS), thuật toán chiếu tia định vị mục tiêu, theo dõi (tracking) 1 mục tiêu ở mức thiết kế, đóng gói và điều khiển phát LoRa 32 byte, watchdog an toàn. | Lọc Kalman nâng cao, theo dõi đa mục tiêu đồng thời, lưu trữ flash bền vững khi mất sóng dài ngày. |
 | **MCU Trạm đất** | Driver SPI điều khiển Ra-02 ở chế độ nhận, kiểm CRC, đọc RSSI/SNR và xuất telemetry qua Wi-Fi SoftAP/WebSocket v1. ESP32-C3 có nguồn riêng; kiểm thử tài nguyên khi các tác vụ chạy đồng thời. | Bổ sung cơ chế phát gói ACK phản hồi khi đường truyền rảnh. |
-| **Dashboard GCS** | Ingress nhận dữ liệu từ ESP32 qua transport được chốt, kiểm tra session và giải mã RF v1, bộ quản lý trạng thái (Reducer), giao diện Radar local và Bản đồ WGS-84, SQLite logger (WAL), Replay phiên. | Hiển thị lớp bản đồ vệ tinh ngoại tuyến (Tile map), thống kê nâng cao. |
+| **Dashboard GCS** | Ingress nhận dữ liệu từ ESP32 qua transport được chốt, kiểm tra session và giải mã RF v1, bộ quản lý trạng thái (Reducer), giao diện Radar local và Bản đồ WGS-84, SQLite logger (WAL), **Nhật ký phiên có lọc và xuất CSV**, relay video IF-05 (kênh phụ). | Hiển thị lớp bản đồ vệ tinh ngoại tuyến (Tile map), thống kê nâng cao. |
 
 Ghi chú về thuật ngữ: “sa bàn” trong các mô tả field local/origin ở đặc tả wire IF-02 dưới đây là tên gọi lịch sử của hệ tọa độ local đã hiệu chuẩn, không phải yêu cầu có mô hình sa bàn tại nơi thi. Có thể áp dụng tại khu vực bể bơi khi origin/pose/đơn vị được xác lập.
 
@@ -314,7 +322,7 @@ Ghi chú về thuật ngữ: “sa bàn” trong các mô tả field local/origi
 
 ##### b. Chi tiết định dạng 8-bit trường Sensor Status Flags (Byte 24)
 - **Bit 0 (`GNSS_VALID`):** `1` = GNSS đạt Fix hợp lệ (tọa độ UAV đáng tin cậy); `0` = Chưa có Fix / mất định vị vệ tinh.
-- **Bit 1 (`ALT_VALID`):** `1` = Cự ly siêu âm hợp lệ trong dải tin cậy 20–500 cm (hoặc 20–800 cm); `0` = Ngoài dải hoặc lỗi đo.
+- **Bit 1 (`ALT_VALID`):** `1` = Cự ly siêu âm hợp lệ trong dải tin cậy **20–700 cm** (trần firmware sau B-7, 31/10/2026). Backend GCS thẩm định riêng tới 800 cm. `0` = Ngoài dải hoặc lỗi đo.
 - **Bit 2 (`IMU_VALID`):** `1` = Dữ liệu góc nghiêng IMU GY-87 hợp lệ và đã qua hiệu chuẩn.
 - **Bit 3 (`AI_DETECTED`):** `1` = Có BBox mục tiêu cứu nạn từ FPGA.
 - **Bits 4–7:** Dự phòng cho mở rộng hệ thống (mặc định gán `0`).
@@ -367,7 +375,7 @@ Trong đó:
 - $\lambda$: Hệ số tỷ lệ độ dài tia, được xác định bằng cách giải phương trình giao điểm của tia với mặt phẳng nước $Z = 0$ (hoặc mặt phẳng độ cao xác định bởi cảm biến siêu âm AJ-SR04M và góc nghiêng).
 2. **Quy tắc tính toán và điều kiện hợp lệ:**
 - Cần camera intrinsics/distortion, phép đổi tọa độ sau resize/letterbox, extrinsics camera–IMU–cảm biến siêu âm–GNSS và mẫu cảm biến đồng bộ theo thời điểm ảnh. GNSS 3D fix một mình chưa đủ xác nhận tọa độ mục tiêu.
-- AJ-SR04M đo khoảng cách bằng sóng siêu âm (góc mở chùm sóng ~75°); chỉ suy ra mặt phẳng nước khi biết hướng/điểm đặt cảm biến và xác nhận sóng phản xạ từ đúng bề mặt. Kiểm timeout, góc nghiêng và khoảng cách tin cậy 20–500 cm; lưu ý mép bờ bể bơi; IMU bù nghiêng không chữa được phép đo mặt nước sai.
+- AJ-SR04M đo khoảng cách bằng sóng siêu âm (góc mở chùm sóng ~75°); chỉ suy ra mặt phẳng nước khi biết hướng/điểm đặt cảm biến và xác nhận sóng phản xạ từ đúng bề mặt. Kiểm timeout, góc nghiêng và khoảng cách tin cậy **20–700 cm**; lưu ý mép bờ bể bơi; IMU bù nghiêng không chữa được phép đo mặt nước sai.
 - Hệ local không cần GNSS khi camera được gá cố định và pose đã đo. Nếu tải di chuyển, cần cập nhật vị trí camera theo hệ local; IMU đơn lẻ không cung cấp vị trí tịnh tiến ổn định.
 - Chỉ tính tọa độ khi các điều kiện trên hợp lệ. Thiếu dữ liệu thì báo INVALID/N/A; không tự chuyển sang local hợp lệ chỉ vì mất GNSS.
 - Hệ thống chỉ xuất tọa độ hợp lệ (`POS_VALID = 1`) khi mẫu số tính $\lambda$ không gần 0 (tia không song song với mặt nước) và $\lambda > 0$ (mục tiêu nằm phía trước camera).
@@ -380,18 +388,29 @@ Trong đó:
 
 | Nội dung | Source hiện có | Phần cần hoàn thiện |
 | --- | --- | --- |
-| Đầu vào | MOCK trong frontend hoặc backend; backend phát event MOCK/REPLAY | Ingress WebSocket từ ESP32 qua Wi-Fi SoftAP, parser RF, dữ liệu REAL và reconnect thiết bị |
-| UI | React/TypeScript/Vite, radar local, bản đồ Leaflet 2D, cảnh báo, điều khiển replay | Browser E2E, hành vi mất link/dữ liệu thật và máy demo |
+| Đầu vào | MOCK trong frontend hoặc backend | Ingress WebSocket từ ESP32 qua Wi-Fi SoftAP, parser RF, dữ liệu REAL và reconnect thiết bị |
+| UI | React/TypeScript/Vite, radar local, bản đồ Leaflet 2D, cảnh báo, **Nhật ký phiên** (`EventLogPage`), panel video IF-05 | Browser E2E, hành vi mất link/dữ liệu thật và máy demo |
 | Hàng đợi | Backend mặc định tối đa 64 event/client, logger queue 1024; xem config.py | Cơ chế buffer/queue cho ingress ESP32 cần thiết kế và kiểm thử; chưa phải chức năng đang chạy |
 | SQLite | WAL/FULL, writer riêng, commit ticket và lưu event; raw fields có thể null khi MOCK | Capture thật và kiểm phục hồi đúng candidate; queue nhận event chưa có nghĩa đã commit |
-| Replay | Đọc phiên đã commit, pause/seek/speed qua backend | Kiểm phiên dài và đồng thời nhiều thao tác; không mặc định có xuất/nhập JSONL |
+| Nhật ký phiên | Đọc log đã commit, lọc theo actor/mức/source, ẩn mục, xuất CSV. Giao diện **không còn chế độ phát lại** (bỏ 02/11/2026). Backend còn `replay_engine.py` + `/api/replay/*` là code dự phòng không có UI gọi | Kiểm phiên dài và tải lớn; quyết định xoá hay tái dùng code replay |
 | Offline | Assets ứng dụng đóng gói local; radar không cần tiles | Phải thử offline cold-cache; bản đồ nền không mặc định offline, cần nguồn tiles có quyền hoặc chấp nhận không có nền |
+| Video phụ (IF-05) | Backend relay MJPEG same-origin, `has_overlay=false`; firmware S3 `BUILT` | Nạp bo S3, đo FPS/độ trễ thật, kiểm `1 + số_người_xem` kết nối |
 
-Luồng mục tiêu: LoRa → ESP32 (SPI/RSSI/SNR) → Wi-Fi SoftAP/WebSocket v1 → ingress laptop → state → logger/WebSocket local → Dashboard web. Ingress ESP32 chưa có trong backend; hiện tại MOCK PC vào state/logger/WebSocket. Laptop chỉ đảm nhiệm Dashboard web và dịch vụ nhận/lưu/phát lại dữ liệu của GCS; ESP32 dùng nguồn riêng và tiếp tục thu LoRa khi laptop tắt hoặc mất kết nối. Video trên laptop là kênh riêng, không đi qua LoRa.
+Luồng mục tiêu: LoRa → ESP32 (SPI/RSSI/SNR) → Wi-Fi SoftAP/WebSocket v1 → ingress laptop → state → logger/WebSocket local → Dashboard web. Ingress ESP32 chưa có trong backend; hiện tại MOCK PC vào state/logger/WebSocket. Laptop chỉ đảm nhiệm Dashboard web và dịch vụ nhận/lưu dữ liệu của GCS; ESP32 dùng nguồn riêng và tiếp tục thu LoRa khi laptop tắt hoặc mất kết nối. Video trên laptop là kênh riêng (IF-05 hoặc file cục bộ), không đi qua LoRa.
 
 WAL/FULL giúp bảo vệ giao dịch đã commit theo khả năng hệ điều hành/thiết bị lưu trữ, không bảo đảm cứu mọi event còn trong RAM khi mất điện. Phép thử kill process không thay phép thử mất nguồn. Khi sao lưu phiên cần thực hiện đúng quy trình SQLite. [S14][S15]
 
 Nguồn hiện hành: [backend README](../configuration/DASHBOARD_BACKEND.md), [frontend README](../configuration/DASHBOARD_FRONTEND.md), [data contract](../interfaces/KVC_GCS_DATA_CONTRACT.md). Contract phân biệt schema ứng dụng đã có với wire ABI IF-02 (đã duyệt 29/10/2026, chưa capture thật); không dùng bảng ABI để suy ra endpoint REAL đã triển khai.
+
+#### 3. Kênh quan sát phụ IF-05 (ESP32-S3-CAM) và ranh giới với kênh telemetry
+Bổ sung 01–02/11/2026 theo [IF-05](../interfaces/IF_ESP32_CAM_GCS.md) và [đề xuất hai camera](KVC_DUAL_CAMERA_DESIGN_PROPOSAL.md). Đây là **thiết kế**, firmware mới `BUILT`, **chưa nạp bo**.
+
+- **Hai luồng vật lý độc lập:** LoRa 433 MHz (IF-02, 32 byte) là **kênh chính** quyết định khả năng cứu nạn; Wi-Fi MJPEG (IF-05) là **kênh phụ** chỉ để người vận hành nhìn. Mất luồng video **không được** ảnh hưởng luồng telemetry.
+- **Phân vai camera:** OV2640 + FPGA là **nguồn tọa độ duy nhất** (`inference_device = FPGA_GW2A` khi có capture thật). ESP32-S3-CAM + OV3660 chỉ tạo hình ảnh (`RELAY`), **không** sinh tọa độ, **không** thay OV2640.
+- **Không vẽ BBox FPGA lên khung S3:** hai camera khác cảm biến/ống kính/FOV nên box không đúng hình học; hai đồng hồ không có sync marker, chênh thực tế 100–500 ms. Vì vậy `VideoStatus.has_overlay` mặc định `false` và frontend chỉ vẽ overlay khi cờ này `true`.
+- **Đường truyền:** `ESP32-S3-CAM --MJPEG--> Backend (video_relay.py) --same-origin--> Browser`. Trình duyệt **không** gọi trực tiếp camera (thiếu CORS gây canvas taint, trang HTTPS bị chặn mixed content, `fetch()` không bao giờ resolve với MJPEG). Camera phải chịu `1 + số_người_xem` kết nối.
+- **Nguồn:** rail 5 V riêng LM2596 600–800 mA, gá chống rung, không câu GPIO.
+- **Trạng thái bằng chứng:** backend/frontend `SOURCE-VERIFIED`; parser và relay `SIMULATED` trên camera TCP giả (29,75/30 khung/s); firmware `BUILT` cho `esp32s3`. **Chưa `HARDWARE-VERIFIED`** — chưa có module để nạp.
 
 ---
 
@@ -445,7 +464,7 @@ Dữ liệu cần phản ánh hai bối cảnh trình diễn: video lũ lụt c�
 | **Truyền thông LoRa** | Thử ≥ 200 gói TxDone tại khu vực bể bơi/địa điểm đo có ghi khoảng cách và điều kiện; kiểm link tại gian thi là bài riêng. | Mục tiêu **PRR ≥ 95%**, tính gói hợp lệ duy nhất nhận được / gói TxDone trong cùng cửa sổ đo. Độ trễ đầu-cuối p95 ≤ 2 giây chỉ báo khi có clock đã đồng bộ hoặc mốc đo chung. |
 | **Sai số định vị Local** | Kiểm 20 vị trí ground truth đã đo tại khu vực bể bơi, có origin/pose/calibration; thực hiện trước cuộc thi, không yêu cầu sa bàn tại gian thi. | Báo median, p95 và maximum riêng theo cm cùng các mẫu invalid. Thiếu pose/calibration tại nơi thi phải báo INVALID/N/A; không coi test trực tiếp là nghiệm thu sai số nếu không có ground truth. |
 | **Công suất & Nhiệt độ**| Đo điện áp và dòng tiêu thụ ở nguồn cấp 12V trong 60 phút chạy toàn tải. | Ghi dòng trung bình/đỉnh, công suất, nhiệt và sụt áp từng rail với cấu hình thực. Chốt ngân sách nguồn từ số đo và giới hạn linh kiện; chưa có căn cứ dùng 3,36–4,20 W làm định mức. Yêu cầu không reset ngoài ý muốn và không vượt giới hạn điện/nhiệt. |
-| **Độ tin cậy GCS** | Thử nghiệm ESP32 chạy độc lập bằng nguồn riêng; ngắt/kết nối lại Wi-Fi SoftAP/WebSocket; kill process Dashboard và ngắt Internet. | Giao diện/radar/log/replay chạy khi mất Internet; mô tả riêng trạng thái bản đồ nền. Kiểm khôi phục các giao dịch SQLite đã commit, báo phần event chưa commit bị mất. |
+| **Độ tin cậy GCS** | Thử nghiệm ESP32 chạy độc lập bằng nguồn riêng; ngắt/kết nối lại Wi-Fi SoftAP/WebSocket; kill process Dashboard và ngắt Internet. | Giao diện/radar/nhật ký phiên chạy khi mất Internet; mô tả riêng trạng thái bản đồ nền. Kiểm khôi phục các giao dịch SQLite đã commit, báo phần event chưa commit bị mất. |
 
 #### 1.1. Tiêu chí nghiệm thu ba hoạt động trình diễn
 
@@ -453,7 +472,7 @@ Dữ liệu cần phản ánh hai bối cảnh trình diễn: video lũ lụt c�
 | :--- | :--- | :--- |
 | Video 1 — lũ lụt/AI | Video gốc và kết quả mở offline; lớp/BBox/confidence đọc được; model/config/source được ghi; đúng nhãn inference và chế độ chạy trực tiếp trên file hay kết quả ghi trước. | Không chứng minh georef/RF/FPGA chỉ bằng overlay; tách demo khỏi evaluation. |
 | Video 2 — bể bơi/Dashboard | Thấy bố trí thực, luồng kết nối, mục tiêu và màn hình cùng phiên; có log/capture đối chiếu và mô tả kênh video riêng. | Chỉ nhận nghiệm thu thành phần đã chạy; cảnh quay dựng không thay log đo hoặc tự xác nhận toàn chuỗi REAL. |
-| Test trực tiếp — không sa bàn | Khởi động/kết nối, đầu vào đã tổng duyệt, dữ liệu cập nhật, mất link–khôi phục, log/replay của phiên mới; lặp 5 lượt khi tổng duyệt và ghi từng kết quả. | Không bắt buộc tọa độ hợp lệ khi thiếu GNSS/local calibration; ghi rõ phần MOCK/PC_REFERENCE/dự phòng. |
+| Test trực tiếp — không sa bàn | Khởi động/kết nối, đầu vào đã tổng duyệt, dữ liệu cập nhật, mất link–khôi phục, mở **Nhật ký phiên** và xuất CSV của phiên mới; lặp 5 lượt khi tổng duyệt và ghi từng kết quả. | Không bắt buộc tọa độ hợp lệ khi thiếu GNSS/local calibration; ghi rõ phần MOCK/PC_REFERENCE/dự phòng. |
 
 **Danh sách đầu vào cần chốt trước tổng duyệt:** file video lũ lụt và nguồn sử dụng; lịch/phiên bể bơi; model/candidate và thiết bị inference của mỗi phần; camera trực tiếp hay video-file input cho live; danh sách phần cứng mang tới; thời lượng trình diễn ban tổ chức cho phép. Đây là quyết định vận hành còn cần xác nhận, không được ngầm suy ra từ tài liệu.
 
@@ -468,7 +487,7 @@ Dữ liệu cần phản ánh hai bối cảnh trình diễn: video lũ lụt c�
 | **Nhiễu nguồn / Sụt áp khi LoRa phát công suất lớn** | **Vừa** | MCU bị reset bất ngờ hoặc cảm biến bị treo khi module LoRa bắt đầu phát. | Bổ sung rail nguồn 3,3V riêng cho LoRa, hàn tụ lọc 100 µF + 100 nF sát chân nguồn, nối mass hình sao (Star Ground). |
 | **Mất dữ liệu GCS khi ứng dụng bị tắt đột ngột** | **Vừa** | File cơ sở dữ liệu SQLite bị hỏng hoặc mất các bản ghi cảnh báo mới. | Cấu hình bắt buộc SQLite WAL mode (`PRAGMA synchronous=FULL`); commit tức thời các bản ghi có sự kiện mục tiêu. |
 | **Video bể bơi không đối chiếu được với Dashboard** | **Cao** | Video và screen recording khác phiên; thiếu timestamp/log hoặc không rõ kênh truyền hình. | Ghi toàn cảnh, màn hình và session/capture cùng lần thử; lưu hash/candidate, đánh dấu đoạn cắt; chỉ mô tả luồng thực chạy và tách video khỏi LoRa metadata. |
-| **Live không chạy tại gian thi** | **Cao** | Phụ thuộc Internet/GNSS/đầu vào chưa thử; thiếu cáp/nguồn; mất link không khôi phục. | Tổng duyệt đúng bộ mang đi, offline và không sa bàn; chuẩn bị hai video/log dự phòng có nhãn. Báo phần live thất bại riêng, không thay bằng replay rồi ghi PASS. |
+| **Live không chạy tại gian thi** | **Cao** | Phụ thuộc Internet/GNSS/đầu vào chưa thử; thiếu cáp/nguồn; mất link không khôi phục. | Tổng duyệt đúng bộ mang đi, offline và không sa bàn; chuẩn bị ảnh chụp nhật ký phiên + video screen recording làm dự phòng có nhãn. Báo phần live thất bại riêng, không thay bằng dữ liệu đã ghi rồi ghi PASS. |
 
 ---
 

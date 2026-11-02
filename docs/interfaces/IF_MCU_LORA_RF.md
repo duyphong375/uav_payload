@@ -17,7 +17,7 @@ Hệ thống sử dụng 02 module **LoRa Ra-02 (chip Semtech SX1278)** giao ti�
 | :--- | :---: | :--- |
 | **Tần số trung tâm (Frequency)** | **433.0 MHz** | Băng tần ISM không cần xin phép, phù hợp module Ra-02 |
 | **Băng thông (Bandwidth - BW)** | **125 kHz** | Cân bằng giữa độ nhạy thu và tốc độ truyền |
-| **Hệ số trải phổ (Spreading Factor - SF)** | **SF7** | Thời gian truyền trên không (Airtime) khoảng 71,9 ms cho gói 32 byte (tính theo tham số ở [thiết kế hệ thống](../../architecture/KVC_ThietKeHeThong.md) mục IV.3; chưa đo trên thanh ghi thực) |
+| **Hệ số trải phổ (Spreading Factor - SF)** | **SF7** | Thời gian truyền trên không (Airtime) khoảng 71,9 ms cho gói 32 byte (tính theo tham số ở [thiết kế hệ thống](../architecture/KVC_ThietKeHeThong.md) mục IV.3; chưa đo trên thanh ghi thực) |
 | **Tỷ lệ mã sửa sai (Coding Rate - CR)** | **4/5** | Chuẩn cấu hình hoạt động |
 | **Độ dài Preamble** | **8 symbols** | Preamble tiêu chuẩn cho SX1278 |
 | **Sync Word** | **`0x12`** | Phân biệt mạng nội bộ KVC (tránh xung đột mạng LoRaWAN 0x34) |
@@ -50,9 +50,15 @@ Hệ thống sử dụng 02 module **LoRa Ra-02 (chip Semtech SX1278)** giao ti�
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 |   Altitude_Dist_cm(2B,uint16) |  Class_ID (1B)| Confidence(1B)|
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-|  Sensor_Flags |  UAV_Battery  |         CRC-16/CCITT          |
+| Sensor_Flags  |Status_Reserved|      Reserved_Ext [26:27]     |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|      Reserved_Ext [28:29]     |         CRC-16/CCITT          |
 +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
 ```
+
+> **Byte 25 KHÔNG còn là `UAV_Battery`.** Từ 29/10/2026 đây là `Status_Reserved`,
+> firmware luôn ghi `0`. Sơ đồ trên và bảng offset §2 là nguồn duy nhất; mọi tài
+> liệu khác ghi `battery_raw`/`UAV_Battery` là mô tả lịch sử trước ngày sửa.
 
 ### Bảng phân rã 32 byte chi tiết:
 

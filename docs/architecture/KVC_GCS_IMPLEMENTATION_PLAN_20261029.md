@@ -12,6 +12,11 @@
 | Tiền nhiệm | `KVC_GCS_P0_Hotfix_Plan_20261029.md` (P0 trong ngày 29/10 — là Phase 1 của kế hoạch này) |
 | Tài liệu liên quan | `KVC_GCS_DESIGN_SPEC.md`, `../interfaces/KVC_GCS_DATA_CONTRACT.md`, `../interfaces/IF_FPGA_MCU_UART.md`, `../interfaces/IF_MCU_LORA_RF.md`, `KVC_PROJECT_STATUS.md` |
 
+> **Ghi chú hiệu lực (02/11/2026):** mọi mục trong kế hoạch này liên quan **chế độ phát lại
+> (Replay)** — A7, 4.2, cổng G3/G4, rủi ro R2, U4 và các bước kiểm UI 3 trạng thái — **không
+> còn hiệu lực**. Dashboard đã bỏ Replay: chỉ còn MOCK/REAL, thay bằng trang **Nhật ký phiên**
+> (`EventLogPage`). Giữ nguyên nội dung gốc để tra cứu lịch sử; không dùng làm yêu cầu hiện hành.
+
 ---
 
 ## 1. Giả định cần thiết

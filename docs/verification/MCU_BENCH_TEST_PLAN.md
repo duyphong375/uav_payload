@@ -241,4 +241,4 @@ Buổi bench **không** nghiệm thu chuỗi RF (không có gateway) và **khôn
 | [KVC_MASTER_PINOUT_WIRING.md](../hardware/wiring/KVC_MASTER_PINOUT_WIRING.md) | Đấu dây, mức logic, ghi chú pull |
 | [IF_MCU_SENSORS.md](../interfaces/IF_MCU_SENSORS.md) | Ngưỡng GNSS, đặc tả cảm biến |
 | [IF_FPGA_MCU_UART.md](../interfaces/IF_FPGA_MCU_UART.md) | IF-01 khi có FPGA/mock |
-| [KVC_PHAN_CONG_2_NGUOI.md](../planning/KVC_PHAN_CONG_2_NGUOI.md) | Phân công, tiến độ, giới hạn |
+| [KVC_PHAN_CONG_2_NGUOI.md](../planning/KVC_PHAN_CONG_2_NGUOI.md) | Phân công, tiến độ, giới hạn — **tài liệu lịch sử 26/10/2026, đã có cảnh báo đầu file; không dùng số liệu cũ (`GV-01`, pin, trần 500 cm) làm hiện trạng** |

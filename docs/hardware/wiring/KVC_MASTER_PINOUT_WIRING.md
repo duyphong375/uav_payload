@@ -2,14 +2,16 @@
 
 - **Mã tài liệu:** `KVC-HW-PINOUT-01`
 - **Trạng thái:** `DRAFT HARDWARE SPECIFICATION (DESIGN BASELINE - SOURCE-VERIFIED)`
-- **Phiên bản:** `1.1.0 (DRAFT)` — cập nhật 31/10/2026
-- **Phạm vi:** Pinout và nguồn của Sonix SN34F780 Starter-Kit V1.1 cùng các kết nối thiết kế được liệt kê. **Camera đã chốt: OV2640 DVP 8-bit** (14 chân tại §3.5.1, khớp `KVC_PR/src/KVC_FPGA.cst:58-98`). Các module/carrier còn lại cần xác nhận đúng phiên bản trước khi đấu dây; tài liệu chưa được kiểm chứng trên phần cứng.
+- **Phiên bản:** `1.2.0 (DRAFT)` — cập nhật 01/11/2026 (bổ sung module camera phụ ESP32-S3-CAM kênh video IF-05)
+- **Phạm vi:** Pinout và nguồn của Sonix SN34F780 Starter-Kit V1.1 cùng các kết nối thiết kế được liệt kê. **Camera trinh sát AI: OV2640 DVP 8-bit** (14 chân tại §3.5.1, khớp `KVC_PR/src/KVC_FPGA.cst:58-98`). **Camera quan sát người vận hành: ESP32-S3-CAM** (kênh video phụ IF-05 độc lập, chỉ dùng nguồn 5V/GND, không chiếm chân Sonix MCU theo SYS-007). Các module/carrier còn lại cần xác nhận đúng phiên bản trước khi đấu dây; tài liệu chưa được kiểm chứng trên phần cứng.
 - **Tài liệu căn cứ:**
   - [docs/hardware/mcu/CHIP_SONIX_SN34F788_MCU.md](../mcu/CHIP_SONIX_SN34F788_MCU.md)
   - [docs/interfaces/IF_MCU_SENSORS.md](../../interfaces/IF_MCU_SENSORS.md)
   - [docs/interfaces/IF_MCU_LORA_RF.md](../../interfaces/IF_MCU_LORA_RF.md)
   - [docs/interfaces/IF_FPGA_MCU_UART.md](../../interfaces/IF_FPGA_MCU_UART.md)
   - [docs/interfaces/IF_CAMERA_FPGA.md](../../interfaces/IF_CAMERA_FPGA.md)
+  - [docs/interfaces/IF_ESP32_CAM_GCS.md](../../interfaces/IF_ESP32_CAM_GCS.md)
+  - [docs/architecture/KVC_DUAL_CAMERA_DESIGN_PROPOSAL.md](../../architecture/KVC_DUAL_CAMERA_DESIGN_PROPOSAL.md)
 
 ---
 
@@ -24,15 +26,19 @@ flowchart TD
             GNSS["Bo GNSS u-blox M10 (chip UBX-M10050)<br/>5V Power (LDO on-board hạ 3.3V), UART 9600 bps logic 3.3V"]
         end
 
-        subgraph AI_BLOCK ["Khối Xử Lý Quang Học & AI"]
+        subgraph AI_BLOCK ["Khối Xử Lý Quang Học & AI (Kênh Trinh Sát Tọa Độ)"]
             CAM["Camera OV2640 DVP 8-bit<br/>(chốt 31/10/2026)"] -->|"DVP 8-bit / SCCB"| FPGA["FPGA OneKiwi GW2A 20K<br/>YOLO11n INT8 Inference"]
+        end
+
+        subgraph CAM_SEC ["Khối Camera Quan Sát Độc Lập (Kênh Phụ IF-05)"]
+            S3CAM["Module ESP32-S3-CAM (OV3660 / OV2640)<br/>5V Power, MJPEG Streamer<br/>(Độc lập vật lý, không nối GPIO vào MCU/FPGA)"]
         end
 
         subgraph MCU_CORE ["Khối Điều Phối & Tính Toán Tọa Độ"]
             SONIX["MCU Sonix SN34F788FG<br/>ARM Cortex-M4F 192MHz"]
         end
 
-        subgraph RF_UAV ["Khối Truyền Thông Vô Tuyến"]
+        subgraph RF_UAV ["Khối Truyền Thông Vô Tuyến Telemetry"]
             LORA_TX["Module LoRa Ra-02 SX1278<br/>SPI0, 433 MHz, +17dBm"]
             ANT_UAV["Ăng-ten Khửu Tay 5cm 2dBi<br/>SMA Đực qua Cáp IPX"]
             LORA_TX --- ANT_UAV
@@ -46,13 +52,14 @@ flowchart TD
         SONIX <-->|"SPI0 + Ngắt DIO0"| LORA_TX
     end
 
-    subgraph GROUND_STATION ["TRẠM MẶT ĐẤT - GCS GATEWAY"]
+    subgraph GROUND_STATION ["TRẠM MẶT ĐẤT - GCS GATEWAY & DASHBOARD"]
         ANT_GND["Ăng-ten Dài 1m 7dBi 433MHz<br/>SMA Đực"] --- LORA_RX["Module LoRa Ra-02 SX1278<br/>SPI Trạm Đất"]
         LORA_RX <-->|"SPI Bus + DIO0"| ESP32["Gateway ESP32-C3 / WROOM<br/>Wi-Fi SoftAP / WebSocket"]
         ESP32 <-->|"Wi-Fi / WebSocket :8080"| GCS_PC["Laptop Điều Hành GCS<br/>Dashboard Web KVC"]
     end
 
-    ANT_UAV -.->|"Sóng LoRa 433 MHz IF-02"| ANT_GND
+    ANT_UAV -.->|"Sóng LoRa 433 MHz IF-02 (Telemetry 32B)"| ANT_GND
+    S3CAM -.->|"Wi-Fi 2.4 GHz MJPEG (Kênh phụ IF-05)"| GCS_PC
 ```
 
 ---
@@ -78,7 +85,7 @@ Vi điều khiển **Sonix SN34F788FG** (gói LQFP 64 chân) bố trí các cổ
 | | `LORA_DIO0` | **Pin 24** | `P2.8` | `JP3` Pin 17 hoặc 18 | GPIO Input (EXTI) | Chân `DIO0` (Ngắt TxDone/RxDone) |
 | | `LORA_RST` | **Pin 25** | `P2.9` | `JP3` Pin 19 hoặc 20 | GPIO Output | Chân `RST` trên Ra-02 |
 | **Siêu âm AJ-SR04M** | `SONIX_URXD2` | **Pin 31** | `P2.15` | `JP3` Pin 31 hoặc 32 | `URXD2` | Nhận cự ly từ chân `TX` cảm biến (qua cầu phân áp) |
-| | `SONIX_UTXD2` | **Pin 30** | `P2.14` | `JP3` Pin 29 hoặc 30 | `UTXD2` | Gửi xung kích hoạt `RX/Trig` (nếu dùng chế độ xung) |
+| | `SONIX_UTXD2` | **Pin 30** | `P2.14` | `JP3` Pin 29 hoặc 30 | `UTXD2` | Gửi lệnh kích hoạt **Mode 4: byte `0x01` qua UART 9600 8N1**. Firmware **không** dùng chế độ xung Trig/Echo — xem §3.2 bảng chọn mode pad `R19` |
 | **IMU GY-87 (I2C0)** | `I2C0_SCL` | **Pin 38** | `P0.10` | `JP1` Pin 7 hoặc 8 | `SCL0` | Pull-up `R3` = 1 kΩ đã có trên kit; kiểm tra pull-up trên module |
 | | `I2C0_SDA` | **Pin 39** | `P0.11` | `JP1` Pin 9 hoặc 10 | `SDA0` | Pull-up `R4` = 1 kΩ đã có trên kit; kiểm tra pull-up trên module |
 | **GNSS u-blox M10 (UART3)**| `GNSS_RXD` | **Pin 15** | `P2.1` | `JP3` Pin 3 hoặc 4 | `URXD3` | Nhận dữ liệu NMEA từ chân `TX` của NEO-M10N |
@@ -98,6 +105,8 @@ Vi điều khiển **Sonix SN34F788FG** (gói LQFP 64 chân) bố trí các cổ
 | **Chân Nguồn & Mass** | `GND (Mass)` | - | `VSS` | **`J5` Pin 1, 2, 3, 4** | Ground | Chân cắm mass chung cho toàn bộ cảm biến/module |
 | | `VDD (3.3V)` | - | `VDD` | **`J6` Pin 1, 2, 3** | 3.3V output | Ngõ ra VDD cấp module khi J4 chọn nguồn phù hợp |
 | | `3V3_EXT` | - | `3V3_EXT` | **`J6` Pin 4** | 3.3V input | Ngõ vào từ nguồn ngoài đã ổn áp; chọn bằng J4 2–3 |
+
+> 💡 **Lưu ý về Module ESP32-S3-CAM:** Module camera quan sát phụ ESP32-S3-CAM (kênh video IF-05) hoạt động độc lập qua Wi-Fi 2.4 GHz, chỉ nhận nguồn nuôi từ rail 5.0V Buck và nối chung GND (J5), **hoàn toàn không sử dụng bất kỳ chân GPIO nào của vi điều khiển Sonix SN34F788FG** (bảo đảm Zero Resource Conflict tuyệt đối).
 
 ---
 
@@ -127,6 +136,13 @@ Vi điều khiển **Sonix SN34F788FG** (gói LQFP 64 chân) bố trí các cổ
 > **Board đang dùng là AJ-SR04M** (board xanh có pad chọn mode `R19`), **không phải
 > JSN-SR04T-2.0**. Hai board dùng chung định dạng khung 4 byte nhưng **khác pad và
 > khác ý nghĩa điện trở** — xem bảng so sánh ở cuối mục này trước khi hàn.
+>
+> **Giao tiếp là UART, KHÔNG phải Trig/Echo.** Firmware chạy **Mode 4** (`R19` =
+> 47 kΩ): gửi byte **`0x01`** qua UART2 9600 8N1 để yêu cầu một lần đo, module trả
+> khung 4 byte `0xFF H L SUM`. Không nối dây theo kiểu xung Trig 10 µs / đọc Echo —
+> driver hiện tại không hỗ trợ Mode 1/2. Tên macro `KVC_PIN_USOUND_TRIG/ECHO` trong
+> `inc/kvc_pinout.h:50-54` là **di sản đặt tên**, hai chân đó thực tế là
+> `UTXD2`/`URXD2`.
 
 Cảm biến cần nguồn **5.0 V** để mạch dao động áp cao tạo sóng siêu âm 40 kHz phản xạ tốt trên bề mặt nước lũ. Do chân GPIO của vi điều khiển Sonix **chỉ chịu được 3.3 V**, chân TX của cảm biến phải đi qua **cầu phân áp điện trở**.
 
@@ -240,11 +256,11 @@ GPIO Sonix SN34F788 — **không cần cầu phân áp**.
 | Tín hiệu OV2640 | Ball FPGA | Header J1 pin | Chức năng | Ghi chú |
 | :--- | :---: | :---: | :--- | :--- |
 | `SDA` (SCCB) | `E11` | 5 | Cấu hình thanh ghi sensor | `PULL_MODE=UP`, open-drain |
-| `SCL` (SCCB) | `F9` | 7 | Clock SCCB | `PULL_MODE=UP` |
+| `SCL` (SCCB) | `F9` | 7 | Clock SCCB | Master Push-Pull (`scl = ~scl_oe`), 100 kHz |
 | `VSYNC` | `A15` | 6 | Đồng bộ khung | `PULL_MODE=DOWN` |
 | `HREF` | `B14` | 8 | Đồng bộ dòng | `PULL_MODE=DOWN` |
 | `PCLK` | `A14` | 10 | Clock pixel từ camera | Xem cảnh báo bên dưới |
-| `XCLK` | `B13` | 12 | Clock tham chiếu cấp cho camera | `DRIVE=8` |
+| `XCLK` | `B13` | 12 | Clock tham chiếu cấp cho camera | `DRIVE=8`, nối vào pin 18 module MINI-200W |
 | `D0` | `C11` | 9 | Bit 0 bus dữ liệu | |
 | `D1` | `A11` | 11 | Bit 1 | |
 | `D2` | `E9` | 13 | Bit 2 | |
@@ -259,6 +275,12 @@ GPIO Sonix SN34F788 — **không cần cầu phân áp**.
 > - `SDA`/`SCL` (E11/F9) nằm cùng cặp `IOL31_N/P`, cùng lưu ý.
 > - `PCLK` hiện được route bằng **generic routing resource** (`PR1014` trong `KVC_PR/impl/pnr/KVC_FPGA.log:16`) → skew lớn. Nếu ảnh bị lệch pixel, cần thêm `IO_LOC ... CLOCK` hoặc dùng BUFG.
 > - OV2640 dùng **rolling shutter** — ảnh méo khi UAV di chuyển ngang > 1 m/s.
+>
+> ⚡ **Cập nhật 01/11/2026 (Module Camera OV2640 MINI-200W 18 pin):**
+> - Bo camera đỏ MINI-200W (27×27 mm) **không có thạch anh/oscillator onboard** (chỉ có 2 IC LDO U1, U2 cấp 2.8V và 1.2V).
+> - **Chân 18 trên module camera chính là chân XVCLK/XCLK**, không phải NC như sơ đồ chung của shop.
+> - **Bắt buộc nối Header J1 pin 12 (FPGA ball B13, cam_xclk 24 MHz) vào pin 18 của camera**, kèm theo 1 dây GND hồi lưu song song (< 10 cm, xoắn đôi nếu được) để cung cấp nhịp tim cho OV2640. Nếu không có XCLK, cảm biến sẽ không ACK SCCB và không xuất PCLK/VSYNC.
+> - Khối SCCB master cấu hình `SCL_DIV=1000` (100 kHz) và SCL Push-Pull để đảm bảo sườn xung 3.3V chuẩn xác. FSM cấu hình `ov2640_config.v` có cờ chốt `cfg_attempted` để chỉ chạy đúng 1 lần khi PLL lock, triệt tiêu hoàn toàn vòng lặp vô hạn và nhiễu xuyên kênh sang VSYNC.
 
 ---
 
@@ -272,7 +294,7 @@ GPIO Sonix SN34F788 — **không cần cầu phân áp**.
 | **TXD (Cáp USB)** | `P0.14` (URXD5, Pin 5) | `JP1` Pin 15 hoặc 16 | Nhận lệnh điều khiển từ bàn phím PC (hiện firmware không xử lý lệnh) |
 | **GND (Cáp USB)** | `VSS` (GND) | **`J5`** Pin 1, 2, 3 hoặc 4 | **Bắt buộc nối chung GND** máy tính và bo mạch |
 
-> **Sửa 28/10/2026:** bảng này trước đây ghi "115.200 bps khi có PLL". Firmware hiện **không** bật PLL, nên chỉ có 9615 bps. Đặt terminal 115200 sẽ ra ký tự rác. Chi tiết cách đọc log: [MCU_BENCH_TEST_PLAN.md](../verification/MCU_BENCH_TEST_PLAN.md).
+> **Sửa 28/10/2026:** bảng này trước đây ghi "115.200 bps khi có PLL". Firmware hiện **không** bật PLL, nên chỉ có 9615 bps. Đặt terminal 115200 sẽ ra ký tự rác. Chi tiết cách đọc log: [MCU_BENCH_TEST_PLAN.md](../../verification/MCU_BENCH_TEST_PLAN.md).
 
 ---
 
@@ -289,6 +311,23 @@ Bo bench hiện tại **không có** FPGA OneKiwi. RTL **đã có** trong `KVC_P
 > **Chưa xác minh:** pull nội có còn tác dụng khi chân ở chế độ AFIO hay không. Nếu đo thấy P2.3 vẫn float, hàn thêm **10 kΩ từ P2.3 lên 3V3** (phương án A của [KVC_PHAN_CONG_2_NGUOI.md](../../planning/KVC_PHAN_CONG_2_NGUOI.md) mục 1.1 — cùng lý do với trở treo 10 kΩ cho P2.15 siêu âm).
 
 Khi cần test đường BBox bằng script giả lập: build với `KVC_FPGA_ENABLE=1` và chạy `scripts/manual/mock_fpga_bbox.py --baud 38400` nối vào `P2.3` (qua USB-TTL, GND chung).
+
+---
+
+### 3.8. Module Camera Quan Sát ESP32-S3-CAM (Kênh Video Phụ IF-05) ↔ Hệ Thống
+
+Theo đặc tả kiến trúc hai camera [SYS-007](../../architecture/KVC_DUAL_CAMERA_DESIGN_PROPOSAL.md) và giao diện kênh video phụ [IF-05](../../interfaces/IF_ESP32_CAM_GCS.md):
+- **Phân định vai trò:** ESP32-S3-CAM (kèm cảm biến OV3660 hoặc OV2640) là **Camera quan sát** phục vụ trực quan cho người vận hành tại Dashboard. Toàn bộ toạ độ mục tiêu phục vụ cứu nạn (BBox -> georef) được giữ nguyên vẹn trên **Camera trinh sát OV2640 + FPGA OneKiwi GW2A**. Module ESP32-S3-CAM **tuyệt đối không tham gia tính toán toạ độ hay georef**.
+- **Độc lập vật lý:** Module phát luồng video MJPEG độc lập qua Wi-Fi 2.4 GHz về GCS Backend relay. Mất kết nối video không được phép làm gián đoạn luồng telemetry LoRa 32 byte (IF-02).
+- **Zero GPIO Conflict:** Module **không nối bất kỳ chân tín hiệu nào vào Sonix MCU hay FPGA**, chỉ dùng nguồn 5.0V Buck và tiếp địa chung.
+
+| Chân Module ESP32-S3-CAM | Điểm kết nối trên phần cứng | Mức điện áp | Hướng tín hiệu | Ghi chú kỹ thuật |
+| :--- | :--- | :---: | :---: | :--- |
+| **5V / VCC** | Rail 5.0V Buck LM2596 (hoặc Buck phụ) | `5.0 V DC` | Nguồn vào | Tiêu thụ ~300mA–500mA (đỉnh phát Wi-Fi ~800mA). **Bắt buộc kẹp cặp tụ 100µF Low-ESR // 100nF** sát chân nguồn để chống sụt áp rail 5V |
+| **GND** | Header `J5` (VSS) / Star Ground | `0 V` | Mass | Nối về điểm tiếp địa chung của hệ thống |
+| **U0TXD (GPIO43)** | Header Debug/Nạp riêng của S3 | `3.3 V Logic` | S3-CAM $\to$ PC | Nối cáp USB-UART riêng khi nạp firmware/xem log; **KHÔNG nối vào Sonix MCU** |
+| **U0RXD (GPIO44)** | Header Debug/Nạp riêng của S3 | `3.3 V Logic` | PC $\to$ S3-CAM | Nối cáp USB-UART riêng khi nạp firmware; **KHÔNG nối vào Sonix MCU** |
+| **Ăng-ten Wi-Fi** | Cáp IPEX ra ăng-ten dán 2.4GHz / PCB | RF 2.4 GHz | Phát sóng RF | Phát luồng MJPEG về GCS Backend (URL: `http://<ip-s3>:81/stream`) |
 
 ---
 
@@ -328,20 +367,29 @@ Tại trạm mặt đất, module LoRa Ra-02 thứ hai kết nối với chip vi
 [ Pin LiPo UAV: 3S (11.1V - 12.6V) ]
          │
          ▼
-[ Khối Hạ Áp Buck DC-DC 5V / 3A ]
+[ Khối Hạ Áp Buck DC-DC 5V / 3A (LM2596S hoặc Module Buck công suất) ]
          │
-         ├───► [ 5.0V ]: Cấp cho cảm biến siêu âm AJ-SR04M và bo GNSS M10 (chân 5V) (chân 5V)
+         ├───► [ 5.0V Rail Công Suất ]:
+         │         ├─► Cảm biến siêu âm AJ-SR04M (~30mA)
+         │         ├─► Bo GNSS u-blox M10 (~45mA, LDO bo hạ 3.3V)
+         │         ├─► Bo AI FPGA OneKiwi GW2A 20K (~400mA - 800mA)
+         │         └─► Bo ESP32-S3-CAM (~300mA - 500mA, đỉnh Wi-Fi 800mA, kèm tụ 100uF // 100nF)
          │
-         └───► [ Khối Hạ Áp LDO 3.3V / 2A ]
+         └───► [ Khối Hạ Áp LDO 3.3V / 800mA - 2A (AMS1117-3.3) ]
                    │
                    └───► [ 3.3V đã ổn áp ]: `J6` Pin 4 (`3V3_EXT`) → `J4` đóng 2–3 → `VDD`
                                                         │
-                                                        └───► `J6` Pin 1–3: Kit Sonix và module 3.3 V (LoRa Ra-02, GY-87)
+                                                        └───► `J6` Pin 1–3: Kit Sonix (~100mA) và module 3.3V:
+                                                                  ├─► Module LoRa Ra-02 (đỉnh 120-150mA, kèm tụ 100uF // 100nF)
+                                                                  └─► Module IMU GY-87 MPU-6050 (~10mA)
+
+Dự toán công suất rail 5.0V: Tổng dòng tải cực đại khi cả FPGA + S3-CAM Wi-Fi hoạt động đạt ~1.4A - 1.7A,
+nằm an toàn trong định mức 3.0A của tầng Buck LM2596S (tản nhiệt nhôm tốt).
 
 Nguồn USB SN-Link dùng lựa chọn khác: `J4` đóng 1–2 (`3V3_LINK`). `3V3_EXT` phải là nguồn 3.3 V đã ổn áp từ buck/LDO; tuyệt đối không đưa pin LiPo thô vào J6 Pin 4.
 
 [ ĐƯỜNG TIẾP ĐỊA CHUNG - STAR GROUND ]:
-Nối toàn bộ chân GND của Pin, Buck 5V, LDO 3.3V, Sonix, AJ-SR04M, GY-87, bo GNSS M10, OneKiwi về 1 điểm chung.
+Nối toàn bộ chân GND của Pin, Buck 5V, LDO 3.3V, Sonix, AJ-SR04M, GY-87, bo GNSS M10, OneKiwi, ESP32-S3-CAM về 1 điểm chung tại cực âm tụ lọc xuất 5V.
 ```
 
 ---
@@ -356,6 +404,7 @@ Nối toàn bộ chân GND của Pin, Buck 5V, LDO 3.3V, Sonix, AJ-SR04M, GY-87,
 - [ ] **Tiếp địa (GND):** Đã kiểm tra thông mạch giữa tất cả các điểm GND của các bo mạch bằng đồng hồ đo VOM chưa?
 - [ ] **Trở kéo I2C:** `R3`/`R4` = 1 kΩ đã có sẵn trên Starter-Kit cho I2C0; **không cắm thêm trở kéo ngoài**. Nếu GY-87 có pull-up tích hợp, xác minh và cô lập một bộ nếu điện trở song song quá thấp.
 - [ ] **Cực tính nguồn:** Đã kiểm tra đúng chiều (+) và (-), đồng thời xác nhận bo GNSS M10 được cấp đúng nguồn 5.0 V DC vào chân 5V (LDO trên bo hạ về 3.3 V), các đường tín hiệu TX/RX giữ chuẩn logic 3.3 V.
+- [ ] **Cách ly và tụ bù nguồn ESP32-S3-CAM:** Đã kẹp tụ 100µF Low-ESR // 100nF tại chân nguồn 5V/GND của ESP32-S3-CAM chưa? Kiểm tra xác nhận **hoàn toàn không có dây GPIO nào từ ESP32-S3-CAM nối sang Kit Sonix hay FPGA OneKiwi**.
 
 ---
-*Trạng thái: DRAFT HARDWARE SPECIFICATION (DESIGN BASELINE - SOURCE-VERIFIED). SOURCE-VERIFIED chỉ phản ánh đối chiếu tài liệu/sơ đồ; chưa có phép đo hoặc xác minh trên bo thật. Camera OV2640 đã chốt pin map 31/10/2026 nhưng chưa hardware-verified. Chờ Human approval trước khi dùng làm wiring release.*
+*Trạng thái: DRAFT HARDWARE SPECIFICATION (DESIGN BASELINE - SOURCE-VERIFIED). SOURCE-VERIFIED chỉ phản ánh đối chiếu tài liệu/sơ đồ; chưa có phép đo hoặc xác minh trên bo thật. Camera OV2640 đã chốt pin map 31/10/2026 nhưng chưa hardware-verified. Module ESP32-S3-CAM bổ sung theo SYS-007 / IF-05. Chờ Human approval trước khi dùng làm wiring release.*

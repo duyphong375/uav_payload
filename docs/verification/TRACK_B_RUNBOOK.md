@@ -136,6 +136,37 @@ Trước khi chạy bất kỳ phép đo dài nào, kiểm **hai dòng**:
 chứng là `byt = 0` tuyệt đối khi dây tuột (nếu pull không tác dụng, chân float
 sẽ sinh byte rác liên tục). Không cần hàn trở treo 10 kΩ.
 
+### 2.2 BẮT BUỘC xác nhận ĐÚNG bitstream trước khi nghiệm thu blob
+
+> **Bài học 03/11/2026.** Một phiên được báo "G6.1 đạt 98 % phát hiện" nhưng log
+> ghi `BB n12`. `kvc_blob_detect` **tối đa 1 bbox/khung** ⇒ không thể ra 12. Bo
+> đang chạy **bitstream chẩn đoán VSYNC**, không phải release blob.
+
+Sau khi nạp bitstream, đọc **hai dòng đầu** rồi đối chiếu bảng:
+
+| Bitstream | `N` trong `BB n?` | Byte/khung | Chu kỳ khung | Tốc độ |
+| :--- | :---: | ---: | ---: | ---: |
+| `86CCF5DD` — **release blob** | **0 hoặc 1** | 10 / 18 | ~200 ms | ~47–50 B/s |
+| `3620B802` — diag SCCB (G0) | 0 hoặc 1 | 10 / 18 | ~200 ms | ~47–50 B/s |
+| `CA6D5137` / `840117FA` / `C82B9EFE` — diag VSYNC | **10 hoặc 12** | N×8+10 = 90/106 | **2000 ms** | **~53 B/s** |
+| mock (`BBOX_SOURCE=0`) | 0 / 1 / 2 / 12 | theo mode | 5 ms | ~1000+ B/s |
+
+**Quy tắc quyết định:**
+
+| Thấy gì | Kết luận |
+| :--- | :--- |
+| `n ≤ 1`, ~5 khung/s, ~50 B/s | ✅ release blob — dùng được cho nghiệm thu |
+| `n ≥ 10`, 0,5 khung/s, ~53 B/s | ❌ **bitstream chẩn đoán VSYNC** — nạp lại `86CCF5DD` |
+| ~1000 B/s | ❌ mock — nạp release |
+| `byt = 0` | ❌ không có tín hiệu — xem §2.1 |
+
+**Vì sao dễ nhầm:** bitstream SRAM **mất khi mất điện**, và ba bản diag có chữ ký
+dữ liệu gần giống release (cùng khung IF-01, cùng CRC, cùng baud — chỉ khác giá
+trị). Mắt thường đọc `BB n12 v1 crc0 en1` rất giống `BB n1 v1 crc0 en1`.
+
+**Khuyến nghị:** dán nhãn giấy lên bo hoặc ghi SHA vào sổ lab mỗi lần nạp.
+Không có nhãn thì mỗi phiên phải suy từ số liệu — và dễ sai.
+
 ---
 
 ## 3. Capture G0
@@ -516,6 +547,42 @@ FPS phụ thuộc ánh sáng (F-01) nên **không** dùng làm tiêu chí ổn �
 Nếu `Ctrl+C` giữa chừng, script vẫn in báo cáo trên phần đã thu và ghi rõ
 *"chưa đủ thời lượng 2.7.1"* thay vì đánh PASS.
 
+#### 5.5.5 `late_max` và `ovr` là HIGH-WATER MARK, không phải giá trị hiện tại
+
+> **Đọc sai chỗ này rất dễ.** `ovr` đứng yên 45 giây không có nghĩa "đã 0"; nó
+> nghĩa "không tăng thêm kể từ mốc cũ".
+
+`main.c:2291-2302`:
+
+```c
+uint32_t elapsed = (uint32_t)(kvc_millis() - cycle_start_ms);
+if (elapsed > KVC_TELEMETRY_PERIOD_MS) {
+    late_ms = elapsed - KVC_TELEMETRY_PERIOD_MS;
+}
+if (late_ms > cycle_late_max_ms) cycle_late_max_ms = late_ms;   /* chỉ tăng */
+if (late_ms > KVC_OVERRUN_TOLERANCE_MS) cycle_overrun_count++;  /* chỉ tăng */
+```
+
+Cả hai **cộng dồn từ lúc boot, không bao giờ giảm**. Hệ quả:
+
+| Thấy gì | Nghĩa ĐÚNG | Nghĩa SAI |
+| :--- | :--- | :--- |
+| `late_max = 552` | Đã từng có **một** chu kỳ trễ 552 ms (thường lúc boot hoặc một lần siêu âm timeout) | "Hiện tại đang trễ 552 ms" |
+| `ovr = 317` đứng yên | Không có chu kỳ trễ mới trong khoảng quan sát | "Đã có 317 lần trễ vừa xảy ra" |
+| `ovr = 0` sau 10 phút | **Chưa từng** có chu kỳ vượt 1005 ms | — |
+
+**Muốn dùng `late_max`/`ovr` làm tiêu chí, PHẢI reset bo trước.** Nếu không reset,
+mọi con số là tích luỹ từ phiên trước và không đánh giá được trạng thái hiện tại.
+
+Quy trình đúng:
+
+1. Reset bo (nhấn nút RESET hoặc rút/cấp nguồn).
+2. Đóng COM **trước** khi reset, mở lại ngay sau để bắt dòng `[INIT] Timebase`.
+3. Chạy ≥ 10 phút.
+4. Đọc `ovr` và `late_max` — lúc này cả hai tính từ 0.
+
+Tiêu chí F-08: `ovr = 0` **và** `late_max < 20 ms` sau khi reset.
+
 ---
 
 ### 5.6 Checklist trước khi cấp nguồn
@@ -585,13 +652,14 @@ Cấu hình khớp **cả 6 tham số**. Nếu gateway không nhận thì lỗi 
 1. **Tắt self-mock.** `ENABLE_SELF_MOCK` phải là `false` (đã là mặc định trong
    `firmware/gateway_esp32/src/main.cpp:231`). Nếu bật, gateway tự sinh dữ liệu và
    bạn sẽ "thấy số" dù không có sóng nào tới.
-2. **Wi-Fi.** Truyền credential lúc build:
+2. **Wi-Fi.** Firmware đã nạp sẵn hotspot Laptop 2.4 GHz của dự án, không cần
+   build flag. Muốn dùng mạng khác thì override:
    ```powershell
    pio run -d firmware/gateway_esp32 `
        -D KVC_WIFI_SSID=\"ten-hotspot\" -D KVC_WIFI_PASS=\"mat-khau\"
    ```
-   Không truyền thì gateway chạy SoftAP: SSID `KVC_GROUND_STATION`, pass
-   `kvc123456`.
+   Override SSID thành chuỗi rỗng thì gateway chạy SoftAP ngay: SSID
+   `KVC_GROUND_STATION`, pass `kvc123456`.
 3. **Nạp và mở Serial 115200** để xem log gateway.
 
 ### 6.3 Phép đo nghiệm thu

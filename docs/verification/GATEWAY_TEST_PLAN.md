@@ -60,9 +60,11 @@ flowchart TD
 #### A. Các bước thực hiện & Lệnh kiểm tra:
 > **Mốc thời gian STA → SoftAP (đã thống nhất 28/10/2026):** firmware dùng `KVC_STA_BOOT_BUDGET_MS = 15000` (`firmware/gateway_esp32/src/main.cpp`), tức **15 giây** cho toàn bộ ngân sách thử STA (gồm cả thời gian thử từng SSID trong danh sách). Bản tài liệu này trước đây ghi 10 s và log mẫu ghi "That bai sau 10000 ms" — **cả hai đều sai so với code**. Khi test, lấy **15 s** làm mốc; nếu thấy ESP32 chuyển SoftAP sớm hơn đáng kể thì kiểm lại build flag. Muốn đổi mốc thì phải sửa code và tài liệu trong cùng một task.
 
-0. **Kiểm tra thứ tự ưu tiên (bắt buộc):** nạp firmware **không** truyền `KVC_WIFI_SSID` → ESP32 phải in `[WIFI-STA] Khong co KVC_WIFI_SSID...` rồi mới phát SoftAP. Sau đó nạp lại **có** truyền SSID/mật khẩu hotspot điện thoại (2.4 GHz) → ESP32 phải in `[WIFI-STA] Ket noi STA THANH CONG` và **không** phát SoftAP. Đây là tiêu chí PASS của thứ tự ưu tiên.
+0. **Kiểm tra thứ tự ưu tiên (bắt buộc):** nạp firmware **override** `KVC_WIFI_SSID=\"\"` (chuỗi rỗng) → ESP32 phải in `[WIFI-STA] Khong co KVC_WIFI_SSID...` rồi mới phát SoftAP. Sau đó nạp lại **bản mặc định** (hotspot Laptop của dự án) hoặc truyền SSID/mật khẩu hotspot khác (2.4 GHz) → ESP32 phải in `[WIFI-STA] Ket noi STA THANH CONG` và **không** phát SoftAP. Đây là tiêu chí PASS của thứ tự ưu tiên. Không truyền flag nào **không còn** là "chạy SoftAP ngay", vì firmware đã có SSID mặc định.
 0b. **Kiểm tra hotspot điện thoại (4G):** bật hotspot 2.4 GHz trên điện thoại, nạp firmware kèm SSID/mật khẩu hotspot → gateway phải bắt được và in IP do điện thoại cấp. Nếu điện thoại chỉ phát 5 GHz, ESP32-C3 **không** thấy mạng — đổi sang 2.4 GHz rồi thử lại.
 0c. **Kiểm tra nhiều mạng:** nạp 2 mạng (hotspot điện thoại + Wi-Fi lab), tắt hotspot → gateway phải chuyển sang mạng thứ hai; bật lại hotspot và chờ hơn 30 s → gateway phải quay lại mạng khai báo trước.
+0d. **Kiểm tra mất STA giữa phiên (mới):** để gateway đang chạy STA bình thường, tắt hotspot/router → sau khoảng **5 s** (`KVC_STA_DOWN_TO_AP_MS`) firmware phải in `[WIFI-STA] Mat STA qua 5000 ms. Bat SoftAP du phong.` và phát lại `KVC_GROUND_STATION` tại `192.168.4.1`. Bật lại hotspot → khi STA nối được **và** không còn client bám SoftAP, firmware in `[WIFI-AP] Da dong SoftAP...`.
+0e. **Kiểm tra path WebSocket:** client kết nối sai path (ví dụ `ws://192.168.4.1:8080/`) phải bị ngắt và Serial in `[WS-REJECT]`; chỉ `ws://192.168.4.1:8080/telemetry` nhận được handshake + telemetry.
 1. Nạp code gateway lên bo ESP32 qua cáp Type-C/MicroUSB.
 2. Mở Serial Monitor với tốc độ baud `115200`.
 3. Nếu đang ở chế độ dự phòng (ưu tiên 2): trên Laptop bật Wi-Fi và quét danh sách mạng → Kết nối vào mạng **`KVC_GROUND_STATION`** (Mật khẩu mặc định: `kvc123456`). Nếu đang ở ưu tiên 1: laptop kết nối cùng Wi-Fi 2.4 GHz với ESP32 và dùng IP in ở dòng `[WIFI-STA] IP do Router cap`.
@@ -419,7 +421,7 @@ Dùng bảng này để theo dõi tiến độ công việc hàng ngày:
 | **G3** | Thông luồng Self-Mock lên Web | Firmware ESP32 tự sinh 3 kịch bản mỗi 1.0s; Backend giải mã; Dashboard hiển thị Người/Phao cứu sinh/Siêu âm | `[ ]` **CHƯA CÓ LOG TRÊN CHIP** |
 | **G4** | SPI Check LoRa Ra-02 | Đọc thanh ghi `RegVersion (0x42)` qua SPI trả về đúng `0x12` | `[ ]` **TIẾP THEO** |
 | **G5** | Thu sóng LoRa 433MHz thật | Bắt gói RF từ UAV, Serial in RSSI/SNR thật, Dashboard cập nhật mượt | `[ ]` **NOT RUN — BLOCKED: bo chưa bàn giao từ Thịnh** (01/11/2026). Phía phát đã `HARDWARE-VERIFIED` (`tx=17/0`) |
-| **G6** | Độ bền & Chống rớt mạng | Tắt/bật Wi-Fi tự phục hồi trong 2 giây; gói sai CRC tự động bị loại | `[ ]` CHỜ TEST |
+| **G6** | Độ bền & Chống rớt mạng | Tắt sóng STA → SoftAP dự phòng bật trong **5 s** (`KVC_STA_DOWN_TO_AP_MS = 5000`); bật lại STA → thử lại theo chu kỳ **30 s** (`KVC_STA_RETRY_INTERVAL_MS = 30000`) và tự đóng SoftAP khi STA sống lại + hết client; gói sai CRC tự động bị loại | `[ ]` CHỜ TEST |
 
 > **Chặn hiện tại (01/11/2026):** toàn bộ G1–G6 **chưa chạy** vì bo Gateway ESP32
 > chưa có trên bàn lab. Đây là chặn **phần cứng**, không phải chặn phần mềm.

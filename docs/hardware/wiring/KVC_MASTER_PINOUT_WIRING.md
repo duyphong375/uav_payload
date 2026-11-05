@@ -95,8 +95,9 @@ Vi điều khiển **Sonix SN34F788FG** (gói LQFP 64 chân) bố trí các cổ
 | | `DATA_READY` | **Pin 3** | `P0.12` | `JP1` Pin 11 hoặc 12 | GPIO Input (EXTI) | Chân báo ngắt khung ảnh sẵn sàng từ FPGA |
 | **Debug Console (UART5)**| `DEBUG_TX` | **Pin 6** | `P0.15` | `JP1` Pin 17 hoặc 18 | `UTXD5` | Xuất log gỡ lỗi (9.600 bps mặc định / 115.200 bps khi có PLL) |
 | | `DEBUG_RX` | **Pin 5** | `P0.14` | `JP1` Pin 15 hoặc 16 | `URXD5` | Nhận lệnh điều khiển cấu hình từ máy tính |
-| **KEY TEST trên Kit** | `LED1` (xanh) | **Pin 52** | `P1.12` | `JP2` Pin 25 hoặc 26; qua `JP10` | GPIO Output | LED kiểm tra 1 theo sơ đồ Starter-Kit V1.1 |
-| | `LED2` (xanh) | **Pin 51** | `P1.13` | `JP2` Pin 27 hoặc 28; qua `JP11` | GPIO Output | LED kiểm tra 2 theo sơ đồ Starter-Kit V1.1 |
+| **LED Chỉ Báo Trạng Thái (Air)** | `LED1` (Đỏ, PWR) | — | — | `J6` Pin 1–3 (VDD 3.3V) ↔ `J5` (GND) | Nguồn cứng | Anode → trở 1 kΩ → 3.3V; Cathode → GND. **Firmware không điều khiển** — tự sáng khi có nguồn (§3.9) |
+| | LED2 (Vàng, GPS) | **Pin 52** | P1.12 | JP2 Pin 25 hoặc 26; qua JP10 | GPIO Output (push-pull) | TẮT khi chưa có GPS 3D Fix; SÁNG ĐỨNG khi đã có 3D Fix và dữ liệu NMEA còn mới (≤ 1500 ms) (§3.9) |
+| | `LED3` (Xanh biển, LORA TX) | **Pin 51** | `P1.13` | `JP2` Pin 27 hoặc 28; qua `JP11` | GPIO Output (push-pull) | 1 xung 100 ms sau mỗi gói LoRa phát xong (TxDone); KHÔNG sáng khi TX fail/timeout (§3.9) |
 | | `KEY1` | **Pin 50** | `P1.14` | `JP2` Pin 29 hoặc 30; qua `JP12` | GPIO Input | Phím kiểm tra theo sơ đồ Starter-Kit V1.1 |
 | **Giao diện Nạp & Reset**| `SWDIO` | **Pin 45** | `P3.5` | `JP4` Pin 11 hoặc 12 | `SWDIO` | Đường dữ liệu SWD (nối sẵn mạch nạp SN-Link Lite) |
 | | `SWCLK` | **Pin 46** | `P3.6` | `JP4` Pin 13 hoặc 14 | `SWCLK` | Đường xung nhịp SWD (nối sẵn mạch nạp SN-Link Lite) |
@@ -328,6 +329,43 @@ Theo đặc tả kiến trúc hai camera [SYS-007](../../architecture/KVC_DUAL_C
 | **U0TXD (GPIO43)** | Header Debug/Nạp riêng của S3 | `3.3 V Logic` | S3-CAM $\to$ PC | Nối cáp USB-UART riêng khi nạp firmware/xem log; **KHÔNG nối vào Sonix MCU** |
 | **U0RXD (GPIO44)** | Header Debug/Nạp riêng của S3 | `3.3 V Logic` | PC $\to$ S3-CAM | Nối cáp USB-UART riêng khi nạp firmware; **KHÔNG nối vào Sonix MCU** |
 | **Ăng-ten Wi-Fi** | Cáp IPEX ra ăng-ten dán 2.4GHz / PCB | RF 2.4 GHz | Phát sóng RF | Phát luồng MJPEG về GCS Backend (URL: `http://<ip-s3>:81/stream`) |
+
+---
+
+### 3.9. Cụm 3 Đèn LED Chỉ Báo Trạng Thái (Air) ↔ Sonix MCU
+
+Khối B7 trong [KVC_ThietKeHeThong.md](../../architecture/KVC_ThietKeHeThong.md) dùng 3 đèn LED
+thay cho màn hình OLED trên tải UAV. Bảng dưới là **bản chốt 03/11/2026** khớp với
+`firmware/mcu_payload/inc/kvc_pinout.h` mục 7.
+
+| Tên LED | Màu | Chân vật lý trên chip | Vị trí cắm trên bo / header | Cách mắc mạch (Anode / Cathode) | Cấu hình trong code (firmware) |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **LED1 (PWR)** | Đỏ | Không qua chip | Lấy trực tiếp từ `J6` chân 1–3 (rail 3.3V) và `J5` (GND) | • Anode (+): nối vào 3.3V qua trở 1 kΩ<br>• Cathode (−): nối vào GND | **Luôn tự sáng khi bật công tắc nguồn.** Firmware không có chân điều khiển. |
+| **LED2 (GPS)** | Vàng | **Pin 52** (`P1.12` của Sonix) | `JP2` Pin 25 hoặc 26, qua `JP10` | • Anode (+): nối vào `P1.12` qua trở 1 kΩ<br>• Cathode (−): nối vào GND (`J5`) | Cấu hình chân `P1.12` = GPIO Output Push-Pull (`DIR=1`, `PULLEN=0`). **TẮT khi chưa có GPS 3D Fix; SÁNG ĐỨNG khi đã có 3D Fix và dữ liệu NMEA còn mới (≤ 1500 ms).** |
+| **LED3 (LORA TX)** | Xanh biển | **Pin 51** (`P1.13` của Sonix) | `JP2` Pin 27 hoặc 28, qua `JP11` | • Anode (+): nối vào `P1.13` qua trở 1 kΩ<br>• Cathode (−): nối vào GND (`J5`) | Cấu hình chân `P1.13` = GPIO Output Push-Pull. **Khi phát xong 1 gói LoRa (cờ `TxDone`) → bật HIGH 100 ms rồi kéo LOW. Không sáng khi TX fail/timeout/chưa init được LoRa.** |
+
+**Điện trở hạn dòng & Nhận định điện áp (chốt 03/11/2026):**
+- LED1 Đỏ (Nguồn 3.3V, Vf ≈ 1,9 V): I ≈ (3,3 - 1,9)/1000 ≈ 1,4 mA.
+- LED2 Vàng (Pin 52, Vf ≈ 2,1 V): I ≈ (3,3 - 2,1)/1000 ≈ 1,2 mA (đủ sáng rõ).
+- LED3 Xanh biển (Pin 51, Vf ≈ 3,0–3,2 V): Với trở 1 kΩ trên kit, dòng I ≈ (3,3 - 3,1)/1000 ≈ 0,2 mA (khá mờ ngoài trời nắng). Nếu bay ngoài trời cần nhìn rõ, khuyến nghị giảm trở xuống 220–330 Ω (I ≈ 1–1,5 mA, vẫn nằm sâu dưới mức an toàn 17 mA của chân SN34F788).
+
+**Mã nhịp đèn LED3 lúc khởi động (không phải trạng thái nhiệm vụ):**
+- 1 xung 150 ms ngay sau khi cấu hình GPIO — POST, xác nhận MCU sống và jumper `JP11` đã cắm.
+- 1 xung 300 ms sau khi `sx1278_init_tx()` trả 1 — xác nhận module Ra-02 sống.
+- Nếu init LoRa thất bại: không có xung nào, log UART5 in `[INIT] LORA FAIL ver=...`.
+- Chớp mã lỗi lúc init bị tắt mặc định (`KVC_LORA_INIT_BLINK_DIAG = 0`) để không phá nghĩa
+  "1 xung = 1 gói đã ra anten".
+
+> ⚠️ **Tên gọi khác nhau giữa silkscreen và bảng chỉ báo:** Starter-Kit V1.1 in
+> `LED1`/`LED2` cho `P1.12`/`P1.13`. Bảng chỉ báo của KVC gọi chúng là `LED2`/`LED3`
+> vì `LED1` là đèn nguồn. Header C giữ alias `KVC_BOARD_LED1_*`/`KVC_BOARD_LED2_*`
+> trỏ đúng sang `KVC_LED_READY_*`/`KVC_LED_LORA_TX_*` để mã cũ không vỡ.
+
+**Giới hạn trạng thái:** "phát xong" được firmware phát hiện bằng cách **poll** thanh
+ghi `RegIrqFlags` (`0x12`) bit 3, không dùng ngắt `DIO0` (chân `DIO0` của Ra-02 chưa
+được nối tới MCU theo §3.1). Vì vậy xung 100 ms có thể trễ tối đa một chu kỳ poll so
+với sườn TxDone thật. Mức xác minh hiện tại là **SOURCE-VERIFIED**; để đạt
+HARDWARE-VERIFIED cần quan sát trực tiếp LED hoặc capture bằng máy hiện sóng.
 
 ---
 

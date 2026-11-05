@@ -1,14 +1,14 @@
-﻿# TÀI LIỆU THIẾT KẾ HỆ THỐNG CHI TIẾT
+# TÀI LIỆU THIẾT KẾ HỆ THỐNG CHI TIẾT
 ## CUỘC THI THIẾT KẾ FPGA VÀ MCU MỞ RỘNG KHU VỰC MIỀN TRUNG 2026
 
 *Dự án:* **Hệ thống tích hợp cho UAV hỗ trợ phát hiện, theo dõi và định vị người bị cuốn trôi trong bão lũ sử dụng FPGA và MCU (KVC)**<br>
 ---
 
-> Cập nhật nội dung: **02/11/2026**. Bo đã có: **OneKiwi Primer 20K V1.1** theo xác nhận của nhóm. Tài liệu mô tả **thiết kế mục tiêu**, không xác nhận các khối phần cứng đã chạy. Gateway trạm đất chọn họ SoC **ESP32-C3** để chạy Wi-Fi SoftAP/WebSocket và dùng nguồn riêng; mã kit/board, module, flash và pinout cụ thể còn chờ xác minh phần cứng. Hiện trạng xem [báo cáo tiến độ](KVC_PROJECT_STATUS.md); công việc xem phân công (không có trong bản sản phẩm) và checklist (không có trong bản sản phẩm).
+> Cập nhật nội dung: **05/11/2026**. Bo đã có: **OneKiwi Primer 20K V1.1** theo xác nhận của nhóm. Tài liệu mô tả **thiết kế mục tiêu và thực tế kỹ thuật**, phân định rõ các khối đã chạy thực nghiệm với khối thiết kế. Gateway trạm đất dùng SoC **ESP32-C3** chạy Wi-Fi (ưu tiên STA, tự động fallback SoftAP) và WebSocket Server cổng 8080. Hiện trạng đối chiếu xem [báo cáo tiến độ](KVC_PROJECT_STATUS.md) và [chỉ mục tài liệu](../INDEX.md).
 >
-> **Thay đổi 02/11/2026:** (a) **Bỏ chế độ phát lại (Replay) khỏi UI** — Dashboard chỉ còn `MOCK`/`REAL`, thay bằng trang **Nhật ký phiên** (`EventLogPage`) có lọc và xuất CSV; (b) bổ sung **kênh quan sát phụ IF-05** dùng **ESP32-S3-CAM + OV3660**, độc lập vật lý với kênh LoRa và **không sinh tọa độ**; (c) đồng bộ lại trạng thái kỹ thuật: bỏ byte pin khỏi IF-02, trần siêu âm 700 cm, top demo đã đạt timing.
+> **Đồng bộ hiện trạng kỹ thuật:** (a) **Giao diện Dashboard chỉ còn 2 chế độ `MOCK`/`REAL`** — chế độ Replay đã loại bỏ hoàn toàn khỏi UI, thay thế bằng trang **Nhật ký phiên** (`EventLogPage`) có bộ lọc theo actor/mức cảnh báo/nguồn và xuất CSV; (b) **Kênh quan sát phụ IF-05** dùng **ESP32-S3-CAM + OV3660** (b1.5.2, HVGA 480×320, q26, cổng 81) truyền MJPEG độc lập vật lý với LoRa và **không sinh tọa độ**; (c) **B-1 đến B-10 đã đồng bộ**: baud UART FPGA↔MCU là 38.400 bps, số BBox $N \le 12$, trần siêu âm 700 cm (bỏ phép đo pin, byte 25 là `status_reserved` = 0), camera OV2640 DVP chốt 14 chân J1; (d) **FPGA đã nạp và chạy thực tế module `kvc_blob_detect.v`** (BBox từ pixel thật cho phao cứu sinh, 0 BSRAM, 0 DSP, Fmax ~113–116 MHz, bitstream release `86CCF5DD` và rev 2 `9E62B590`); (e) **Dashboard bổ sung Tactical HUD chuyên dụng** (OrientationCluster, WaterClearanceGauge, SensorFlagsInspector) và hệ thống cảnh báo tự động `alertDetector.ts`.
 >
-> Cách đọc: mục III là linh kiện/cấu hình cần xác minh; mục IV gồm nhiệm vụ và **giao thức** — ABI RF 32 byte (IF-02) đã được HUMAN duyệt ngày 29/10/2026, các giao thức khác còn dự thảo; mục VII là nghiệm thu; mục VIII là nguồn tham chiếu. Bản này không chứa lịch 21 ngày; ngày/gate trong kế hoạch cũ là tham chiếu lịch sử.
+> Cách đọc: mục III là cấu hình linh kiện và BOM; mục IV gồm nhiệm vụ, 6 luồng dữ liệu chi tiết và **giao thức wire** — ABI RF 32 byte (IF-02) đã được HUMAN duyệt ngày 29/10/2026; mục VII là nghiệm thu; mục VIII là nguồn tham chiếu.
 
 ### I. THÔNG TIN CHUNG
 
@@ -189,7 +189,7 @@ Kênh truyền LoRa (Long Range) đóng vai trò là xương sống thông tin l
      - `RegPktRssiValue` (Offset 0x1A): Cường độ tín hiệu nhận được (tính ra dBm).
      - `RegPktSnrValue` (Offset 0x19): Tỷ số tín hiệu trên tạp âm (tính ra dB).
    - ESP32 đẩy thông số nhanh lên màn hình OLED 0.96 inch tại chỗ (phục vụ cứu hộ viên quan sát độc lập ngoài trời).
-    - ESP32 đóng vai trò gateway mạng theo thứ tự ưu tiên: (1) STA vào Wi-Fi 2.4 GHz có sẵn; (2) nếu không nối được thì phát SoftAP `KVC_GROUND_STATION` (IP `192.168.4.1`, mật khẩu `kvc123456`) và tự đóng SoftAP khi STA nối lại. ESP32 mở WebSocket Server `ws://192.168.4.1:8080/telemetry`. Backend GCS trên laptop là client nhận telemetry; browser Dashboard chỉ kết nối với backend local.
+    - ESP32 đóng vai trò gateway mạng theo thứ tự ưu tiên: (1) STA vào Wi-Fi 2.4 GHz có sẵn; (2) nếu không nối được thì phát SoftAP `KVC_GROUND_STATION` (IP `192.168.4.1`, mật khẩu `kvc123456`) và tự đóng SoftAP khi STA nối lại **và không còn client bám** (giữ AP khi laptop hoặc ESP32-S3-CAM đang kết nối, để không cắt phiên giữa chừng). ESP32 mở WebSocket Server `ws://192.168.4.1:8080/telemetry`. Backend GCS trên laptop là client nhận telemetry; browser Dashboard chỉ kết nối với backend local.
 
 ---
 
@@ -288,14 +288,54 @@ Danh mục dưới đây phân loại chính xác linh kiện theo 5 phân hệ 
 | **MCU Trạm đất** | Driver SPI điều khiển Ra-02 ở chế độ nhận, kiểm CRC, đọc RSSI/SNR và xuất telemetry qua Wi-Fi SoftAP/WebSocket v1. ESP32-C3 có nguồn riêng; kiểm thử tài nguyên khi các tác vụ chạy đồng thời. | Bổ sung cơ chế phát gói ACK phản hồi khi đường truyền rảnh. |
 | **Dashboard GCS** | Ingress nhận dữ liệu từ ESP32 qua transport được chốt, kiểm tra session và giải mã RF v1, bộ quản lý trạng thái (Reducer), giao diện Radar local và Bản đồ WGS-84, SQLite logger (WAL), **Nhật ký phiên có lọc và xuất CSV**, relay video IF-05 (kênh phụ). | Hiển thị lớp bản đồ vệ tinh ngoại tuyến (Tile map), thống kê nâng cao. |
 
+#### 1a. Đặc tả chi tiết 6 luồng vận hành cốt lõi toàn hệ thống
+
+Nhằm đảm bảo tính chính xác và nhất quán kỹ thuật, quy trình xử lý dữ liệu của KVC được cấu trúc hóa thành 6 luồng chuyên biệt:
+
+1. **Luồng 1 — Thị giác máy tính & AI Detection trên FPGA (`IF-CAM` ➔ `IF-01`):**
+   - Thu nhận ảnh thô từ Camera OV2640 DVP 8-bit qua Header J1 bo Gowin Primer 20K.
+   - Tiền xử lý letterbox/resize về kích thước chuẩn **160×160 RGB565**.
+   - Khối nhận diện phần cứng hiện hành `kvc_blob_detect.v` quét trực tiếp dòng pixel theo tỷ lệ sắc độ và độ bão hòa, lọc hình học (run-length ≥ 3, rows ≥ 6, aspect ≤ 4) để phát hiện phao cứu sinh phản quang (`class_id = 2`, 0 BSRAM, 0 DSP, Fmax ~113–116 MHz). Đường định hướng tương lai: YOLO11n INT8 stream weights từng lớp từ SPI Flash W25Q128 (16 MiB).
+   - Khối chẩn đoán: `pixel_stats.v` (histogram 10 slot đo dải màu RGB565) và `vsync_monitor.v` (đo độ rộng xung và tần số VSYNC).
+   - Bộ đệm FIFO CDC chuyển khung sang `bbox_packetizer.v` ➔ xuất UART TX **38.400 bps** (8N1) kèm xung báo `DATA_READY` sang MCU Sonix (IF-01: Header `0x5A 0xA5`, Ver `0x01`, Count $N \le 12$, Timestamp ms, $N \times 8$ byte BBox, CRC-16/CCITT-FALSE).
+
+2. **Luồng 2 — Thu thập cảm biến & Định vị mục tiêu 3D trên MCU Sonix (`IF-00` ➔ Thuật toán Georef):**
+   - MCU Sonix SN34F788 nhận khung BBox qua ngắt `UART1_IRQHandler` và bộ đệm vòng Ring buffer SPSC 4096 byte (`kvc_fpga_bbox.c`).
+   - Đọc đồng bộ dữ liệu cảm biến định vị: Siêu âm chống nước AJ-SR04M qua UART2 9600 bps (Dải tin cậy **20–700 cm**, phân cấp `alt_quality`), IMU GY-87 MPU-6050 qua I2C0 400 kHz (ước lượng góc nghiêng Roll/Pitch bù chuyển động lắc UAV), GNSS u-blox NEO-M10N qua UART3 9600 bps (tọa độ WGS-84 3D fix và góc hướng Yaw qua course-over-ground `track_made_good`).
+   - Thuật toán giao tia chiếu Ray-Plane Intersection (`kvc_georef.c`) tính toán giao điểm tia quang học qua tâm BBox với mặt phẳng nước: $\mathbf{p}_{\text{local}} = \mathbf{t}_{\text{camera}} + \lambda \cdot \mathbf{R}_{\text{camera}} \cdot \mathbf{v}_{\text{pixel}}$.
+   - Xuất tọa độ Local (cm, mốc bể bơi/sa bàn) hoặc WGS-84 toàn cầu (độ $\times 10^7$). Cập nhật cờ trạng thái `Sensor Status Flags` (GNSS_VALID, ALT_VALID, IMU_VALID, AI_DETECTED).
+
+3. **Luồng 3 — Đóng gói vô tuyến LoRa 433 MHz & Gateway Trạm Đất (`IF-02` ➔ `IF-03`):**
+   - MCU Sonix đóng gói đúng **32 byte** Little-Endian (`KvcTelemetryPacket32`, ABI IF-02 được HUMAN duyệt 29/10/2026), tính CRC-16/CCITT-FALSE trên byte 0–29. Byte 25 là `status_reserved` (luôn `0`, đã bỏ đo pin).
+   - Module Ra-02 (SX1278 433 MHz, SF7, BW 125 kHz, CR 4/5, HW CRC) phát vô tuyến ở tần suất 1 Hz (chuẩn) / 2–5 Hz (khi có mục tiêu cứu nạn).
+   - Module Ra-02 trạm đất thu sóng, kích hoạt ngắt DIO0. Gateway ESP32-C3 đọc gói qua SPI, đọc thanh ghi RSSI và SNR, kiểm tra CRC-16 (loại bỏ gói hỏng) và hiển thị tức thời lên màn hình OLED SSD1306 (128×64) độc lập với máy tính.
+   - Gateway ESP32 kết nối Wi-Fi 2.4 GHz (ưu tiên STA; tự động fallback SoftAP `KVC_GROUND_STATION` 192.168.4.1 nếu mất mạng) và mở WebSocket Server tại cổng 8080 (`ws://<IP>:8080/telemetry`).
+   - Chuyển tiếp JSON Envelope v1: `transport_version: 1`, `gateway_session_id`, `gateway_sequence`, `rx_monotonic_ms`, `rf_payload_hex` (64 ký tự hex), `rssi_dbm`, `snr_db`, `rx_drop_count`.
+
+4. **Luồng 4 — Tiếp nhận Ingress, Lưu trữ SQLite WAL & Hiển thị GCS Dashboard (`IF-03` ➔ `IF-04` ➔ UI):**
+   - Dịch vụ Python FastAPI trên Laptop (`gcs/backend/esp32_ingress.py`) kết nối WebSocket vào ESP32, thẩm định 64 hex và giải mã 32 byte wire.
+   - Ghi dữ liệu tuần tự vào SQLite database (`kvc_telemetry.db`) ở chế độ WAL (`PRAGMA synchronous=FULL`), bảo vệ dữ liệu chống mất nguồn đột ngột.
+   - Backend mở WebSocket Server local (`ws://127.0.0.1:8000/ws/telemetry`) phát tán cho giao diện người dùng.
+   - GCS Tactical Dashboard (React 19 + TypeScript + Vite, 100% Offline): Hiển thị Tactical HUD chuyên dụng (OrientationCluster, WaterClearanceGauge, SensorFlagsInspector), Radar quét 2D cục bộ (cm) và bản đồ OSM Leaflet WGS-84; hệ thống cảnh báo tự động `alertDetector.ts` kích hoạt khi vi phạm an toàn; trang **Nhật ký phiên** (`EventLogPage`) đọc log đã commit và xuất CSV. Chỉ hỗ trợ 2 chế độ `MOCK` và `REAL` (Replay đã loại bỏ hoàn toàn khỏi UI).
+
+5. **Luồng 5 — Kênh quan sát phụ Video Relay IF-05 (ESP32-S3-CAM + OV3660):**
+   - Kênh video quang học hỗ trợ người vận hành quan sát hiện trường, **hoàn toàn độc lập với kênh LoRa 32 byte**, **không sinh tọa độ** và **không thay thế camera OV2640/FPGA**.
+   - ESP32-S3-CAM chụp ảnh bằng cảm biến OV3660 (độ phân giải HVGA 480×320, chất lượng JPEG q22/q26), phát luồng HTTP MJPEG `multipart/x-mixed-replace` trên cổng 81.
+   - Backend GCS (`video_relay.py`) duy trì duy nhất **1** kết nối tới camera và phân phối lại cùng nguồn (same-origin) cho trình duyệt web tại `http://localhost:8000/video/stream` (`has_overlay = false`). Trình duyệt web không bao giờ gọi trực tiếp camera.
+
+6. **Luồng 6 — Kênh tham chiếu mô hình AI trên máy tính (`PC_REFERENCE`):**
+   - Đánh giá đối chứng mô hình YOLO11n phát hiện 2 lớp (`person`, `lifebuoy`) trên video lũ lụt thực tế hoặc webcam phòng lab trước khi triển khai phần cứng.
+   - Thực thi qua script `scripts/manual/run_stream.py` với Ultralytics YOLO11n checkpoint, suy luận trực tiếp trên CPU/GPU laptop, vẽ khung bao và phát lại luồng MJPEG tại cổng 8090.
+   - Mọi kết quả mang nhãn nguồn `PC_REFERENCE`, phục vụ nghiên cứu và kiểm thử đối sánh thuật toán.
+
 Ghi chú về thuật ngữ: “sa bàn” trong các mô tả field local/origin ở đặc tả wire IF-02 dưới đây là tên gọi lịch sử của hệ tọa độ local đã hiệu chuẩn, không phải yêu cầu có mô hình sa bàn tại nơi thi. Có thể áp dụng tại khu vực bể bơi khi origin/pose/đơn vị được xác lập.
 
-#### 2. Giao tiếp nội bộ FPGA ↔ MCU Sonix
-- **Đặc tả vật lý:** UART 8N1 (8 bit dữ liệu, không parity, 1 stop bit), mức điện áp logic 3,3V CMOS. Tốc độ danh định trong mã nguồn firmware MCU hiện tại là **38.400 bps** (cấu hình tối ưu với clock ngoại vi UCLK 12 MHz từ nguồn dao động nội IHRC; nếu chạy 115.200 bps ở UCLK 12 MHz thì sai số baud tối thiểu là 6,99% gây lỗi khung framing error; muốn chạy 115.200 bps hoặc cao hơn cần cấu hình PLL nâng UCLK lên ≥ 24 MHz). Nối chung GND chặt chẽ.
-- **Cấu trúc khung truyền kết quả AI:**
-  `[Sync: 0x5A 0xA5 (2B)]` + `[Version: 1B]` + `[Candidate Count: 1B (tối đa 20)]` + `[Timestamp: 4B]` + `[Danh sách BBox: N × 8B]` + `[CRC-16: 2B]`.
-  Mỗi BBox 8 byte gồm: `X_center (2B)` + `Y_center (2B)` + `Width (1B)` + `Height (1B)` + `Class_ID (1B: 1=person, 2=lifebuoy)` + `Confidence (1B: 0–100)`.
-- **Cơ chế ngắt và Flow Control:** Chân `DATA_READY` từ FPGA chuyển lên mức cao để báo hiệu khi có frame mới. Phía MCU tải Sonix sử dụng cơ chế ngắt `UART1_IRQHandler` kết hợp bộ đệm vòng Ring Buffer SPSC 4096 byte (Task M2) để không bị mất byte khi MCU bận phát LoRa.
+#### 2. Giao tiếp nội bộ FPGA ↔ MCU Sonix (IF-01)
+- **Đặc tả vật lý:** UART 8N1 (8 bit dữ liệu, không parity, 1 stop bit), mức điện áp logic 3,3V CMOS trực tiếp. Tốc độ danh định đã chốt duy nhất theo phê duyệt B-1 (31/10/2026) là **38.400 bps** (FPGA dùng `BAUD_DIV = 2604 @100 MHz` chuẩn 0% sai số; MCU Sonix chạy `DLL = 20 @UCLK 12 MHz` đạt 37.500 bps (−2,34% sai số), đã được chứng minh hoạt động hoàn hảo trên phần cứng thực tế qua 197.844 byte không lỗi khung `fe=0`, không tràn `oe=0`).
+- **Cấu trúc khung truyền kết quả AI (Khóa N ≤ 12 theo B-2):**
+  `[Sync: 0x5A 0xA5 (2B)]` + `[Version: 0x01 (1B)]` + `[Candidate Count: 1B (0..12)]` + `[Timestamp: 4B (uint32 ms)]` + `[Danh sách BBox: N × 8B]` + `[CRC-16: 2B]` (Little-Endian, CRC-16/CCITT-FALSE).
+  Mỗi BBox 8 byte gồm: `X_center (2B, uint16 LE)` + `Y_center (2B, uint16 LE)` + `Width (1B, uint8)` + `Height (1B, uint8)` + `Class_ID (1B: 1=person, 2=lifebuoy)` + `Confidence (1B: 0–100%)`.
+- **Cơ chế ngắt và Flow Control:** Chân `DATA_READY` (R12 bo OneKiwi ➔ P0.12 MCU) chuyển lên mức cao báo hiệu khi có frame BBox mới. Phía MCU tải Sonix sử dụng cơ chế ngắt `UART1_IRQHandler` kết hợp bộ đệm vòng Ring Buffer SPSC 4096 byte (`kvc_fpga_bbox.c`) để thu nhận byte tức thời, triệt tiêu nguy cơ nghẽn hoặc mất byte khi MCU bận thực thi chu kỳ phát LoRa.
 
 #### 3. Đặc tả giao thức vô tuyến LoRa v1 (RF Payload 32 byte chuẩn hóa - Khớp IF-02)
 - **Quy tắc chung:** Toàn bộ số nguyên nhiều byte lưu theo thứ tự **Little-Endian**. Số nguyên có dấu dùng dạng bù hai. Chiều dài gói RF cố định đúng **32 byte**. Thuật toán kiểm tra lỗi là **CRC-16/CCITT-FALSE** (Poly `0x1021`, Init `0xFFFF`, RefIn/RefOut `false`, XorOut `0x0000`) tính toán trên 30 byte đầu (offset 0–29), lưu low-byte trước tại offset 30–31.
@@ -340,7 +380,7 @@ Gói Status dự kiến dùng chung Sync (0–1), Version (2), Type `0x03` (3), 
 
 #### 4. Giao diện dữ liệu ESP32 trạm đất → laptop (Wi-Fi SoftAP/WebSocket v1)
 
-Dự thảo USB Ground Envelope 48 byte trước đây thuộc kiến trúc STM32F103 + CP2102 và **không còn là giao diện mục tiêu**. V1 dùng ESP32-C3 làm gateway Wi-Fi theo thứ tự ưu tiên: (1) STA vào Wi-Fi 2.4 GHz đã cấu hình sẵn qua build flag (tối đa 4 mạng; "4G" của dự án là hotspot do điện thoại phát — điện thoại lo sóng di động, gateway không cần module 4G); (2) nếu không nối được trong ngân sách khởi động thì phát SoftAP `KVC_GROUND_STATION` (WPA2-PSK, mật khẩu `kvc123456`). Khi ưu tiên 1 nối lại được, firmware tự đóng SoftAP. Credential STA không ghi vào source/log. ESP32 mở endpoint `ws://192.168.4.1:8080/telemetry` (SoftAP) hoặc `ws://<IP_STA>:8080/telemetry`; backend GCS trên laptop kết nối như WebSocket client. Dashboard trong browser chỉ nhận dữ liệu từ backend local, không kết nối trực tiếp ESP32. ESP32-C3 chỉ hỗ trợ 2.4 GHz. Mã kit/board và pinout cần xác minh theo phần cứng thực tế; thay SoC không tự thay đổi schema transport v1.
+Dự thảo USB Ground Envelope 48 byte trước đây thuộc kiến trúc STM32F103 + CP2102 và **không còn là giao diện mục tiêu**. V1 dùng ESP32-C3 làm gateway Wi-Fi theo thứ tự ưu tiên: (1) STA vào Wi-Fi 2.4 GHz đã cấu hình sẵn qua build flag (tối đa 4 mạng; "4G" của dự án là hotspot do điện thoại phát — điện thoại lo sóng di động, gateway không cần module 4G); (2) nếu không nối được trong ngân sách khởi động thì phát SoftAP `KVC_GROUND_STATION` (WPA2-PSK, mật khẩu `kvc123456`). Khi ưu tiên 1 nối lại được và SoftAP không còn client bám, firmware tự đóng SoftAP. Credential STA không ghi vào source/log. ESP32 mở endpoint `ws://192.168.4.1:8080/telemetry` (SoftAP) hoặc `ws://<IP_STA>:8080/telemetry`; backend GCS trên laptop kết nối như WebSocket client. Dashboard trong browser chỉ nhận dữ liệu từ backend local, không kết nối trực tiếp ESP32. ESP32-C3 chỉ hỗ trợ 2.4 GHz. Mã kit/board và pinout cần xác minh theo phần cứng thực tế; thay SoC không tự thay đổi schema transport v1.
 
 Mỗi message WebSocket là một JSON UTF-8 có đủ các trường sau:
 
@@ -448,6 +488,27 @@ Dữ liệu cần phản ánh hai bối cảnh trình diễn: video lũ lụt c�
 - **Chỉ tiêu kỹ thuật lượng tử hóa:**
   - Độ suy giảm Recall và Precision của mô hình INT8 trên FPGA so với mô hình Float gốc ≤ 3 điểm phần trăm.
   - Độ lệch tâm Bounding Box trung bình giữa Float và INT8 < 5 pixel.
+
+#### 3. Hiện trạng triển khai AI, giới hạn phần cứng FPGA 20K và phân vai hệ thống
+
+Để bảo đảm tính trung thực kỹ thuật và khả thi thực địa, dự án phân định rõ ràng giữa **thiết kế mô hình lý thuyết**, **giới hạn vật lý của chip FPGA 20K**, và **vai trò của từng phân hệ**:
+
+- **Giới hạn vật lý của chip FPGA Gowin GW2A-18K (OneKiwi Primer 20K):**
+  - Tài nguyên phần cứng: 20.736 LUTs, 828 Kbit Block RAM nội (tương đương ~103 KB SRAM), 48 bộ nhân DSP. Bo mạch phần cứng **không có chip nhớ RAM DDR3 ngoài**.
+  - Kích thước mô hình: Mô hình mạng nơ-ron tích chập YOLO11n dù đã lượng tử hóa INT8 vẫn có dung lượng trọng số (weights) xấp xỉ **2,57 MB** — lớn gấp ~25 lần toàn bộ dung lượng RAM nội 103 KB của chip.
+  - Do đó, việc nạp toàn bộ weights của YOLO11n vào RAM nội của FPGA 20K là **bất khả thi về mặt vật lý**. Để chạy được YOLO11n trên FPGA này, bắt buộc phải dùng kỹ thuật stream từng lớp weights (layer-by-layer) từ bộ nhớ SPI Flash ngoài W25Q128 (16 MiB), dẫn đến trần tốc độ suy luận bị giới hạn ở mức 2–4 FPS.
+
+- **Giải pháp phần cứng thực tế đang hoạt động (HARDWARE-VERIFIED):**
+  - Để đảm bảo hệ thống tải bay hoạt động ổn định ở tốc độ thời gian thực (Real-time), nhóm đã phát triển và nạp chạy thành công module xử lý ảnh phần cứng siêu nhẹ: `kvc_blob_detect.v`.
+  - Module này quét trực tiếp luồng pixel RGB565 từ camera OV2640 DVP theo thuật toán ngưỡng màu và độ vượt trội sắc độ (Color Dominance & Thresholding):
+    - Nhận diện màu cam/đỏ phản quang đặc trưng của phao cứu sinh (`lifebuoy`, `class_id = 2`).
+    - **Không nhận diện `person`:** RTL gán cứng `CLASS_LIFEBUOY` cho mọi blob màu; người trong nước bùn lũ lụt không có đặc trưng màu ổn định để lọc ngưỡng. Việc nhận diện người do mô hình YOLO11n đảm nhiệm (xem phân vai bên dưới).
+  - **Tài nguyên tiêu thụ thực tế (bitstream release `86CCF5DD`, 01/11/2026):** toàn thiết kế dùng **1.616 logic (1.443 LUT + 167 ALU) / 20.736 (~8 %)**, **1 BSRAM**, **0,5 DSP**; Fmax `clk_100m` **113,277 MHz** (TNS=0). Riêng khối `g_blob_gen.u_blob`: **172 LUT + 98 ALU, 174 FF, 0 BSRAM, 0 DSP**. BBox truyền qua UART1 (IF-01) sang MCU Sonix.
+
+- **Phân định rõ ràng vai trò giữa FPGA và ESP32-S3-CAM:**
+  - **FPGA (GW2A + OV2640 DVP):** Là nguồn nhận diện quang học duy nhất sinh BBox phục vụ thuật toán giao tia tính tọa độ (`IF-01`).
+  - **ESP32-S3-CAM (OV3660 + Wi-Fi):** Là kênh video quan sát phụ (`IF-05`). Module này chỉ làm nhiệm vụ chụp ảnh, nén JPEG và phát luồng MJPEG qua Wi-Fi về cho mắt người vận hành trên máy tính; **hoàn toàn KHÔNG nạp mô hình AI từ dataset và KHÔNG tham gia tính toán tọa độ**.
+  - **Dataset AI (`dataset_4k_yolo_v1_hardware_2class`):** Dành cho mô hình YOLO11n hoàn chỉnh. Ngoài định hướng stream trên FPGA trong tương lai, mô hình huấn luyện từ dataset này được bố trí chạy tham chiếu trực tiếp trên máy tính trạm đất GCS Laptop (`inference_device = PC_REFERENCE`) trên luồng video phụ. Đây là **định hướng thiết kế**: GCS hiện chưa có service suy luận nào, công cụ chạy tham chiếu nằm ở `scripts/manual/`.
 
 ---
 

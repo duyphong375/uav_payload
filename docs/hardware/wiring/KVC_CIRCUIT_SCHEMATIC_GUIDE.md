@@ -537,14 +537,16 @@ flowchart LR
 | **MOSI** | **Pin 23 (`P2.7`)** | `JP3` Pin 15/16 | `3.3 V Logic` | MCU $\to$ LoRa | Dữ liệu từ MCU gửi ra LoRa |
 | **DIO0** | **Pin 24 (`P2.8`)** | `JP3` Pin 17/18 | `3.3 V Logic` | LoRa $\to$ MCU | Ngắt EXTI báo TxDone / RxDone |
 | **RST** | **Pin 25 (`P2.9`)** | `JP3` Pin 19/20 | `3.3 V Logic` | MCU $\to$ LoRa | Reset cứng module (Active-LOW) |
-| **DIO0** | **Pin 24 (`P2.8`)** | `JP3` Pin 17/18 | `3.3 V Logic` | LoRa $\to$ MCU | Ngắt EXTI báo TxDone / RxDone |
-| **RST** | **Pin 25 (`P2.9`)** | `JP3` Pin 19/20 | `3.3 V Logic` | MCU $\to$ LoRa | Reset cứng module (Active-LOW) |
 
 ---
 
-### 3.5. Mạch Cầu Phân Áp Đo Điện Áp Pin LiPo (SAR ADC 12-bit)
+### 3.5. Mạch Cầu Phân Áp Đo Điện Áp Pin LiPo (Tùy chọn mở rộng dự phòng)
 
-Mạch phân áp cho phép vi điều khiển Sonix đo chính xác điện áp thực tế của khối pin LiPo động lực (2S đến 4S) để phát hiện pin yếu và cảnh báo an toàn cho UAV.
+> [!NOTE]
+> **Trạng thái kỹ thuật hiện hành (Quyết định 29/10/2026):**
+> KVC đã loại bỏ phép đo pin khỏi payload telemetry cứu nạn chuẩn (byte 25 của IF-02 là `status_reserved`, firmware luôn gán `0`; Dashboard không hiển thị pin). Mạch phân áp ADC này được giữ lại trong cẩm nang phần cứng như **tùy chọn phần cứng mở rộng**, không tham gia truyền thông IF-02.
+
+Mạch phân áp (nếu lắp) cho phép vi điều khiển Sonix đo điện áp thực tế của khối pin LiPo động lực (2S đến 4S) qua ADC0_IN10:
 
 ```mermaid
 flowchart LR

@@ -350,6 +350,24 @@ Khối lượng này **không thể nén** dưới 4–6 tuần theo `../hardwar
 | Test runner FPGA | `scripts/run_fpga_tb.ps1` chạy toàn bộ TB, exit ≠ 0 khi fail — giữ nguyên hành vi |
 | Bàn giao | 1 trang `docs/HANDOVER.md`: thiết bị, phiên bản tool, SHA, cách chạy, danh sách phần **chưa đo** |
 
+### P3-06 — Nợ kỹ thuật Gateway ESP32-C3 (từ `KVC-GW-20261103-001`)
+
+Sinh ra khi đồng bộ Wi-Fi IF-03 / khoá path WebSocket ngày 03/11/2026. Toàn bộ mục dưới
+**chưa sửa** — không nằm trong phạm vi task đã đóng. Quyền writer phân hệ Gateway đã dừng;
+mở task mới và chỉ định owner trước khi sửa.
+
+| ID | Mức | Vấn đề | Sửa tối thiểu | Phép xác minh |
+| :--- | :--- | :--- | :--- | :--- |
+| GW-N1 | P2 | `validatePacketCrc()` không kiểm `msg_id`. IF-02 định nghĩa `0x01` telemetry và `0x02` heartbeat, nhưng mọi `msg_id` đều được đóng gói thành envelope telemetry | Từ chối `msg_id` ngoài tập đã biết, hoặc phân nhánh heartbeat | Host test thêm ca `msg_id = 0x02` và `msg_id = 0xFF` |
+| GW-N2 | P2 | Watchdog LoRa chỉ chạy khi `lastRxPacketMs > 0` → bo cắm sai dây từ lúc boot không bao giờ tự phục hồi | Khởi tạo `lastRxPacketMs = millis()` lúc `initLoRaHardware()` thành công, hoặc thêm mốc "lần thử init gần nhất" | Host test cho nhánh chưa-từng-nhận-gói |
+| GW-N3 | P3 | Chưa có FIFO 64 message → `rx_drop_count` luôn `0` (IF-03 mục 3 đã ghi đúng là chưa triển khai) | Triển khai FIFO hoặc giữ nguyên và không suy diễn `rx_drop_count = 0` là "đường buffer khoẻ" | Backend test khi FIFO đầy |
+| GW-N4 | P3 | `docs/verification/GATEWAY_TEST_PLAN.md` còn đường dẫn chết `Project_UAV\...` (hai chỗ, mục lệnh kiểm tra nhanh) | Đổi sang đường dẫn trong repo (`scripts/manual/check_esp32_ws.py`, `.venv`) | `grep -c "Project_UAV" docs/verification/GATEWAY_TEST_PLAN.md` = 0 |
+| GW-N5 | P3 | `docs/INDEX.md` dòng IF-03 (`2026-10-29`) và CFG-GW-002 (`2026-10-25`, `DESIGN`) chưa cập nhật theo trạng thái 03/11/2026 | Cập nhật ngày + mức bằng chứng; CFG-GW-002 nên là `SOURCE-VERIFIED` | Đọc lại dòng INDEX khớp `KVC-GW-20261103-001.md` |
+| GW-N6 | P3 | `ENABLE_SELF_MOCK = false`; G3 cần dữ liệu tự sinh | Build riêng có bật cờ và **ghi rõ trong biên bản** rằng dữ liệu tự sinh không phải sóng thật | Không được dùng log self-mock để đóng G3/G5 |
+
+> **Không** dùng `EVIDENCE` của đợt này để đóng G1–G6: `KVC-GW-20261103-001.md` chỉ là
+> host/build (`SOURCE-VERIFIED` + `BUILT`), **không** phải log Serial từ chip.
+
 ---
 
 ## 6. Quyết định cần HUMAN chốt (đang chặn nhiều việc)

@@ -70,24 +70,24 @@ sequenceDiagram
     participant BE as GCS Backend
     participant BR as Browser
 
-    BE->>CAM: GET /stream  (client thường trực, chỉ đếm khung)
+    BE->>CAM: GET /stream  (MỘT kết nối duy nhất, thường trực)
     CAM-->>BE: --boundary / JPEG / --boundary / JPEG ...
-    Note over BE: FrameExtractor đếm khung<br/>cập nhật VideoStatus
+    Note over BE: FrameExtractor cập nhật VideoStatus<br/>và phát khung cho subscriber
     BR->>BE: WS /ws/telemetry  (VIDEO_STATUS)
     BE-->>BR: video.source_kind = RELAY
     BR->>BE: GET /video/stream
-    BE->>CAM: GET /stream  (kết nối RIÊNG cho từng người xem)
-    CAM-->>BE: các khung JPEG
-    BE-->>BR: passthrough (same-origin)
+    BE-->>BR: part multipart dựng từ khung relay nhận được
 ```
 
-**Hai kết nối độc lập tới camera, không phải một.** `VideoRelay._consume`
-(`video_relay.py:151-167`) là client thường trực; `GET /video/stream`
-(`main.py:240-270`) mở thêm một client cho mỗi người xem. Camera phải chịu
-`1 + số_người_xem` kết nối. Trước 01/11/2026 comment ở `main.py` ghi "kết nối
-duy nhất" và điều đó **sai**. Nếu A5 đo thấy camera quá tải (rớt khung, lỗi
-`fb_get`), phải gộp upstream fan-out trong `video_relay.py` — không thêm client
-thứ ba.
+**Một kết nối tới camera, fan-out trong backend.** `VideoRelay._consume`
+(`video_relay.py`) giữ **duy nhất** một client tới camera; mỗi khung tách ra
+được đẩy vào hàng đợi riêng (dung lượng 1) của từng người xem. `GET /video/stream`
+(`main.py`) **không** mở thêm client — nó `relay.subscribe()`.
+
+Trước 03/11/2026 kiến trúc là `1 + số_người_xem` kết nối: `_consume` đếm khung
+và mỗi người xem mở một client riêng. Hệ quả đo được từ source: firmware giữ
+mutex camera trong lúc gửi TCP (`main.cpp`, bản trước 03/11), nên N người xem
+chia nhau khung và nhịp khung rất không đều. Nay camera chỉ thấy một kết nối.
 
 ### 3.2 Endpoint
 
@@ -116,15 +116,29 @@ SOI/EOI, nên boundary chỉ cần đúng để VLC/trình duyệt khác đọc 
 | `KVC_ENABLE_VIDEO_RELAY` | `0` (tắt) | Bật relay. Không mở kết nối mạng khi tắt |
 | `KVC_VIDEO_SOURCE_URL` | rỗng | URL gốc của camera, vd `http://192.168.4.2:81/stream` |
 | `video_reconnect_sec` | 2,0 s | Backoff sau mỗi lần mất kết nối |
-| `video_frame_timeout_sec` | 5,0 s | Quá hạn này không có khung → `is_connected = false` |
+| `video_frame_timeout_sec` | 10,0 s | Quá hạn này không có khung → `is_connected = false` |
 
 `Settings.__post_init__` **từ chối cấu hình sai**: bật relay mà không có URL
 ném `ValueError` ngay khi khởi động, thay vì chạy rồi lỗi ngầm.
 
 **Cổng `:81` chỉ là ví dụ.** Firmware S3 chọn cổng này trong
-`firmware/esp32_s3_cam/include/camera_config.h` (`KVC_HTTP_PORT`). Nếu đổi, **phải**
+`firmware/esp32_s3_cam/include/kvc_config.h` (`KVC_HTTP_PORT`). Nếu đổi, **phải**
 cập nhật `KVC_VIDEO_SOURCE_URL` và mục này trong cùng lượt. Không hardcode hai
 nơi khác nhau.
+
+**Địa chỉ camera (cập nhật 03/11/2026).** Firmware S3 mặc định chạy **STA**
+(`KVC_WIFI_USE_SOFTAP 0`) và nối vào cùng mạng 2.4 GHz với gateway C3 + laptop.
+Ba cách trỏ backend, theo thứ tự ưu tiên:
+
+1. `http://kvc-s3cam.local:81/stream` — mDNS, không cần biết IP. Firmware đăng ký
+   `KVC_MDNS_NAME = "kvc-s3cam"`.
+2. IP do DHCP cấp, in ở Serial lúc boot và ở `/status` (`ip`).
+3. IP tĩnh: bật `KVC_STA_USE_STATIC_IP 1` và đặt `KVC_STA_IP` (mặc định
+   `192.168.4.50`) để URL không đổi giữa các lần boot.
+
+Chỉ bật `KVC_WIFI_USE_SOFTAP 1` khi bring-up camera một mình: khi đó S3 phát
+`KVC-S3CAM` / `192.168.5.1`, laptop có một card Wi-Fi sẽ **mất telemetry** nếu
+cùng lúc phải vào SoftAP của gateway C3 (`192.168.4.1`).
 
 **Nhịp phát `VIDEO_STATUS`:** tối đa 1 lần/giây theo **đồng hồ**, cộng thêm một
 lần ngay khi kết nối thành công và một lần khi lỗi. Trước 01/11/2026 bản cũ phát
@@ -186,7 +200,7 @@ có video thật.
 | :--- | :---: | :--- | :--- |
 | Chưa cấu hình | `false` | Bình thường | `source_kind = NONE` |
 | Camera tắt | `false` | Bình thường | `error_message` = lỗi kết nối |
-| Camera chậm > 5 s | `false` | Bình thường | Ngưỡng `video_frame_timeout_sec` |
+| Camera chậm > 10 s | `false` | Bình thường | Ngưỡng `video_frame_timeout_sec` |
 | Relay crash | `false` | Bình thường | Vòng backoff tự nối lại |
 | Đổi session | reset `NONE` | Bình thường | `rotate_session()` |
 | Camera đóng stream | `false` rồi `true` | Bình thường | `_consume` trả về, backoff nối lại |
@@ -205,7 +219,7 @@ có video thật.
 | 3 | Ghép cặp bbox FPGA ↔ khung video | **CHƯA CÓ** → `has_overlay` luôn `false` |
 | 4 | Đo FPS/độ trễ thật | **NOT RUN** — cần phần cứng. Công cụ đã có: `scripts/manual/measure_mjpeg_stream.py` |
 | 5 | Bảo mật: có xác thực không | **CHƯA** — MJPEG không auth; chỉ dùng mạng nội bộ |
-| 6 | Gộp upstream fan-out (giảm `1 + số_người_xem` kết nối) | **CHƯA** — chỉ làm nếu A5 đo thấy camera quá tải |
+| 6 | Gộp upstream fan-out (giảm `1 + số_người_xem` kết nối) | **ĐÃ LÀM (03/11/2026)** — `VideoRelay` giữ một kết nối tới camera và broadcast cho subscriber; `/video/stream` không mở client mới. Test đếm kết nối TCP thật: 3 người xem → **1** kết nối. **Chưa kiểm trên bo thật** |
 | 7 | Nạp firmware lên module thật (`HARDWARE-VERIFIED`) | **NOT RUN** — chưa thao tác phần cứng |
 
 **Không được tuyên bố** "video HARDWARE-VERIFIED", "AI FPGA qua camera ESP32",
@@ -220,8 +234,8 @@ boundary. Số dưới đây là số **thực chạy**, thay cho các con số 
 
 | Hạng mục | Lệnh | Kết quả |
 | :--- | :--- | :--- |
-| `tests/test_video_relay.py` | `.venv/Scripts/python.exe -B -m pytest gcs/backend/tests/test_video_relay.py -q -p no:cacheprovider` | **20/20 PASS** (exit 0) — parser, split-chunk, isolation, 503, reset, tuổi khung, camera giả chạy dài, reconnect, timeout |
-| Toàn bộ backend | `.venv/Scripts/python.exe -B -m pytest gcs/backend/tests -q -p no:cacheprovider` | **65 PASS** (exit 0) |
+| `tests/test_video_relay.py` | `.venv/Scripts/python.exe -B -m pytest gcs/backend/tests/test_video_relay.py -q -p no:cacheprovider` | **24/24 PASS** (exit 0, 03/11/2026) — parser, split-chunk, isolation, 503, reset, tuổi khung, camera giả chạy dài, reconnect, timeout, **fan-out một kết nối**, **hàng đợi 1 khung cho người xem chậm**, route phục vụ từ relay |
+| Toàn bộ backend + integration | `.venv/Scripts/python.exe -B -m pytest gcs/backend/tests tests -q -p no:cacheprovider` | **123 PASS + 8 subtests** (exit 0, 03/11/2026) |
 | `missionReducer.test.ts` IF-05 | `npx vitest run src/state/missionReducer.test.ts` | PASS — relay/NONE/telemetry độc lập/domain/tick/reset + REAL+NONE không rơi về MOCK |
 | `VideoPanel.test.tsx` | `npx vitest run src/features/video/VideoPanel.test.tsx` | PASS — nhãn RELAY, `KHUNG: n`, `FPS: N/A`, không phủ BBox FPGA, banner mất video, REAL không hiện pattern |
 | Toàn bộ frontend | `npm test` | **173 PASS / 27 file** (exit 0) |

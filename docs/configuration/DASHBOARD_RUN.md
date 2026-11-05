@@ -4,17 +4,17 @@
 - **Mục tiêu:** Cung cấp giao diện trạm mặt đất (GCS) chuyên dụng để giám sát tải nhiệm vụ cứu nạn bão lũ (Bounding Box người/phao cứu sinh từ AI, hình ảnh camera quan sát qua kênh phụ IF-05, vị trí định vị WGS-84, cảm biến độ cao siêu âm AJ-SR04M).
 - **Phân định ranh giới khí tài:** KVC là hệ thống giám sát **tải nhiệm vụ cứu nạn** (Payload), **không phải Flight Controller (FC)**. Dashboard không can thiệp điều khiển bay, arm/disarm hay lập lộ trình bay waypoint của máy bay.
 - **Tài liệu căn cứ:**
-  - Thiết kế kiến trúc tổng thể: [docs/architecture/KVC_ThietKeHeThong.md](file:///d:/Project_UAV_KVC/docs/architecture/KVC_ThietKeHeThong.md)
-  - Đặc tả thiết kế GCS: [docs/architecture/KVC_GCS_DESIGN_SPEC.md](file:///d:/Project_UAV_KVC/docs/architecture/KVC_GCS_DESIGN_SPEC.md)
-  - Hợp đồng dữ liệu nội bộ: [docs/interfaces/IF_GCS_DATA_CONTRACT.md](file:///d:/Project_UAV_KVC/docs/interfaces/IF_GCS_DATA_CONTRACT.md)
+  - Thiết kế kiến trúc tổng thể: [docs/architecture/KVC_ThietKeHeThong.md](../architecture/KVC_ThietKeHeThong.md)
+  - Đặc tả thiết kế GCS: [docs/architecture/KVC_GCS_DESIGN_SPEC.md](../architecture/KVC_GCS_DESIGN_SPEC.md)
+  - Hợp đồng dữ liệu nội bộ: [docs/interfaces/IF_GCS_DATA_CONTRACT.md](../interfaces/IF_GCS_DATA_CONTRACT.md)
   - Hướng dẫn kết nối Wi-Fi & ESP32: [HUONG_DAN_KET_NOI_WIFI_VA_ESP32.md](GATEWAY_WIFI_ESP32.md)
-  - Giao diện kết nối Gateway ESP32: [docs/interfaces/IF_ESP32_GCS_WS.md](file:///d:/Project_UAV_KVC/docs/interfaces/IF_ESP32_GCS_WS.md)
+  - Giao diện kết nối Gateway ESP32: [docs/interfaces/IF_ESP32_GCS_WS.md](../interfaces/IF_ESP32_GCS_WS.md)
 
 ---
 
 ## 1. Kiến Trúc Kết Nối 2 Chặng (2-Tier Topology)
 
-Kiến trúc mục tiêu của trạm mặt đất được thiết kế phân tầng. Backend GCS chạy FastAPI hỗ trợ MOCK, Ingress thu nhận thực tế từ Gateway ESP32 (`gcs/backend/esp32_ingress.py` theo chuẩn [IF-03](file:///d:/Project_UAV_KVC/docs/interfaces/IF_ESP32_GCS_WS.md) và [IF-02](file:///d:/Project_UAV_KVC/docs/interfaces/IF_MCU_LORA_RF.md)) và relay video phụ [IF-05](file:///d:/Project_UAV_KVC/docs/interfaces/IF_ESP32_CAM_GCS.md). Xem [backend README](DASHBOARD_BACKEND.md) để biết trạng thái chi tiết.
+Kiến trúc mục tiêu của trạm mặt đất được thiết kế phân tầng. Backend GCS chạy FastAPI hỗ trợ MOCK, Ingress thu nhận thực tế từ Gateway ESP32 (`gcs/backend/esp32_ingress.py` theo chuẩn [IF-03](../interfaces/IF_ESP32_GCS_WS.md) và [IF-02](../interfaces/IF_MCU_LORA_RF.md)) và relay video phụ [IF-05](../interfaces/IF_ESP32_CAM_GCS.md). Xem [backend README](DASHBOARD_BACKEND.md) để biết trạng thái chi tiết.
 
 > **Cập nhật 02/11/2026:** chế độ phát lại (REPLAY) **đã bỏ khỏi giao diện**. `AppHeader.tsx` chỉ còn nút MOCK và REAL; `routes.tsx` không còn route Replay. Chức năng thay thế là trang **Nhật ký phiên** (`/history`) đọc log đã commit, lọc và xuất CSV. Backend còn `replay_engine.py` + `/api/replay/*` như code dự phòng không có UI gọi.
 
@@ -45,7 +45,7 @@ Kiến trúc mục tiêu của trạm mặt đất được thiết kế phân t
 ## 2. Cấu Trúc Thư Mục Phân Hệ Dashboard
 
 ```text
-Dashboard/
+gcs/
 ├── backend/                  # Dịch vụ Backend trung tâm trên Laptop (FastAPI / Python)
 │   ├── main.py               # Điểm khởi chạy FastAPI, WebSocket server/client & REST API
 │   ├── config.py             # Cấu hình biến môi trường, cổng, đường dẫn DB
@@ -103,6 +103,48 @@ npm ci
 npm run dev
 ```
 * Truy cập giao diện: `http://localhost:5173`
+
+### 3.3. Chạy nhận diện AI (tùy chọn, process riêng — Terminal 3)
+
+AI chạy như **một process độc lập**, đọc khung từ relay backend rồi phát lại luồng
+đã vẽ box. Không nhúng vào backend: Ultralytics chạy Python pre/post trên event
+loop sẽ làm mọi viewer cùng trễ, và một lần model crash sẽ kéo dashboard chết theo.
+
+```powershell
+python scripts/manual/run_stream.py `
+  --source http://127.0.0.1:8000/video/stream `
+  --device 0 --imgsz 480 --conf 0.25
+```
+
+Điều bắt buộc:
+
+- `--source` trỏ vào **relay** `127.0.0.1:8000`, KHÔNG trỏ thẳng
+  `192.168.x.x:81/stream`. Firmware chỉ cho 2 slot stream
+  (`kMaxStreams = fb_count - 1`); client thứ ba bị `503`, và mọi kết nối thêm đều
+  tranh sóng Wi-Fi với relay.
+- `--imgsz 480` khớp nguồn 480×320. `imgsz=640` phóng to 1,33× mà không thêm
+  thông tin, chỉ thêm latency.
+- Bỏ `--display` khi vận hành: `cv2.imshow` là chi phí GUI thật. Cửa sổ OpenCV
+  chỉ để debug, không phải điều kiện để AI lên dashboard.
+
+Luồng đã vẽ box được phát tại `http://127.0.0.1:8090/`. Muốn dashboard hiển thị
+luồng đó thay vì luồng sạch của relay, đặt trong `gcs/frontend/.env`:
+
+```ini
+VITE_VIDEO_STREAM_URL=http://127.0.0.1:8090/
+```
+
+Đây là **Đường A** (box đốt vào pixel). Nó luôn khớp khung vì box được vẽ trên
+chính khung được phát. **Đường B** (backend phát metadata `bounding_boxes` để
+frontend tự vẽ overlay) chưa có producer: `has_overlay` bị ép `false` trong
+`gcs/frontend/src/state/missionReducer.ts`, và mảng `bounding_boxes` luôn rỗng.
+Không bật overlay bằng cách tự sinh box từ `target` — toạ độ mục tiêu là WGS-84,
+không phải pixel trong khung này.
+
+`/healthz` của process AI trả `fps`, `infer_ms`, `frames`, `last_boxes`,
+`detections`. **`fps` là tốc độ lấy được khung MỚI từ nguồn**, không phải tốc độ
+model; `infer_ms` mới là chi phí suy luận. HUD trên video ghi rõ `SRC ... FPS`
+và `INFER ... ms` để hai đại lượng không bị nhầm.
 
 ---
 

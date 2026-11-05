@@ -53,8 +53,8 @@ Firmware gateway chạy theo đúng thứ tự sau, **không cần chọn tay**:
 
 | Ưu tiên | Điều kiện | Hành vi |
 | :--- | :--- | :--- |
-| **1** | Có Wi-Fi **2.4 GHz** đã thiết lập sẵn (truyền qua build flag `KVC_WIFI_SSID` / `KVC_WIFI_PASS`, hỗ trợ tới 4 mạng `..._SSID2..4`) | ESP32 lần lượt thử từng mạng đã khai báo. **Không phát SoftAP** nếu một mạng kết nối thành công. |
-| **2** | Không có credential, hoặc hết `15 s` ngân sách khởi động mà chưa nối được mạng nào | ESP32 tự phát SoftAP `KVC_GROUND_STATION` để laptop bắt vào. Đồng thời vẫn thử lại ưu tiên 1 mỗi `30 s`, luân phiên qua các mạng; nếu nối được thì **tự đóng SoftAP**. |
+| **1** | Có Wi-Fi **2.4 GHz** đã thiết lập sẵn (mặc định là hotspot Laptop của dự án; override bằng build flag `KVC_WIFI_SSID` / `KVC_WIFI_PASS`, hỗ trợ tới 4 mạng `..._SSID2..4`) | ESP32 lần lượt thử từng mạng đã khai báo. **Không phát SoftAP** nếu một mạng kết nối thành công. |
+| **2** | Không có mạng STA nào khai báo, hết `15 s` ngân sách khởi động mà chưa nối được, **hoặc mất STA liên tục quá `5 s`** trong lúc đang chạy | ESP32 tự phát SoftAP `KVC_GROUND_STATION` để laptop bắt vào. Đồng thời vẫn thử lại ưu tiên 1 mỗi `30 s`, luân phiên qua các mạng; khi nối được **và SoftAP đã hết client** thì **tự đóng SoftAP**. Còn client bám (laptop, ESP32-S3-CAM) thì giữ AP để không cắt phiên. |
 
 > [!NOTE]
 > **"4G" trong dự án là do điện thoại phát hotspot Wi-Fi 2.4 GHz** — không phải module 4G/LTE gắn vào ESP32. Điện thoại lo phần sóng di động, ESP32-C3 chỉ cần bắt Wi-Fi của điện thoại, nên **không cần thêm phần cứng nào**.
@@ -79,7 +79,7 @@ Firmware gateway chạy theo đúng thứ tự sau, **không cần chọn tay**:
 | **Đường dẫn Ingress** | **`ws://192.168.4.1:8080/telemetry`** | Endpoint mục tiêu |
 
 #### B. Các bước thực hiện:
-1. **Cắm nguồn ESP32-C3:** Cắm cáp Type-C vào Laptop hoặc pin sạc dự phòng. Sau **15 giây** (`KVC_STA_BOOT_BUDGET_MS = 15000` trong `src/main.cpp`) không kết nối được Wi-Fi 2.4 GHz ở ưu tiên 1, ESP32 tự kích hoạt SoftAP `KVC_GROUND_STATION`. Tài liệu này trước đây ghi 10 giây; con số đó không khớp code.
+1. **Cắm nguồn ESP32-C3:** Cắm cáp Type-C vào Laptop hoặc pin sạc dự phòng. Sau **15 giây** (`KVC_STA_BOOT_BUDGET_MS = 15000` trong `src/main.cpp`) không kết nối được Wi-Fi 2.4 GHz ở ưu tiên 1, ESP32 tự kích hoạt SoftAP `KVC_GROUND_STATION`. Tài liệu này trước đây ghi 10 giây; con số đó không khớp code. Mất STA giữa phiên (router/hotspot tắt) cũng kích hoạt SoftAP sau **5 giây** (`KVC_STA_DOWN_TO_AP_MS`).
 2. **Laptop bắt Wi-Fi:** Mở danh sách mạng Wi-Fi trên thanh Taskbar Windows $\rightarrow$ Chọn mạng **`KVC_GROUND_STATION`** $\rightarrow$ Nhập mật khẩu: `kvc123456`.
 3. **Khởi động Backend và Frontend:** (Xem Mục 3 bên dưới) $\rightarrow$ Hệ thống tự động kết nối và chạy ngay lập tức.
 4. **Sửa code:** **HOÀN TOÀN KHÔNG CẦN SỬA BẤT KỲ DÒNG CODE NÀO.**
@@ -98,7 +98,7 @@ Firmware gateway chạy theo đúng thứ tự sau, **không cần chọn tay**:
 - iPhone: Cài đặt → Điểm truy cập cá nhân → bật "Tối đa hóa khả năng tương thích" (bắt buộc phát 2.4 GHz).
 
 #### Bước 2: Cấu hình SSID & Mật khẩu qua Build Flag của PlatformIO (Không sửa code)
-Kể từ bản vá Task F11, thông tin Wi-Fi không còn hardcode trong mã nguồn `firmware/gateway_esp32/src/main.cpp`. Bạn truyền trực tiếp thông tin mạng lúc nạp code. Có thể khai báo **tới 4 mạng**, gateway thử lần lượt theo thứ tự:
+Firmware đã nạp sẵn hotspot Laptop 2.4 GHz của dự án làm giá trị mặc định (`KVC_WIFI_SSID` / `KVC_WIFI_PASS` trong `firmware/gateway_esp32/src/main.cpp`), nên **không cần build flag nào** cho cấu hình chuẩn. Khi cần đổi sang mạng khác, override bằng build flag — vẫn không phải sửa code. Có thể khai báo **tới 4 mạng**, gateway thử lần lượt theo thứ tự:
 
 ```powershell
 # Chỉ hotspot điện thoại:

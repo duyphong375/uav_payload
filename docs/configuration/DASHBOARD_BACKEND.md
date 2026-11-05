@@ -1,4 +1,4 @@
-﻿# KVC Application Backend (Mock, ESP32 Ingress & Video Relay)
+# KVC Application Backend (Mock, ESP32 Ingress & Video Relay)
 
 Dịch vụ Backend GCS tiếp nhận dữ liệu đo xa Telemetry và trạng thái mục tiêu UAV. Hệ thống hỗ trợ các nguồn dữ liệu:
 1. **Chế độ Giả lập (MOCK):** Tự sinh kịch bản chu kỳ phục vụ kiểm thử đơn vị, giao diện và ghi log SQLite.
@@ -12,7 +12,7 @@ From repository root (Windows PowerShell):
 ```powershell
 python -m venv .venv
 .venv/Scripts/python.exe -m pip install -r gcs/backend/requirements.txt
-.venv/Scripts/python.exe -m Dashboard.backend.main
+.venv/Scripts/python.exe -m uvicorn gcs.backend.main:app --host 127.0.0.1 --port 8000
 ```
 
 Default server: `127.0.0.1:8000`. Use one process/worker: application state and client queues are in memory; accepted records are durable only after the logger commit counter/ticket acknowledges them. Runtime databases default to `data/sessions/<session_id>.db`. The module does not start tasks during import; FastAPI lifespan owns the generator, SQLite writer and shutdown. CORS/browser WS origins allow only localhost/127.0.0.1 port 5173. This is a local development service, not a remotely exposed service.
@@ -30,7 +30,7 @@ Endpoints:
 - POST `/api/replay/speed`: body `{ "speed": 0.5|1|2 }`; change application playback rate without discontinuity. It is not a hardware command. **Không có lời gọi từ UI.**
 - POST `/api/replay/stop`: cancel the replay task, broadcast a clean MOCK snapshot and restart the configured MOCK generator. Replay target/camera/alerts are not retained under a live label. **Không có lời gọi từ UI.**
 - WS `/ws/telemetry`: read-only JSON stream, full snapshot first, then event patches. Client commands are rejected with 1008.
-- GET `/video/stream` (IF-05): MJPEG passthrough from the ESP32-S3-CAM. Returns 503 unless `KVC_ENABLE_VIDEO_RELAY=1`. The backend is the outbound client; the browser never contacts the camera directly. This route opens **one upstream connection per viewer**, in addition to the always-on `VideoRelay._consume` client — camera load is `1 + viewers`, not a single shared connection.
+- GET `/video/stream` (IF-05): MJPEG passthrough from the ESP32-S3-CAM. Returns 503 unless `KVC_ENABLE_VIDEO_RELAY=1`. The backend is the outbound client; the browser never contacts the camera directly. This route uses internal fan-out (`relay.subscribe()`), sharing the single upstream connection of `VideoRelay._consume` across all viewers — camera load is strictly 1 connection, regardless of how many browser viewers subscribe.
 - GET `/api/video/status`: relay state (`source_kind`, `is_connected`, `frame_count`, `last_frame_age_ms`, `error_message`) without opening a stream.
 
 ### IF-05 video relay (optional, off by default)

@@ -57,7 +57,7 @@ Gateway ESP32 tự chọn chế độ mạng theo **thứ tự ưu tiên cố đ
 
 ### Ưu tiên 1 — Station Mode (STA), Wi-Fi 2.4 GHz có sẵn
 
-- ESP32 kết nối vào mạng Wi-Fi 2.4 GHz của phòng Lab, router, hoặc hotspot điện thoại. Credential truyền lúc build qua `KVC_WIFI_SSID` / `KVC_WIFI_PASS` (không hardcode trong source).
+- ESP32 kết nối vào mạng Wi-Fi 2.4 GHz của phòng Lab, router, hoặc hotspot điện thoại/laptop. Firmware nạp sẵn hotspot Laptop của dự án làm mặc định; đổi mạng bằng `KVC_WIFI_SSID` / `KVC_WIFI_PASS` lúc build (không phải sửa code).
 - **ESP32-C3 chỉ hỗ trợ 2.4 GHz**, không hỗ trợ 5 GHz.
 - Khi STA thành công, firmware **không phát SoftAP**.
 - Backend Python tích hợp cơ chế Auto-Discovery (`discover_esp32_gateway`) tự dò địa chỉ IP của ESP32 trên mạng cục bộ, không cần cấu hình IP thủ công.
@@ -65,12 +65,12 @@ Gateway ESP32 tự chọn chế độ mạng theo **thứ tự ưu tiên cố đ
 
 ### Ưu tiên 2 — SoftAP dự phòng (tự động)
 
-- Kích hoạt khi **không có credential** hoặc **hết 15 giây** (`KVC_STA_BOOT_BUDGET_MS = 15000` trong `main.cpp`) chưa nối được STA.
+- Kích hoạt khi **không có mạng STA nào khai báo**, **hết 15 giây** (`KVC_STA_BOOT_BUDGET_MS = 15000` trong `main.cpp`) chưa nối được STA, **hoặc mất STA liên tục quá 5 giây** (`KVC_STA_DOWN_TO_AP_MS`) trong lúc đang chạy.
 - **SSID:** `KVC_GROUND_STATION`
 - **Mật khẩu (Password):** `kvc123456` (WPA2-PSK, thông số vận hành nội bộ)
 - **Địa chỉ IP ESP32:** `192.168.4.1`
-- **WebSocket Endpoint:** `ws://192.168.4.1:8080/telemetry`
-- Firmware vẫn thử lại STA mỗi 30 giây; nếu STA nối được thì **tự đóng SoftAP** và chuyển về ưu tiên 1.
+- **WebSocket Endpoint:** `ws://192.168.4.1:8080/telemetry`. Đây là path **duy nhất** được phục vụ; client yêu cầu path khác bị firmware ngắt ngay và Serial in `[WS-REJECT]`.
+- Firmware vẫn thử lại STA mỗi 30 giây; khi STA nối được **và SoftAP không còn client nào** thì tự đóng SoftAP và chuyển về ưu tiên 1. Nếu còn client (laptop / ESP32-S3-CAM đang bám), SoftAP được giữ để không cắt phiên đang chạy — `net_policy.cpp` trả `None` thay vì `CloseSoftAp`.
 
 > [!NOTE]
 > **"4G" trong dự án là do điện thoại phát hotspot Wi-Fi 2.4 GHz**, không phải module 4G/LTE gắn vào ESP32. Điện thoại lo phần sóng di động; gateway chỉ cần bắt Wi-Fi của điện thoại nên **không cần thêm phần cứng nào**. Firmware hỗ trợ khai báo tối đa 4 mạng ở ưu tiên 1 và thử lần lượt; nếu không mạng nào kết nối được thì mới phát SoftAP.

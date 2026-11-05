@@ -170,11 +170,12 @@ Dưới đây là mã nguồn chuẩn chỉnh từng file bạn có thể lưu t
 #define RF_PAYLOAD_SIZE  32       // Kích thước chuẩn 32 bytes
 
 // =================== CẤU HÌNH WI-FI & WEBSOCKET ===================
-// Ưu tiên 1: STA (Wi-Fi 2.4 GHz có sẵn) qua build flag, không hardcode.
+// Ưu tiên 1: STA (Wi-Fi 2.4 GHz có sẵn). Firmware nạp sẵn hotspot Laptop của
+// dự án; đổi mạng bằng build flag -D, không phải sửa code.
 // Ưu tiên 2: SoftAP dự phòng dưới đây, bật khi STA thất bại sau 15 s
 // (KVC_STA_BOOT_BUDGET_MS = 15000 trong src/main.cpp).
-#define WIFI_SSID        ""                // Nạp bằng -D KVC_WIFI_SSID=\"...\"
-#define WIFI_PASS        ""                // Nạp bằng -D KVC_WIFI_PASS=\"...\"
+#define WIFI_SSID        "Ars vô địch thì đổi tên"  // Override: -D KVC_WIFI_SSID=\"...\"
+#define WIFI_PASS        "hihihihi"                 // Override: -D KVC_WIFI_PASS=\"...\"
 #define AP_SSID          "KVC_GROUND_STATION"
 #define AP_PASS          "kvc123456"       // Mật khẩu SoftAP dự phòng
 #define WS_PORT          8080              // Cổng WebSocket

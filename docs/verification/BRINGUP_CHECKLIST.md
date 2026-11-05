@@ -221,11 +221,84 @@ sai số baud phía MCU hoặc dây/nhiễu.
 | 6.1.5 | Đo DC module pin 17 (PWDN) | ≈ 0 V | **PASS** (0,0 V DC) |
 | 6.1.5a | Đo module pin 18 (XCLK) | **có xung 24 MHz** (hoặc DC trung bình ~1,65 V khi đo VOM, ~3,3 V p-p) từ J1-12 | **PASS** (đo thực tế 1,65 V DC) |
 | 6.1.5b | Đo DC module pin 3 (SCL) | **3,3 V DC** (FPGA Master Push-Pull, 100 kHz, FSM chốt `cfg_attempted` dừng ở S_DONE) | **PASS** (đo thực tế 3,3 V DC) |
-| 6.1.6 | Đo module pin 15 (DCLK/PCLK) bằng scope/LA hoặc VOM AC | **có xung 12–24 MHz** (áp AC > 1,2 V khi có XCLK) | ⬜ Đang đo |
-| 6.1.7 | Đo module pin 4 (VSYNC) bằng scope/LA | **có xung ~30 Hz** | ⬜ Đang đo |
+| 6.1.6 | Đo module pin 15 (DCLK/PCLK) bằng scope/LA hoặc VOM AC | **có xung 12–24 MHz** (áp AC > 1,2 V khi có XCLK) | ⚪ **SUPERSEDED** — bằng chứng mạnh hơn ở 6.1.10 |
+| 6.1.7 | Đo module pin 4 (VSYNC) bằng scope/LA | **có xung ~30 Hz** | ⚪ **SUPERSEDED** — bằng chứng mạnh hơn ở 6.1.10 |
 | 6.1.8 | Chạy `fpga_uart_capture.py --seconds 15` | **FPS > 105** (không phải 100,0) | **PASS 01/11/2026** — nhưng khác cách hiểu, xem dưới |
-| 6.1.9 | Chụp vật đỏ thuần trước ống kính | R > 0xF000, G/B < 0x2000 | ⬜ **NOT RUN** |
-| 6.1.10 | Đưa mục tiêu cam vào khung, đọc `x/y/w/h/conf/class` | `N=1`, `class=2` | **PASS 01/11/2026** — 7/69 khung `N=1`, `class=2`, 0 lỗi CRC. Xem `evidence/KVC-FPGA-G0G6-20261101-001.md` |
+| 6.1.9 | Chụp vật đỏ/cam trước ống kính | Đỏ thuần: R > 240/255, G/B < 32/255. Cam: `cnt_match` cao | ⬜ **NOT RUN — rev 3 đã build, chưa nạp bo** |
+
+> **6.1.9 — rev 4 đã build, chưa đo.** Đường release không mang giá trị pixel ra
+> ngoài, nên phải dùng bitstream chẩn đoán riêng:
+>
+> | Thành phần | Chi tiết |
+> | :--- | :--- |
+> | RTL | `KVC_PR/src/processing/pixel_stats.v` **rev 4** — thống kê tổng R/G/B trên **toàn frame** + 4 bộ đếm chẩn đoán theo bộ lọc tỷ lệ + `max_px`/`max_py` + slot 10 = `PIXSTAT_REV` |
+> | Wrapper | `KVC_PR/src/kvc_top_diag_pixel.v` (`DIAG_MODE = 3`) |
+> | Build | `KVC_PR/tools/build_kvc_diag_pixel.tcl` |
+> | **Bitstream rev 4** | **`review/artifacts/KVC_FPGA_diag_pixel_EC4BC008.fs`** (SHA-256 `EC4BC0081339729AD8CAFA4551A3076908E0FCC04CF4A8827A61B9CF153971A4`, Fmax `clk_100m` **119,792 MHz**, TNS 0) |
+> | Bitstream cũ | rev 3 `05288FA6` (**lỗi tràn 8 bit** ở slot 7/9 + `center_pixel` stale), rev 2 `0B125CDC` (ngưỡng blob **cũ**), rev 1 `A92E18B9` (chặt hơn blob cũ) — **KHÔNG dùng để hiệu chuẩn** |
+> | Testbench | `tb_pixel_stats` — **34/34 PASS** (có test [5] hồi quy tràn 8 bit); suite giữ **PASS** |
+> | Giải mã | `scripts/manual/decode_pixel_diag.py` (nhận diện rev 1/2/3/4; test **28/28 PASS**) |
+> | Hướng dẫn | **`docs/verification/G6.1.9_PIXEL_COLOR_PROCEDURE.md`** |
+>
+> **Vì sao cần đường riêng:** 6.1.10 chỉ trả lời *"có pixel khớp ngưỡng không"*;
+> 6.1.9 hỏi *"màu thật là gì"*. Blob trả lời câu đầu, không trả lời câu sau.
+>
+> **Rev 4 dùng ĐÚNG bộ lọc blob rev 2** (thứ tự `R>G>B`, hue 10–40°, `S ≥ 0,80`,
+> sàn sáng/chroma) **+ run-length ≥ 3**, nên `cnt_match` so sánh trực tiếp được
+> với `cnt` của `kvc_blob_detect`. Slot 6..9 tách riêng từng điều kiện để biết
+> **điều kiện nào loại nhiều pixel nhất** — dữ liệu cho F-02.
+>
+> **Rev 3 có hai lỗi, đừng dùng số của nó:** (1) `d`/`n` khai báo 8 bit nên
+> **tràn** khi `R8 < B8` / `G8 < B8`; `cnt_hue_ok` dư **10.581/16.192** mã và
+> `cnt_tone_ok` dư **24.192/51.968** mã (quét đủ 65.536 mã RGB565). `cnt_match`,
+> `cnt_ord_ok`, `cnt_sat_ok` vẫn đúng. (2) `center_pixel` stale. Chi tiết:
+> `evidence/KVC-G6.1-20261104-001.md`.
+>
+> **Đính chính quan trọng về chiều cao frame:** `center_pixel` khác 0 ở **42/42**
+> khung rev 3 và **43/43** khung rev 1 ⇒ `py` **đã** tới 240. Vì `pix_count` tối
+> đa chỉ 119.838, nếu là VGA thì 241 dòng đã cần 154.240 pixel — **mâu thuẫn**.
+> Vậy **không** được kết luận "frame bị cắt còn 46–187 dòng" chỉ từ `pix_count`.
+> Rev 4 thêm `max_px`/`max_py` để trả lời dứt điểm; tool FAIL nếu `max_py < 479`.
+>
+> **Điểm phải biết trước khi đo — bộ lọc đã đổi:** rev 2 của blob bỏ hoàn toàn
+> `R_MIN/G_MIN/G_MAX/B_MAX`. Vật **đỏ thuần `#FF0000`** giờ bị loại vì
+> `G8 > B8` sai (`0 > 0`), **không phải** vì `G_MIN = 10` như trước. Vì vậy
+> `cnt_ord_ok = 0` trên đỏ thuần là **kết quả đúng**, không phải lỗi. Vật cam
+> thật (`#FF8800`) phải cho `cnt_match ≈ 100 %` khi phủ kín khung.
+>
+> **Tiêu chí G < 32/255 chỉ áp cho đỏ thuần.** Màu cam cứu hộ thật có `G8 ≈ 130–150`
+> nên luôn FAIL tiêu chí đó — đây là mâu thuẫn định nghĩa giữa checklist và bộ
+> lọc, không phải lỗi RTL.
+>
+> **Không dùng màn hình điện thoại** làm vật thử — đã sai một lần ở F-02 (viền
+> đen + AWB + phản xạ làm lấp đầy chỉ 1 %). Dùng vật đỏ/cam **đặc**, phủ kín ≥ 80 %
+> khung.
+>
+> **Không hạ `MIN_PIXELS` từ 120 xuống 64 trên cơ sở capture rev 3.** Trên
+> `px.bin`, `cnt_match/cnt_ord_ok` chỉ **0,27–1,76 %** — pixel `ord_ok` **rời rạc**,
+> không thành mảng. Tấm cam 240×240 nằm trong dải đo sẽ cho tỉ lệ ≈100 %. Hạ
+> ngưỡng lúc này là hiệu chuẩn trên nhiễu. Hồi quy 42 khung còn cho
+> `corr(meanR, meanB) = +0,585`, `dB/dR = +0,253` — phần "đỏ" tăng lên là ánh sáng
+> trắng ấm, không phải mảng cam.
+>
+> **Sau khi đo phải nạp lại bitstream release mới nhất** (`9E62B590`, xem
+> `FPGA_BUILD_RECORD.md §1`). Bitstream SRAM mất khi mất điện, nhưng để nguyên
+> bản diag thì phiên sau đọc nhầm số.
+| 6.1.10 | Đưa mục tiêu cam vào khung, đọc `x/y/w/h/conf/class` | `N=1`, `class=2` | **PASS 03/11/2026 (HARDWARE-VERIFIED)** — **7/58 dòng (12,1 %)** `N=1`, `class=2`, `crc=0`. Xem `evidence/KVC-G6.1-20261103-001.md`. **Số này là của bộ lọc CŨ (bitstream `86CCF5DD`); bitstream rev 2 `9E62B590` CHƯA đo** |
+
+> **6.1.6 / 6.1.7 — SUPERSEDED, không phải NOT RUN.** Mục đích của chúng là chứng
+> minh camera phát PCLK/VSYNC thật. Blob sinh bbox **từ pixel thật** là bằng chứng
+> **mạnh hơn**: thiếu PCLK/VSYNC thì `kvc_blob_detect` không thể đếm pixel và
+> không thể ra `N=1`. Không cần đo scope nữa — không thêm thông tin.
+>
+> **6.1.9 — KHÔNG thể thay thế, vẫn NOT RUN.** Đây là phép đo **giá trị RGB565**,
+> trả lời câu hỏi khác hẳn: *ngưỡng màu có đúng không*. 6.1.10 chỉ chứng minh
+> "có pixel khớp ngưỡng". Đây chính là dữ liệu cần cho **F-02** (ngưỡng quá hẹp,
+> lấp đầy ~1 %).
+>
+> **Kết luận G6.1: `PASS 8/10`** — 6.1.6/6.1.7 superseded, **6.1.9 NOT RUN**.
+> Không ghi `CLOSED`.
+
 
 > **6.1.8 — cách đọc khác với bản trước.** Ngưỡng "FPS > 105" được viết cho
 > **bitstream mock** (`BBOX_SOURCE=0`), nơi khung do bộ đếm nội bộ sinh ra ở
@@ -383,11 +456,23 @@ high byte, dòng 112: `pixel_data <= {high_byte, data_in}`).
 | 6.3.1 | In bàn cờ 9×6 ô, mỗi ô 25 mm, dán phẳng | — | ⬜ |
 | 6.3.2 | Chụp 15–20 ảnh bằng chính OV2640 ở nhiều góc | File ảnh lưu được | ⬜ |
 | 6.3.3 | Chạy `cv2.calibrateCamera` | Reproj error < 0,5 px | ⬜ |
-| 6.3.4 | Ghi `fx_px`, `cx_px`, `cy_px` thật | Sai khác so với 554/320/240 được ghi rõ | ⬜ |
+| 6.3.4 | Ghi `fx_px`, `cx_px`, `cy_px` thật | Sai khác so với 346/200/150 được ghi rõ | ⬜ |
 | 6.3.5 | Cập nhật `firmware/mcu_payload/inc/kvc_georef.h:80-82` | — | ⬜ |
 | 6.3.6 | Nạp lại firmware MCU, đo lại georef tĩnh | Sai số < 0,5 m @ 3 m | ⬜ |
 
-**Đây là bước quan trọng nhất trong G6.** `fx_px = 554` là giả định HFOV 60°; nếu OV2640 thực tế 56° hoặc 64°, toạ độ sai 6–7 % ở mọi khoảng cách và không test nào phát hiện được.
+> **CẬP NHẬT 04/11/2026 — hệ quy chiếu đã sửa, nhưng 6.3.4–6.3.6 vẫn `NOT RUN`.**
+>
+> Trước hôm nay `kvc_georef.c` dùng `554/320/240`, tức **giả định ảnh 640×480**.
+> Đo trên bo (`px_rev4.bin`) cho thấy OV2640 trong cấu hình hiện tại xuất
+> **400×300** (`max_px = 399`, `max_py` tới 299). Với hệ cũ, một mục tiêu ở
+> **chính giữa khung** vẫn bị báo lệch **−10,8 m / +8,1 m ở độ cao 50 m**.
+> Đã đổi thành `346/200/150` và thêm `TEST 15` khoá hành vi này.
+>
+> **`346` KHÔNG phải giá trị hiệu chuẩn** — nó chỉ giữ nguyên giả định HFOV 60°
+> khi bề rộng 640 → 400. Bước 6.3.3–6.3.6 vẫn phải làm. Cự ly ngang tỉ lệ thuận
+> với `fx`, nên `fx` lệch 10 % thì ở 50 m sai 5 m.
+>
+> Chi tiết: `evidence/KVC-G6.1-20261104-002.md`.
 
 ---
 
@@ -410,10 +495,12 @@ G2.3 Timestamp ms      : PASS / FAIL   dt tb = ____ ms (kỳ vọng ~10 cho MOCK
 G2.4 MCU nhận          : PASS / FAIL   fe = ____ crc = ____
 G2.7 Soak 30 min       : PASS 2/3     reset = 0, drop = 0, fe = 0 (G2.7_soak_20261102.txt) · nhiệt NOT MEASURED
 G6.1 Camera            : PASS / FAIL   frame_ok = ____ %
-G6.1 blob thật         : PASS / FAIL   N=1 đếm = ____  class = ____  crc_err = ____
+G6.1 blob thật         : PASS 7/58    N=1 = 12,1 %  class = 2  crc_err = 0  (03/11/2026)
+G6.1 muc 9 (mau RGB)   : NOT RUN      ← mục duy nhất còn thiếu
 G6.2 Siêu âm 3 m       : PASS / FAIL   frame_ok = ____ %
 G6.3 fx_px             : PASS / FAIL   đo được = ____
 GW   Gateway thu sóng  : PASS / FAIL   NOT RUN (chờ bo từ Thịnh — 01/11/2026)
+F-08 ovr/late_max      : CLOSED       ovr=0, late_max=0 trên 58 chu kỳ sau reset (03/11/2026)
 ```
 
 > **Ghi chú 01/11/2026:** với bitstream **release** (`BBOX_SOURCE=1`), nhịp khung

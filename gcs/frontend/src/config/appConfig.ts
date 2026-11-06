@@ -14,6 +14,9 @@ export const APP_CONFIG = {
   WS_URL: import.meta.env.VITE_WS_URL || 'ws://127.0.0.1:8000/ws/telemetry',
   DEFAULT_SOURCE_MODE: (import.meta.env.VITE_DEFAULT_SOURCE_MODE || 'MOCK') as 'MOCK' | 'REAL' | 'REPLAY',
   MOCK_TRANSPORT: import.meta.env.VITE_MOCK_TRANSPORT === 'BACKEND' ? 'BACKEND' : 'LOCAL',
+  // IF-05: để trống thì URL được lấy từ trạng thái backend (`video.url`).
+  // Chỉ đặt biến này khi muốn ép một nguồn ngoài backend (vd. replay file cục bộ).
+  // KHÔNG trỏ thẳng vào ESP32-S3-CAM: IF-03 cấm trình duyệt nối trực tiếp thiết bị.
   VIDEO_STREAM_URL: import.meta.env.VITE_VIDEO_STREAM_URL || '',
 
   // Bản đồ GPS (Leaflet 2D & MapLibre 3D)
@@ -44,6 +47,18 @@ export const APP_CONFIG = {
   WS_RECONNECT_INTERVAL_MS: 2000,
   HEARTBEAT_INTERVAL_MS: 500,
 
+  // IF-05: chu kỳ thử tải lại khung hình sau khi <img> báo lỗi. đủ ngắn để
+  // người vận hành thấy hình trở lại sau vài giây, đủ dài để không dội stream
+  // khi camera thật sự mất kết nối.
+  VIDEO_RETRY_INTERVAL_MS: 3000,
+
+  // Ngưỡng khoảng cách mặt nước (mét). Giá trị duy nhất có căn cứ trong code
+  // hiện hành là 2.0 m (BottomTacticalDock); chưa có văn bản kỹ thuật cho mức
+  // "chú ý", nên KHÔNG thêm ngưỡng vàng khi chưa được duyệt.
+  LIDAR_DANGER_M: 2.0,
+  // Thang đo của ống nước: cận trên hiển thị, không phải ngưỡng an toàn.
+  LIDAR_GAUGE_MAX_M: 8.0,
+
   // Giới hạn lưu trữ bộ nhớ client (Memory bounds)
   MAX_TRAIL_POINTS: 200,
   MAX_ALERTS_HISTORY: 50,
@@ -66,5 +81,10 @@ export const APP_CONFIG = {
     WS_URL: 'kvc_gcs_ws_url',
     FOLLOW_CAMERA: 'kvc_gcs_follow_camera',
     SHOW_TRAILS: 'kvc_gcs_show_trails',
+    DISPLAY_DENSITY: 'kvc_gcs_density',
   },
+
+  // Mật độ hiển thị do người vận hành chọn tay (PLAN-002 §13.2).
+  // Không tự đổi theo chiều rộng màn hình.
+  DEFAULT_DENSITY: 'comfortable' as const,
 } as const

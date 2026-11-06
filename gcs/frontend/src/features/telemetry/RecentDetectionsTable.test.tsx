@@ -1,4 +1,4 @@
-﻿import { render } from '@testing-library/react'
+import { fireEvent, render } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AppRouterProvider } from '@/app/routes'
@@ -28,11 +28,11 @@ const makeTarget = (overrides: Partial<TargetInfo> = {}): TargetInfo => ({
   ...overrides,
 })
 
-const renderTable = (partial: Partial<MissionState>) => {
+const renderTable = (partial: Partial<MissionState>, dispatch = vi.fn()) => {
   const state: MissionState = { ...INITIAL_MISSION_STATE, ...partial }
   const value: MissionContextValue = {
     state,
-    dispatch: vi.fn(),
+    dispatch,
     selectedScenarioId: 'NORMAL_GPS_TARGET',
     setSelectedScenarioId: vi.fn(),
     switchSourceMode: vi.fn(),
@@ -40,7 +40,7 @@ const renderTable = (partial: Partial<MissionState>) => {
     wsUrl: 'ws://127.0.0.1:8000/ws/telemetry',
     setWsUrl: vi.fn(() => ({ ok: true })),
   }
-  return render(
+  const utils = render(
     <TooltipProvider>
       <MissionContext.Provider value={value}>
         <AppRouterProvider>
@@ -49,6 +49,7 @@ const renderTable = (partial: Partial<MissionState>) => {
       </MissionContext.Provider>
     </TooltipProvider>
   )
+  return { ...utils, dispatch }
 }
 
 describe('RecentDetectionsTable – không bịa toạ độ/confidence/khoảng cách', () => {
@@ -115,5 +116,84 @@ describe('RecentDetectionsTable – không bịa toạ độ/confidence/khoảng
       target: makeTarget(),
     })
     expect(container.textContent).toContain('WGS-84')
+  })
+
+  it('nút Ghi mốc không bị disabled khi mục tiêu chưa có toạ độ hợp lệ (pos_valid = false)', () => {
+    const dispatch = vi.fn()
+    const { getByRole, getByText } = renderTable(
+      {
+        source_mode: 'REAL',
+        has_target: true,
+        camera_position: {
+          latitude: 16.0544,
+          longitude: 108.2022,
+          altitude_m: 25.0,
+          heading_deg: 90.0,
+          is_valid: true,
+          age_ms: 50,
+          last_updated_iso: '2026-11-05T08:00:00.000Z',
+        },
+        target: makeTarget({
+          track_id: 1031,
+          class_name: 'lifebuoy',
+          confidence: 5.0,
+          pos_valid: false,
+          coordinate_frame: 'NONE',
+          latitude: null,
+          longitude: null,
+        }),
+      },
+      dispatch
+    )
+
+    const markBtn = getByRole('button', { name: /Ghi mốc/i }) as HTMLButtonElement
+    expect(markBtn.disabled).toBe(false)
+
+    fireEvent.click(markBtn)
+
+    expect(dispatch).toHaveBeenCalledWith({
+      type: 'LOG_EVENT',
+      payload: expect.objectContaining({
+        level: 'INFO',
+        source: 'SAR_MISSION',
+        code: 'SAR_MARK_EVENT',
+        message: expect.stringContaining('#1031'),
+        details: expect.stringContaining('16.054400'),
+      }),
+    })
+
+    expect(getByText('Đã ghi mốc')).toBeDefined()
+  })
+
+  it('cho phép sao chép toạ độ UAV lúc phát hiện khi toạ độ mục tiêu chưa hợp lệ', () => {
+    const writeText = vi.fn()
+    Object.assign(navigator, { clipboard: { writeText } })
+
+    const { getByRole } = renderTable({
+      source_mode: 'REAL',
+      has_target: true,
+      camera_position: {
+        latitude: 16.0544,
+        longitude: 108.2022,
+        altitude_m: 25.0,
+        heading_deg: 90.0,
+        is_valid: true,
+        age_ms: 50,
+        last_updated_iso: '2026-11-05T08:00:00.000Z',
+      },
+      target: makeTarget({
+        track_id: 1031,
+        pos_valid: false,
+        coordinate_frame: 'NONE',
+        latitude: null,
+        longitude: null,
+      }),
+    })
+
+    const copyBtn = getByRole('button', { name: /Sao chép toạ độ UAV/i }) as HTMLButtonElement
+    expect(copyBtn.disabled).toBe(false)
+
+    fireEvent.click(copyBtn)
+    expect(writeText).toHaveBeenCalledWith('16.054400, 108.202200')
   })
 })

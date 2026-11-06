@@ -50,9 +50,11 @@ describe('KVC Reality Verification (KVC-GCS-UI-REALITY-001)', () => {
       </>
     )
 
-    // Nút và badge MOCK hiển thị rõ ràng
+    // Nút và badge MOCK hiển thị rõ ràng ở AppHeader
     expect(screen.getAllByText(/MOCK/i).length).toBeGreaterThan(0)
-    expect(screen.getByText(/Chế độ Mô phỏng/i)).toBeDefined()
+    // Thanh ngữ cảnh không lặp nhãn chế độ; nó chỉ giữ chọn kịch bản
+    expect(screen.queryByText(/Chế độ Mô phỏng/i)).toBeNull()
+    expect(screen.getByLabelText(/Chọn kịch bản mô phỏng/i)).toBeDefined()
   })
 
   it('AC2: REAL hiển thị rõ CHƯA KẾT NỐI khi chưa có Ingress từ ESP32-C3', () => {
@@ -70,9 +72,9 @@ describe('KVC Reality Verification (KVC-GCS-UI-REALITY-001)', () => {
 
     // Nút REAL ở AppHeader hoặc badge phải hiện rõ CHƯA KẾT NỐI
     expect(screen.getAllByText(/CHƯA KẾT NỐI/i).length).toBeGreaterThan(0)
-    // ModeContextBar phải thông báo chưa có Ingress ESP32
-    expect(screen.getByText(/REAL: ESP32 Chưa Kết Nối/i)).toBeDefined()
+    // Thanh ngữ cảnh hiện mô tả gateway nhưng không lặp trạng thái nguồn
     expect(screen.getByText(/Chưa cấu hình Ingress/i)).toBeDefined()
+    expect(screen.queryByText(/REAL: ESP32 Chưa Kết Nối/i)).toBeNull()
   })
 
   it('AC4: Tách rõ Browser-Backend WS và Hardware Link (ESP32)', () => {
@@ -97,11 +99,14 @@ describe('KVC Reality Verification (KVC-GCS-UI-REALITY-001)', () => {
         source_mode: 'REAL',
         video: {
           source_type: 'REFERENCE',
+          source_kind: 'NONE',
           url: null,
           is_connected: true,
           is_loading: false,
           error_message: null,
           has_overlay: true,
+          frame_count: 0,
+          last_frame_age_ms: null,
         },
       },
       <VideoPanel />

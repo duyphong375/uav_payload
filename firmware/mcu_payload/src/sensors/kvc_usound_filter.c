@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file kvc_usound_filter.c
  * @brief Cài đặt bộ lọc trung vị trượt + chặn ngoại lai. Xem header.
  *
@@ -7,8 +7,6 @@
  * chỉ thay biến `static` cục bộ bằng trường của struct. Mọi quyết định
  * (điều kiện giữ mẫu, ngưỡng ngoại lai, cách so chiều, thứ tự cập nhật lịch sử)
  * đều giữ đúng để hành vi trên kit không đổi.
- *
- * Người phụ trách: Nguyễn Tá Duy Phong
  */
 
 #include "kvc_usound_filter.h"

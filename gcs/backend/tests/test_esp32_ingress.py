@@ -1,4 +1,4 @@
-﻿"""Tests for ESP32 ingress decoding and envelope injection."""
+"""Tests for ESP32 ingress decoding and envelope injection."""
 
 import struct
 
@@ -16,6 +16,21 @@ from gcs.backend.esp32_ingress import (
     validate_rf_payload,
 )
 from gcs.backend.main import create_app
+
+
+def build_frame(*, lat=0, lon=0, x=0, y=0, lidar=0, cls=0, conf=0, flags=0,
+                seq=1, ts=100):
+    """Dựng frame IF-02 32 byte với CRC hợp lệ.
+
+    Test trước đây dùng `struct.pack(..., 0x1234)` cho CRC, tức CRC SAI, và chỉ
+    qua được vì `inject_envelope` bỏ qua `crc_valid` (T-04). Nay CRC-invalid bị
+    từ chối nên helper phải tính CRC thật.
+    """
+    body = struct.pack(
+        "<2sBBIIIhhHBBBB4s", b"\xaa\x55", 1, seq, ts, lat, lon,
+        x, y, lidar, cls, conf, flags, 0, b"\x00\x00\x00\x00",
+    )
+    return body + struct.pack("<H", crc16_ccitt_false(body))
 
 
 def test_abi_constants_match_if02_layout():
@@ -187,12 +202,7 @@ def test_http_ingress_envelope_api():
     app = create_app(Settings(storage_dir=None, enable_mock=False))
     client = TestClient(app)
     with client:
-        fmt = RF_PAYLOAD_FORMAT
-        raw = struct.pack(
-            fmt, b"\xaa\x55", 1, 1, 100,
-            0, 0, 100, 200, 250, 2, 90,
-            0x0e, 122, b"\x00\x00\x00\x00", 0x0000,
-        )
+        raw = build_frame(lat=0, lon=0, x=100, y=200, lidar=250, cls=2, conf=90, flags=0x0E)
         res = client.post("/api/ingress/envelope", json={
             "rf_payload_hex": raw.hex(),
             "rssi_dbm": -65,
@@ -204,6 +214,32 @@ def test_http_ingress_envelope_api():
         assert snap["has_target"] is True
         assert snap["target"]["class_name"] == "lifebuoy"
         assert snap["telemetry"]["packet_rssi_dbm"] == -65
+        # KVC-DUAL-CAMERA-20261102 (T-05): phiên live mang nhãn REAL thật.
+        assert snap["source_mode"] == "REAL"
+        assert snap["original_source_mode"] == "REAL"
+        assert snap["inference_device"] == "FPGA_GW2A"
+        assert snap["diagnostics"]["packets_received_total"] == 1
+        assert snap["diagnostics"]["decode_errors_total"] == 0
+
+
+def test_ingress_rejects_bad_crc_and_keeps_state():
+    """KVC-DUAL-CAMERA-20261102 (T-04): frame sai CRC không được vào state."""
+    app = create_app(Settings(storage_dir=None, enable_mock=False))
+    client = TestClient(app)
+    with client:
+        good = build_frame(lat=107723450, lon=1066578900, x=150, y=320, lidar=240, cls=1, conf=92, flags=0x0F)
+        assert client.post("/api/ingress/envelope", json={"rf_payload_hex": good.hex()}).status_code == 200
+        before = client.get("/api/state/snapshot").json()
+
+        corrupt = bytearray(good)
+        corrupt[12] ^= 0xFF
+        res = client.post("/api/ingress/envelope", json={"rf_payload_hex": bytes(corrupt).hex()})
+        assert res.status_code == 400
+
+        after = client.get("/api/state/snapshot").json()
+        assert after["target"] == before["target"]
+        assert app.state.hub.store.rf_reject_count == 1
+        assert app.state.hub.store.decode_errors_total == 1
 
 
 def test_session_inactivity_auto_close():
@@ -212,12 +248,7 @@ def test_session_inactivity_auto_close():
     client = TestClient(app)
     with client:
         hub = app.state.hub
-        fmt = RF_PAYLOAD_FORMAT
-        raw = struct.pack(
-            fmt, b"\xaa\x55", 1, 1, 100,
-            0, 0, 100, 200, 250, 1, 90,
-            0x0e, 122, b"\x00\x00\x00\x00", 0x0000,
-        )
+        raw = build_frame(lat=0, lon=0, x=100, y=200, lidar=250, cls=1, conf=90, flags=0x0E)
         res = client.post("/api/ingress/envelope", json={
             "rf_payload_hex": raw.hex(),
             "rssi_dbm": -65,
@@ -239,6 +270,9 @@ def test_session_inactivity_auto_close():
         assert new_session != old_session
         assert hub.store.times["rx"] is None
         assert "SESSION_AUTO_CLOSED" in hub.store.alerts
+        # KVC-DUAL-CAMERA-20261102 (T-05): xoay phiên giữ provenance REAL.
+        assert hub.store.source_mode == "REAL"
+        assert hub.store.original_source_mode == "REAL"
 
 
 def test_phase3_self_mock_scenarios():
@@ -263,7 +297,7 @@ def test_phase3_self_mock_scenarios():
     assert p0["telemetry"]["lidar_range_cm"] == 250
     assert p0["telemetry"]["battery_pct"] is None  # đã bỏ đo pin ở tải
 
-    # Scenario 1: Boat WGS-84 (Đà Nẵng)
+    # Scenario 1: Lifebuoy WGS-84 (Đà Nẵng)
     raw_lifebuoy = struct.pack(
         fmt, b"\xaa\x55", 1, 2, 2000,
         160751000, 1081512000,

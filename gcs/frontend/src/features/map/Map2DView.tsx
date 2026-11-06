@@ -1,7 +1,7 @@
-﻿import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { ChevronDown, ChevronUp, LocateFixed, WifiOff } from 'lucide-react'
+import { LocateFixed } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { APP_CONFIG } from '@/config/appConfig'
 import {
@@ -10,8 +10,6 @@ import {
   type PositionHistoryPoint,
   type TargetInfo,
 } from '@/types/telemetry'
-import { MapLayerSwitcher } from './MapLayerSwitcher'
-import { formatCoordinates, formatTimeAgo } from './positionUtils'
 
 // SVG Custom Icon cho Camera/Tải nhiệm vụ (Không dùng animation pulse liên tục)
 function createCameraIcon(heading: number | null | undefined, isStale: boolean) {
@@ -67,37 +65,16 @@ function createTargetIcon(className: string, isStale: boolean) {
   })
 }
 
-// Tính toán đa giác vùng quan sát quang học (Camera FOV polygon)
+// Vùng quan sát camera (FOV cone): ĐÃ VÔ HIỆU HÓA theo KVC Data Integrity Policy.
+// Lý do: Các thông số góc mở ống kính (45°), góc chúc (45°) và độ cao giả định (25m)
+// là suy đoán không có gimbal thật đo đạc, tạo vùng phủ giả dễ gây bỏ sót nạn nhân.
 function calculateFovPolygon(
-  lat: number,
-  lng: number,
-  headingDeg: number | null | undefined,
-  altM: number | null | undefined
+  _lat: number,
+  _lng: number,
+  _headingDeg: number | null | undefined,
+  _altM: number | null | undefined
 ): [number, number][] | null {
-  if (headingDeg === null || headingDeg === undefined) return null
-  const alt = Math.max(altM ?? 25, 10)
-  // Chiều dài vệt chiếu xuống mặt đất xấp xỉ theo độ cao và góc chúc 45 độ
-  const groundDistanceM = alt * 1.0
-  const fovAngleDeg = 45 // Góc mở ống kính
-
-  // Đổi mét sang độ vĩ/kinh (xấp xỉ: 1m ≈ 0.000009 độ)
-  const degPerMeterLat = 0.000009
-  const degPerMeterLng = 0.000009 / Math.cos((lat * Math.PI) / 180)
-
-  const leftHeadingRad = ((headingDeg - fovAngleDeg / 2) * Math.PI) / 180
-  const rightHeadingRad = ((headingDeg + fovAngleDeg / 2) * Math.PI) / 180
-
-  const p1: [number, number] = [lat, lng]
-  const p2: [number, number] = [
-    lat + Math.cos(leftHeadingRad) * groundDistanceM * degPerMeterLat,
-    lng + Math.sin(leftHeadingRad) * groundDistanceM * degPerMeterLng,
-  ]
-  const p3: [number, number] = [
-    lat + Math.cos(rightHeadingRad) * groundDistanceM * degPerMeterLat,
-    lng + Math.sin(rightHeadingRad) * groundDistanceM * degPerMeterLng,
-  ]
-
-  return [p1, p2, p3]
+  return null
 }
 
 // Tạo Leaflet tileLayer hỗ trợ zoom mượt mà, chống mất hình ảnh khi phóng to (Zoom in)
@@ -146,6 +123,13 @@ interface Map2DViewProps {
   rxAgeMs: number
   mapInstanceRef: React.MutableRefObject<L.Map | null>
   onResetView?: () => void
+  /**
+   * Lớp nền đang chọn ('2D' = bản đồ số, '3D' = ảnh vệ tinh).
+   * Trước đây Map2DView tự giữ state này và tự vẽ nút chuyển lớp bên trong khung
+   * bản đồ, trùng gốc với các lớp nổi khác của MissionPage. Nay nút do
+   * MissionPage bố trí trong overlay rail và state được truyền xuống từ đây.
+   */
+  layerMode?: '2D' | '3D'
 }
 
 export const Map2DView: React.FC<Map2DViewProps> = ({
@@ -158,6 +142,7 @@ export const Map2DView: React.FC<Map2DViewProps> = ({
   rxAgeMs,
   mapInstanceRef,
   onResetView,
+  layerMode = '2D',
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null)
   const cameraMarkerRef = useRef<L.Marker | null>(null)
@@ -169,9 +154,7 @@ export const Map2DView: React.FC<Map2DViewProps> = ({
 
   const [tileError, setTileError] = useState(false)
   const [newPositionOutsideView, setNewPositionOutsideView] = useState(false)
-  const [isSatellite, setIsSatellite] = useState(false)
-  // Cho phép thu gọn cảnh báo Mất Fix GNSS thành thanh chip nổi để tăng diện tích hiển thị bản đồ
-  const [isGnssAlertCollapsed, setIsGnssAlertCollapsed] = useState<boolean>(true)
+  const isSatellite = layerMode === '3D'
   const lastMarkerUpdateRef = useRef<number>(0)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
 
@@ -394,7 +377,7 @@ export const Map2DView: React.FC<Map2DViewProps> = ({
       const targetTooltipContent = `
         <div style="font-family: system-ui, sans-serif; font-size: 11px; line-height: 1.4; padding: 2px;">
           <div style="font-weight: 700; color: #ef4444; margin-bottom: 2px;">
-            Mục tiêu #${target.track_id ?? '101'}
+            Mục tiêu #${target.track_id ?? 'N/A'}
           </div>
           <div style="font-family: monospace;">Lat: ${target.latitude.toFixed(6)}°</div>
           <div style="font-family: monospace;">Lon: ${target.longitude.toFixed(6)}°</div>
@@ -488,9 +471,11 @@ export const Map2DView: React.FC<Map2DViewProps> = ({
       {/* Khung bản đồ Leaflet */}
       <div ref={mapContainerRef} className="w-full h-full z-0 cursor-grab active:cursor-grabbing" />
 
-      {/* Nút nhỏ nổi: "Có vị trí mới" khi UAV ở ngoài vùng xem hiện tại của người dùng (Quy tắc chống nhấp nháy Mục 7) */}
+      {/* Nút nhỏ nổi: "Có vị trí mới" khi UAV ở ngoài vùng xem hiện tại của người dùng (Quy tắc chống nhấp nháy Mục 7).
+          Căn trên-phải nhưng đặt trong vùng an toàn dưới thanh công cụ khung nhìn
+          của overlay rail để không đè lên nút thu gọn thanh điều khiển. */}
       {newPositionOutsideView && (
-        <div className="absolute top-3 right-3 z-[var(--kvc-z-panel)] pointer-events-auto">
+        <div className="absolute top-14 right-3 z-[var(--kvc-z-map-overlay)] pointer-events-auto">
           <Button
             size="sm"
             variant="default"
@@ -504,57 +489,13 @@ export const Map2DView: React.FC<Map2DViewProps> = ({
         </div>
       )}
 
-      {/* Cảnh báo Mất Fix / Giữ vị trí cuối dạng thanh thu để tăng diện tích hiển thị bản đồ */}
-      {!hasGpsFix && (
-        <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[var(--kvc-z-banner)] pointer-events-auto">
-          {isGnssAlertCollapsed ? (
-            <button
-              type="button"
-              onClick={() => setIsGnssAlertCollapsed(false)}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--kvc-overlay)] border border-[var(--kvc-warn-line)] shadow-sm text-[var(--kvc-warn-ink)] hover:text-[var(--kvc-warn-ink)] hover:bg-[var(--kvc-surface-2)] transition-all text-xs cursor-pointer animate-in fade-in"
-              title="Nhấp để xem chi tiết cảnh báo mất khóa GNSS"
-              aria-label="Xem chi tiết cảnh báo mất khóa GNSS"
-            >
-              <WifiOff className="h-3.5 w-3.5 text-[var(--kvc-warn-ink)] " />
-              <span className="font-semibold">Mất Khóa Vệ Tinh (GNSS)</span>
-              <span className="text-[11px] text-[var(--kvc-warn-ink)]/80 hidden sm:inline">• Giữ vị trí cuối</span>
-              <ChevronDown className="h-3 w-3 text-[var(--kvc-warn-ink)] ml-0.5" />
-            </button>
-          ) : (
-            <div className="kvc-on-overlay max-w-sm bg-[var(--kvc-overlay)] border border-[var(--kvc-warn-line)] p-3 rounded-kvc-panel shadow-sm text-center relative animate-in fade-in zoom-in-95 text-[var(--kvc-text-on-overlay)]">
-              <button
-                type="button"
-                onClick={() => setIsGnssAlertCollapsed(true)}
-                className="absolute top-2 right-2 text-[var(--kvc-text-on-overlay-muted)] hover:text-[var(--kvc-text-on-overlay)] p-1 rounded-kvc-control hover:bg-[var(--kvc-surface-2)]/40 cursor-pointer"
-                title="Thu nhỏ cảnh báo để xem bản đồ"
-                aria-label="Thu nhỏ cảnh báo GNSS"
-              >
-                <ChevronUp className="h-4 w-4" />
-              </button>
-              <WifiOff className="h-5 w-5 text-[var(--kvc-warn-ink)] mx-auto mb-1.5" />
-              <h4 className="text-xs font-semibold text-[var(--kvc-text-on-overlay)] mb-1">Mất Khóa Vệ Tinh (GNSS)</h4>
-              <p className="text-[11px] text-[var(--kvc-text-on-overlay-muted)] mb-1.5">
-                {cameraPosition.last_updated_iso
-                  ? `Vị trí cuối nhận: ${formatCoordinates(cameraPosition.latitude, cameraPosition.longitude)} (${formatTimeAgo(cameraPosition.last_updated_iso)})`
-                  : 'Chưa nhận được gói tin tọa độ hợp lệ từ tải nhiệm vụ.'}
-              </p>
-              <div className="text-[11px] text-[var(--kvc-warn-ink)] font-medium">
-                Vị trí marker làm mờ để tránh nhầm lẫn với dữ liệu trực tiếp.
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Nút chuyển đổi lớp Bản đồ ↔ Vệ tinh phong cách Google Maps ở góc dưới trái */}
-      <MapLayerSwitcher
-        mode={isSatellite ? '3D' : '2D'}
-        onToggle={() => setIsSatellite((prev) => !prev)}
-      />
+      {/* Nút chuyển đổi lớp Bản đồ ↔ Vệ tinh do MissionPage bố trí trong
+          overlay rail (data-overlay="layer-switcher"); ở đây không vẽ nút nổi
+          để tránh hai nút trùng chức năng và tránh chồng với PiP/dock. */}
 
       {/* Banner thông báo tile offline nếu không có mạng */}
       {tileError && (
-        <div className="absolute bottom-20 left-3 z-[var(--kvc-z-map-overlay)] bg-[var(--kvc-surface)]/95 border border-[var(--kvc-line)] px-2.5 py-1 rounded-kvc-control text-[11px] text-muted-foreground shadow-xs pointer-events-none">
+        <div className="absolute bottom-2 left-2 z-[var(--kvc-z-map-overlay)] bg-[var(--kvc-surface)]/95 border border-[var(--kvc-line)] px-2.5 py-1 rounded-kvc-control text-[11px] text-muted-foreground shadow-xs pointer-events-none max-w-[min(100%,20rem)]">
           Bản đồ nền Internet không phản hồi (Chế độ xem độc lập nội bộ)
         </div>
       )}

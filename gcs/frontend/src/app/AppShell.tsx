@@ -50,16 +50,11 @@ export const AppShell: React.FC = () => {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
+  // Sidebar giữ 220px theo Design Contract P7. Chỉ thu gọn khi người dùng bấm:
+  // không tự thu gọn theo innerWidth vì sẽ đè lên lựa chọn của người vận hành.
   const handleToggleCollapse = () => {
     dispatch({ type: 'TOGGLE_SIDEBAR_COLLAPSED' })
   }
-
-  // Tự động thu gọn sidebar trên màn hình < 1400px (1366x768 ngoài hiện trường)
-  React.useEffect(() => {
-    if (typeof window !== 'undefined' && window.innerWidth < 1400 && !sidebar_collapsed) {
-      dispatch({ type: 'SET_SIDEBAR_COLLAPSED', payload: true })
-    }
-  }, [sidebar_collapsed, dispatch])
 
   // Render trang phù hợp theo URL route
   const renderCurrentPage = () => {
@@ -80,7 +75,7 @@ export const AppShell: React.FC = () => {
     }
   }
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground font-sans antialiased select-none">
+    <div className="flex h-[100dvh] w-full overflow-hidden bg-background text-foreground font-sans antialiased select-none">
       {/* 1. Sidebar trên Desktop - cố định 220px (16 khi collapsed) */}
       <div className="hidden md:flex h-full shrink-0">
         <AppSidebar
@@ -114,8 +109,11 @@ export const AppShell: React.FC = () => {
         {/* Thanh ngữ cảnh MOCK / REAL (ẩn trên /mission để giải phóng chiều dọc bản đồ tối đa theo Phương án 1) */}
         {currentPath !== '/mission' && <ModeContextBar />}
 
-        {/* Nội dung trang theo Router - trang Mission được mở rộng tràn viền trên màn hình 1920x1080 */}
-        <main className="flex-1 min-h-0 overflow-y-auto lg:overflow-hidden relative flex flex-col bg-background">
+        {/* Nội dung trang theo Router - trang Mission được mở rộng tràn viền trên màn hình 1920x1080.
+            `overflow-hidden` cố định: mỗi trang tự quản vùng cuộn qua PageFrame,
+            để hành vi không đổi theo breakpoint (trước đây `lg:overflow-hidden`
+            làm trang dữ liệu cắt mất phần dưới ở màn hình thấp). */}
+        <main className="flex-1 min-h-0 overflow-hidden relative flex flex-col bg-background">
           <div
             className={`w-full mx-auto h-full flex flex-col min-h-0 ${
               currentPath === '/mission' ? 'max-w-none' : 'max-w-[1440px]'

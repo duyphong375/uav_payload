@@ -1,0 +1,236 @@
+# Capture 40 s trên bo — `G6.1_blob_vsyncdiag_20261102-1130.bin`
+
+- **Nguồn:** file `.bin` 1.654 byte trong thư mục này, Kilo đọc trực tiếp bằng
+  parser CRC-16 độc lập.
+- **Cổng:** COM9, 38.400 8N1. **Kit:** Primer 20K (GW2A-18C). **Camera:** OV2640.
+- **Bitstream — XEM §1, ĐÂY LÀ ĐIỂM QUAN TRỌNG NHẤT.**
+
+---
+
+## 1. Bitstream đang nạp **KHÔNG PHẢI** bản chẩn đoán
+
+Đây là kiểm tra quyết định, và nó **bác bỏ** cả hai kết luận "F-04 đã fix" và
+"lưới 65,54 ms đã được xác nhận trên bo".
+
+### 1.1 Chữ ký của `DIAG_MODE = 2`
+
+`vsync_report` phát **10 slot** mỗi báo cáo ⇒ mỗi khung phải có `N = 10` và dài
+`8 + 10×8 + 2 = 90` byte. Đó là dấu hiệu không thể nhầm.
+
+| Nguồn | N phân bố | Kích thước khung |
+| :--- | :--- | :--- |
+| `C82B9EFE` (diag, `DIAG_MODE=2`) phải cho | **N = 10**, 100 % khung | **90 B** |
+| File `…1130.bin` thực tế | **N=0: 160 khung, N=1: 3 khung** | 10 B / 18 B |
+
+```text
+160 × 10 + 3 × 18 = 1.654 B   ← khớp tuyệt đối với kích thước file
+Không có một khung N=10 nào trong 163 khung.
+```
+
+Chạy chính công cụ của bitstream đó:
+
+```text
+$ python scripts/manual/decode_vsync_diag.py --file G6.1_blob_vsyncdiag_20261102-1130.bin
+[!] Khong co khung nao o dinh dang bao cao 10 slot.
+    Kiem tra: bitstream co dung DIAG_MODE=2 khong?
+    N cua khung dau = 0 (ky vong 10)
+```
+
+### 1.2 Chữ ký của blob thật
+
+`vsync_report` đặt `class = 2` và **`conf = 100` cố định** cho cả 10 slot. File
+này có `conf = 6 / 8 / 15` và `x/y/w/h` thay đổi từng khung ⇒ đây là **blob
+detect thật**, không phải báo cáo chẩn đoán.
+
+### 1.3 Kết luận §1
+
+Bitstream đã nạp là bản **release `86CCF5DD`** (build 01/11 15:24), **không phải**
+`C82B9EFE` (build 02/11 11:09). Hai hệ quả:
+
+| # | Hệ quả |
+| :---: | :--- |
+| 1 | **F-04 chưa được kiểm trên bo.** `bbox_packetizer.v` sửa lúc 02/11 **10:33**; `86CCF5DD` build **01/11 15:24** ⇒ bản đang chạy **không có** `ts_lat`. |
+| 2 | **`vsync_monitor` chưa chạy.** Không có số đo VSYNC nội bộ nào. Mọi suy luận về nhịp VSYNC dưới đây vẫn chỉ từ timestamp IF-01, đúng như trước. |
+
+Bản `C82B9EFE` **có** chứa module: report PnR của nó ghi `u_top/g_vsync_diag.mon_snap`
+và `u_top/g_vsync_diag.u_vsync_mon/win_done_133`, tài nguyên 2.437 LUT (so với
+1.616 LUT của release). Nghĩa là bản build đúng; chỉ **file nạp** là sai.
+
+---
+
+## 2. Số liệu đọc trực tiếp từ file
+
+| Chỉ số | Giá trị | Kiểm |
+| :--- | :--- | :--- |
+| Khung hợp lệ | **163** (160 `N=0`, 3 `N=1`) | 160×10 + 3×18 = 1.654 ✓ |
+| Byte rác / CRC sai | **0 / 0** | toàn bộ 1.654 B thuộc khung |
+| Timestamp | 21.857 → 61.614 ms, **tăng đơn điệu**, 0 trùng | 0 khung lùi |
+| Cửa sổ thực | **39,757 s** (yêu cầu 40,00 s) | 21.857 → 61.614 |
+| FPS trung bình | **4,10** | 162 khoảng / 39,757 s |
+| Tải UART | 16.540 bit ÷ 38.400 = **0,431 s** = **1,08 %** | loại trừ nghẽn UART |
+
+**Không xé timestamp trong 163 khung — nhưng đó KHÔNG phải bằng chứng đã fix.**
+Tần suất xé đo trước đây là 1/85 khung (1,18 %). Xác suất không gặp lần nào:
+
+| Số khung | P(0 lần xé) |
+| ---: | ---: |
+| 128 | 22,0 % |
+| **163** | **14,5 %** |
+| 409 | 0,8 % |
+
+14,5 % là chuyện thường. Cần **≥ 409 khung** mới có ý nghĩa, và quan trọng hơn:
+**phải chạy đúng bản `C82B9EFE` có `ts_lat`** thì phép thử mới nói lên điều gì.
+
+---
+
+## 3. Ba BBox bắt được (số liệu đúng như báo cáo)
+
+| # | ts | x | y | w | h | class | conf | `cnt` ≥ | diện tích | fill |
+| ---: | ---: | ---: | ---: | ---: | ---: | :---: | ---: | ---: | ---: | ---: |
+| 2 | 22.055 | 263 | 127 | 200 | 100 | 2 | 6 | 384 | 20.000 | **1,9 %** |
+| 13 | 24.746 | 255 | 114 | 202 | 77 | 2 | 8 | 512 | 15.554 | **3,3 %** |
+| 33 | 29.730 | 229 | 129 | 228 | 104 | 2 | 15 | 960 | 23.712 | **4,0 %** |
+
+3/163 = **1,84 %** số khung có mục tiêu (trước: 0,78 % khi sáng mạnh, 10,1 %
+ngày 01/11). Fill vẫn **1,9–4,0 %**, aspect **2,0 / 2,6 / 2,2** — vẫn là **vệt
+ngang**, không phải khối phao tròn. Nhất quán với F-02, chưa có gì mới.
+
+---
+
+## 4. Lưới 65,54 ms: **không xác định được** từ dữ liệu này
+
+Báo cáo nêu `P = 65,54 ms (15,26 fps), 98 % khớp, bội 1/3/5/6/11`. Con số đó
+đúng như công cụ tính, nhưng **kết luận rút ra từ nó là quá mức**.
+
+### 4.1 Chỉ có 5 giá trị khoảng khác nhau
+
+```text
+68, 69 | 196, 197, 198, 199 | 324…327 | 393…395 | 720   (đơn vị ms)
+```
+
+Với 162 khoảng nhưng chỉ **5 giá trị phân biệt** và timestamp độ phân giải 1 ms,
+bài toán "tìm P" có vô số nghiệm gần đúng. Quét P từ 10 đến 68 ms:
+
+| P (ms) | fps | rms (ms) | bội số |
+| ---: | ---: | ---: | :--- |
+| 11,60 | 86,21 | **0,99** | 6, 17, 28, 34, 62 |
+| 14,09 | 70,97 | **1,22** | 5, 14, 23, 28, 51 |
+| 21,85 | 45,77 | 1,31 | 3, 9, 15, 18, 33 |
+| **32,77** | **30,52** | **1,31** | **2, 6, 10, 12, 22** |
+| **65,54** | **15,26** | **1,31** | **1, 3, 5, 6, 11** |
+
+**`P = 32,77 ms` khớp y hệt `P = 65,54 ms` (cùng rms 1,31 ms)** — và 32,77 ms
+chính là **30,52 fps**, đúng nhịp danh định của camera. Con số này còn khớp vật
+lý:
+
+```text
+640 × 480 × 2 byte ÷ 24 MHz = 25,60 ms   (chỉ thời gian pixel)
+32,77 − 25,60              =  7,17 ms   blanking = 28,0 %
+```
+
+28 % blanking là cao hơn VGA điển hình (~16 %), nên đây **không phải bằng chứng**
+cho `P = 32,77`; nó chỉ cho thấy giá trị đó **không vô lý**. Điểm quan trọng là
+**hai cách đọc cùng khớp dữ liệu**:
+
+| Cách đọc | Camera | FPGA phát | Nghĩa |
+| :--- | :--- | :--- | :--- |
+| `P = 65,54 ms` | 15,26 fps | mỗi frame | AEC kéo frame — **không** mất khung |
+| `P = 32,77 ms` | **30,52 fps** | mỗi **2** frame | camera đúng nhịp, **FPGA bỏ 50 % khung** |
+
+Nói cách khác, "lưới 65,54 ms" và "FPGA rớt nửa số frame" là **cùng một dữ liệu**.
+Chọn cách thứ nhất chỉ vì bội số "đẹp" 1/3/5/6 — đó là **giả định**, không phải
+kết quả đo.
+
+
+
+### 4.2 Nhóm "1x" phản đối P = 65,54
+
+9 khoảng ngắn nhất: `68, 68, 68, 68, 68, 68, 68, 69, 69`.
+
+Với P = 65,54, "1x" phải là **65 hoặc 66 ms** (timestamp 1 ms). Thực tế **cả 9
+đều ≥ 68**, lệch ≥ 2,5 ms = **3,8 %** và **lệch cùng một phía**. Đó là sai số
+hệ thống, không phải nhiễu lượng tử hoá.
+
+Con số "98 % khớp" có được vì công cụ dùng dung sai **±5 % của P = ±3,28 ms**,
+rộng hơn sai số 1 ms cần thiết — nên 68 ms vẫn được tính là "khớp 1x".
+
+### 4.3 Bội 11x không giải thích được
+
+Khoảng **720 ms** (ts 56.039 → 56.759) đứng một mình, không có khoảng 11x nào
+khác. Với P = 32,77 nó là 22x; với P = 65,54 là 11x. Cả hai đều là **ngoại lệ
+duy nhất**, không phải bằng chứng cho mô hình.
+
+Đáng chú ý: **0 byte rác, 0 CRC sai** ⇒ không mất byte trên dây, nên đây là
+khoảng **thật** trong miền FPGA: 720 ms không có khung nào được phát.
+
+---
+
+## 5. Điều dữ liệu này **không thể** phân biệt
+
+Timestamp IF-01 là **bộ đếm ms tự do**. Nó không biết vì sao khung đến muộn.
+Ba nguyên nhân sau cho **cùng một phân bố khoảng**:
+
+| Nguyên nhân | Cơ chế | Phân biệt bằng gì |
+| :--- | :--- | :--- |
+| **(a) AEC kéo dài exposure** | frame time = N × line_time | `t_vsync` ≈ `t_frame` |
+| **(b) FPGA rớt frame** | blob/packetizer không phát dù camera có VSYNC | **`t_vsync > t_frame`** |
+| **(c) camera ngừng phát** | VSYNC biến mất | `t_vsync` cũng giảm theo |
+
+Cả ba đều tạo ra "197 ms thay vì 65 ms". **Chỉ có `vsync_monitor` phân biệt
+được** — và đúng vì thế bitstream `C82B9EFE` được tạo ra (§1: nó chưa được nạp).
+
+Vì vậy câu "chứng minh OV2640 đang bị AEC kéo giãn" ở báo cáo là **chưa có cơ sở
+từ file này**. Đó vẫn là **giả thuyết**, không phải kết luận.
+
+Loại trừ được: **nghẽn UART** (1,08 % tải) và **mất byte** (0 rác, 0 CRC).
+
+---
+
+## 6. Trạng thái bằng chứng
+
+| Mệnh đề | Trạng thái | Căn cứ |
+| :--- | :--- | :--- |
+| Link IF-01 sạch 163 khung, 0 CRC, 0 rác | **HARDWARE-VERIFIED** | §2 |
+| Timestamp đơn điệu trong 163 khung | **HARDWARE-VERIFIED** | §2 |
+| Blob phát `class = 2` từ pixel thật | **HARDWARE-VERIFIED** | §3 |
+| **F-04 đã fix** | **CHƯA KIỂM** — bitstream đang chạy **không có** bản sửa | §1 |
+| **Nhịp VSYNC = 65,54 ms** | **CHƯA ĐO** — `vsync_monitor` chưa chạy | §1, §4 |
+| **AEC là nguyên nhân** | **GIẢ THUYẾT** — IF-01 không phân biệt được (a)/(b)/(c) | §5 |
+| A8 (25–32 fps) | **FAIL** — 4,10 fps | §2 |
+
+---
+
+## 7. Việc cần làm (theo thứ tự)
+
+| # | Việc | Điều kiện vào |
+| :---: | :--- | :--- |
+| 1 | **Nạp đúng `review/artifacts/KVC_FPGA_diag_vsync_C82B9EFE.fs`** qua SRAM Program | — |
+| 2 | **Kiểm chữ ký nạp:** chạy 10 s, phải thấy `N = 10` và khung **90 byte**. Không thấy ⇒ vẫn sai file, dừng | bước 1 |
+| 3 | Capture **≥ 300 s** (cửa sổ là 2.000 ms, cần ≥ 2 báo cáo) | bước 2 |
+| 4 | `decode_vsync_diag.py` đọc `t_vsync`, `t_frame`, `t_b1x..t_bother` | bước 3 |
+| 5 | Chỉ khi đó mới biết: camera đều hay không, và FPGA có rớt frame hay không | bước 4 |
+
+Bước 2 là **bắt buộc** — chính là bước đã thiếu trong lần này.
+
+**Đừng** chuyển sang Pha 1 của PLAN-005 trước bước 4: nếu kết luận là (b) FPGA
+rớt frame thì sửa thanh ghi camera sẽ **không** cải thiện gì, và ta mất một
+bitstream để quy trách nhiệm.
+
+---
+
+## 8. Về yêu cầu "đóng F-04"
+
+Không đóng. Lý do là §1.1 và §2:
+
+1. Bitstream đang chạy (`86CCF5DD`, 01/11 15:24) **không chứa** `ts_lat`
+   (`bbox_packetizer.v` chỉ được sửa 02/11 10:33).
+2. Không gặp xé trong 163 khung là kết quả **kỳ vọng** với xác suất 14,5 % kể cả
+   khi **chưa** sửa.
+3. Bằng chứng đúng đang có là **testbench**: `tb_bbox_packetizer` 109/109 PASS
+   với 3 case F-04, kèm **phép thử âm** cho ra `0000010a` thay vì `000000ff` —
+   đúng kiểu xé. Đó là `SIMULATED`, không phải `HARDWARE-VERIFIED`.
+
+Muốn đóng F-04 trên phần cứng: nạp `C82B9EFE`, capture **≥ 409 khung** (để
+P(0 lần xé) < 1 % nếu chưa sửa), và nếu có thể thì thêm một bitstream cố ý
+`force_bad_crc`/timestamp nhanh để tăng tần suất xé. Không có bước đó thì
+"HARDWARE-VERIFIED cho F-04" là ghi sai mức bằng chứng.

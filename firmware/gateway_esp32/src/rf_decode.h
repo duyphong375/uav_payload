@@ -11,8 +11,6 @@
  * Hợp đồng tham chiếu: docs/interfaces/IF_MCU_LORA_RF.md (IF-02).
  * Định nghĩa phía MCU: firmware/mcu_payload/inc/kvc_telemetry.h.
  * Nếu hai bên lệch layout, static_assert dưới đây làm build FAIL ngay.
- *
- * Người phụ trách phân hệ Gateway: Đoàn Thanh Trường Thịnh
  */
 
 #ifndef KVC_GATEWAY_RF_DECODE_H

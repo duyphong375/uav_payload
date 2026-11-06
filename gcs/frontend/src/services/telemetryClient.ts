@@ -199,17 +199,52 @@ export class TelemetryClient {
               }
             }
 
-            const matchesExpected = packet.source_mode === this.expectedSource
-            // Khi ở chế độ REAL: kết nối tới backend để nhận tình trạng phần cứng thật.
-            // Nếu backend đang chạy MOCK slice hoặc chuyển tiếp ESP32, chuẩn hóa về REAL để Dashboard cập nhật đúng tình trạng.
-            const allowRealFromBackend =
-              this.expectedSource === 'REAL' && (packet.source_mode === 'REAL' || packet.source_mode === 'MOCK')
+            // IF-05: Kênh video phụ độc lập với telemetry LoRa (IF_ESP32_CAM_GCS.md §1).
+            // Gói VIDEO_STATUS luôn được chuyển tiếp để UI cập nhật camera mà không bị chặn
+            // bởi telemetry source_mode hay snapshot session.
+            if (packet.event_type === 'VIDEO_STATUS') {
+              for (const listener of this.onPacketListeners) {
+                try {
+                  listener(packet)
+                } catch (err) {
+                  console.error('[TelemetryClient] Lỗi listener packet:', err)
+                }
+              }
+              return
+            }
 
-            if (matchesExpected || allowRealFromBackend) {
-              const adaptedPacket =
-                this.expectedSource === 'REAL' && packet.source_mode === 'MOCK'
-                  ? { ...packet, source_mode: 'REAL' as const }
-                  : packet
+            // Nếu nhận SNAPSHOT mang trạng thái video khi source_mode chưa khớp (vd: backend MOCK, UI REAL),
+            // phát riêng trạng thái video để UI có ngay stream mà không cần chờ nhịp VIDEO_STATUS 1s tiếp theo.
+            if (packet.event_type === 'SNAPSHOT' && packet.video && packet.source_mode !== this.expectedSource) {
+              const initialVideoPacket: ApplicationPacket = {
+                event_type: 'VIDEO_STATUS',
+                schema_version: packet.schema_version,
+                session_id: packet.session_id,
+                source_mode: packet.source_mode,
+                sequence_number: packet.sequence_number,
+                video: packet.video,
+              }
+              for (const listener of this.onPacketListeners) {
+                try {
+                  listener(initialVideoPacket)
+                } catch (err) {
+                  console.error('[TelemetryClient] Lỗi listener packet:', err)
+                }
+              }
+            }
+
+            const matchesExpected = packet.source_mode === this.expectedSource
+            // KVC-DUAL-CAMERA-20261102 (T-05): KHÔNG còn ghi đè source_mode ở
+            // client.
+            //
+            // Trước đây khi UI chọn REAL mà backend báo MOCK, client tự sửa
+            // packet thành { ...packet, source_mode: 'REAL' }. Cách đó che giấu
+            // sự thật: nhãn trong state (và mọi ảnh chụp báo cáo) nói REAL
+            // trong khi SQLite/backend nói MOCK, và nó không sửa được nguyên
+            // nhân gốc (schema thiếu REAL). Nay backend phát đúng nhãn REAL và
+            // client chỉ chuyển tiếp nguyên bản.
+            if (matchesExpected) {
+              const adaptedPacket = packet
 
               if (adaptedPacket.event_type === 'SNAPSHOT') this.snapshotSession = adaptedPacket.session_id ?? null
               else if (!this.snapshotSession || adaptedPacket.session_id !== this.snapshotSession) return
@@ -324,6 +359,44 @@ export class TelemetryClient {
       return parseSessions(await res.json())
     } catch {
       return null
+    }
+  }
+
+  public static async deleteSession(
+    sessionId: string,
+    apiBaseUrl = APP_CONFIG.API_BASE_URL,
+  ): Promise<{ ok: boolean; message?: string }> {
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/sessions/${encodeURIComponent(sessionId)}`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json' },
+      })
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as Record<string, unknown>
+        return { ok: false, message: typeof err.detail === 'string' ? err.detail : `Lỗi ${res.status}` }
+      }
+      return { ok: true }
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : 'Lỗi kết nối' }
+    }
+  }
+
+  public static async deleteAllSessions(
+    apiBaseUrl = APP_CONFIG.API_BASE_URL,
+  ): Promise<{ ok: boolean; deletedCount?: number; message?: string }> {
+    try {
+      const res = await fetch(`${apiBaseUrl}/api/sessions`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json' },
+      })
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as Record<string, unknown>
+        return { ok: false, message: typeof err.detail === 'string' ? err.detail : `Lỗi ${res.status}` }
+      }
+      const data = (await res.json().catch(() => ({}))) as Record<string, unknown>
+      return { ok: true, deletedCount: typeof data.deleted_count === 'number' ? data.deleted_count : 0 }
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : 'Lỗi kết nối' }
     }
   }
 

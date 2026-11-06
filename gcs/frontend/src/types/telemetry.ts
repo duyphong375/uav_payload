@@ -64,6 +64,7 @@ export interface DiagnosticsInfo {
   ingress_drops_total: number
   logger_drops_total?: number
   client_drops_total?: number
+  rf_reject_count?: number
   data_loss_latched: boolean
   logger_status: 'OK' | 'LOG_DEGRADED' | 'STORAGE_ERROR'
 }
@@ -80,7 +81,7 @@ export type AlertLevel = 'INFO' | 'WARN' | 'CRITICAL'
 
 export type AlertConditionStatus = 'ACTIVE' | 'RESOLVED' | 'UNKNOWN'
 
-export type AlertSourceCategory = 'GPS' | 'VIDEO' | 'TELEMETRY' | 'SENSORS' | 'STORAGE' | 'SYSTEM'
+export type AlertSourceCategory = 'GPS' | 'VIDEO' | 'TELEMETRY' | 'SENSORS' | 'STORAGE' | 'SYSTEM' | 'AI'
 
 export interface AlertItem {
   id: string
@@ -148,14 +149,29 @@ export interface BoundingBox {
   is_synced: boolean
 }
 
+/**
+ * Nguồn của luồng video. TÁCH RIÊNG khỏi `source_mode` (telemetry) theo
+ * `KVC_ThietKeHeThong.md:81`: nhãn REAL/MOCK của telemetry phải độc lập với
+ * provenance video. Một phiên REAL có thể không có video, và ngược lại.
+ *
+ * Chỉ có NONE/RELAY: IF-03 cấm trình duyệt nối trực tiếp thiết bị, nên mọi
+ * luồng đều đi qua backend relay (IF-05). Muốn thêm DIRECT phải có HUMAN duyệt.
+ */
+export type VideoSourceKind = 'NONE' | 'RELAY'
+
 export interface VideoStreamStatus {
   source_type: 'LIVE' | 'MOCK' | 'REFERENCE' | 'REPLAY' | 'NONE'
+  source_kind: VideoSourceKind
   url: string | null
   is_connected: boolean
   is_loading: boolean
   error_message: string | null
   has_overlay: boolean
   frame_timestamp_iso?: string | null
+  /** Số khung BACKEND đếm được. KHÔNG phải FPS — cấm suy ra FPS từ đây. */
+  frame_count: number
+  /** Tuổi khung cuối theo đồng hồ backend. null = chưa từng có khung. */
+  last_frame_age_ms: number | null
 }
 
 export interface ReplayMetadata {
@@ -208,6 +224,15 @@ export interface RawTelemetryPacket {
     is_valid?: boolean
   } | null
   bounding_boxes?: BoundingBox[] | null
+  // IF-05: trạng thái kênh video do BACKEND đo. Có thể vắng ở bản ghi replay cũ.
+  video?: {
+    source_kind?: VideoSourceKind
+    stream_path?: string | null
+    is_connected?: boolean
+    frame_count?: number
+    last_frame_age_ms?: number | null
+    error_message?: string | null
+  } | null
 }
 
 export type WebSocketEventType =
@@ -218,6 +243,7 @@ export type WebSocketEventType =
   | 'LINK_STATUS'
   | 'REPLAY_TICK'
   | 'SYSTEM_DIAGNOSTICS'
+  | 'VIDEO_STATUS'
 
 export interface WebSocketEventMessage extends RawTelemetryPacket {
   event_type: WebSocketEventType

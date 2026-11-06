@@ -28,12 +28,15 @@ struct NetPolicyState {
   bool staConfigured;      // Có credential Wi-Fi 2.4 GHz để thử không
   bool staConnected;       // STA đang nối thành công
   bool apStarted;          // SoftAP đang phát
+  uint32_t apStationCount; // Số client đang bám vào SoftAP (WiFi.softAPgetStationNum)
   uint32_t lastStaAttemptMs; // Mốc lần thử STA gần nhất
+  uint32_t staDownDurationMs; // Đã mất STA liên tục bao lâu (ms)
 };
 
 /** Hành động phía gọi cần thực hiện. */
 enum class NetAction {
   None,          // Không làm gì
+  OpenSoftAp,    // Bật SoftAP dự phòng (mất STA lúc đang chạy)
   RetrySta,      // Gọi WiFi.reconnect()
   CloseSoftAp,   // Gọi WiFi.softAPdisconnect(true) rồi WiFi.mode(WIFI_STA)
 };
@@ -45,19 +48,24 @@ enum class NetAction {
  * 1. Chưa cấu hình STA -> không làm gì (SoftAP là phương án duy nhất, do lúc
  *    khởi động đã bật).
  * 2. STA đang nối:
- *    - Nếu SoftAP đang phát -> CloseSoftAp (không phát sóng thừa).
- *    - Nếu không -> None.
+ *    - Nếu SoftAP đang phát VÀ không còn client nào bám -> CloseSoftAp.
+ *    - Nếu SoftAP còn client -> None: đóng AP lúc này sẽ cắt luồng video
+ *      ESP32-S3-CAM và kết nối của laptop giữa phiên. Chờ client rời hết.
+ *    - Nếu không phát AP -> None.
  * 3. STA chưa nối:
- *    - Nếu đã qua retryIntervalMs kể từ lần thử trước -> RetrySta.
- *    - Nếu chưa -> None.
+ *    - Mất STA quá openApDelayMs mà chưa phát AP -> OpenSoftAp (dự phòng khi
+ *      router/hotspot tắt giữa phiên, không chỉ lúc khởi động).
+ *    - Ngược lại, đã qua retryIntervalMs kể từ lần thử trước -> RetrySta.
+ *    - Chưa tới hạn -> None.
  *
  * @param state Trạng thái hiện tại.
  * @param nowMs Đồng hồ millis() hiện tại.
  * @param retryIntervalMs Chu kỳ thử lại STA (ms). 0 nghĩa là thử mỗi lần gọi.
+ * @param openApDelayMs Thời gian mất STA liên tục trước khi mở SoftAP (ms).
  * @return Hành động cần thực hiện.
  */
 NetAction netPolicyEvaluate(const NetPolicyState &state, uint32_t nowMs,
-                            uint32_t retryIntervalMs);
+                            uint32_t retryIntervalMs, uint32_t openApDelayMs);
 
 /**
  * @brief Tìm mạng kế tiếp có SSID, duyệt vòng tròn từ afterIndex.

@@ -40,6 +40,7 @@ const EVENT_TYPES = new Set<WebSocketEventType>([
   'LINK_STATUS',
   'REPLAY_TICK',
   'SYSTEM_DIAGNOSTICS',
+  'VIDEO_STATUS',
 ])
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -480,6 +481,53 @@ function parseBoundingBoxes(raw: unknown): BoundingBox[] {
  * Adapter WebSocket strict: source_mode và event_type không được suy đoán.
  * Patch chỉ materialize các field thuộc domain của event; field vắng mặt không trở thành default.
  */
+function parseVideoPatch(raw: unknown): RawTelemetryPacket['video'] {
+  if (!isRecord(raw)) throw new TypeError('video must be an object or null')
+  const result: NonNullable<RawTelemetryPacket['video']> = {}
+
+  if (hasOwn(raw, 'source_kind')) {
+    if (raw.source_kind !== 'NONE' && raw.source_kind !== 'RELAY') {
+      throw new TypeError('video.source_kind must be NONE or RELAY')
+    }
+    result.source_kind = raw.source_kind
+  }
+
+  if (hasOwn(raw, 'stream_path')) {
+    if (raw.stream_path !== null && typeof raw.stream_path !== 'string') {
+      throw new TypeError('video.stream_path must be string or null')
+    }
+    result.stream_path = raw.stream_path
+  }
+
+  const isConnected = parseStrictBoolean(raw, 'is_connected')
+  if (isConnected !== undefined) result.is_connected = isConnected
+
+  const frameCount = parseOptionalNumber(raw, 'frame_count')
+  if (frameCount !== undefined && frameCount !== null) {
+    if (!Number.isInteger(frameCount) || frameCount < 0) {
+      throw new TypeError('video.frame_count must be a non-negative integer')
+    }
+    result.frame_count = frameCount
+  }
+
+  const lastFrameAgeMs = parseOptionalNumber(raw, 'last_frame_age_ms')
+  if (lastFrameAgeMs !== undefined) {
+    if (lastFrameAgeMs !== null && (!Number.isFinite(lastFrameAgeMs) || lastFrameAgeMs < 0)) {
+      throw new TypeError('video.last_frame_age_ms must be non-negative or null')
+    }
+    result.last_frame_age_ms = lastFrameAgeMs
+  }
+
+  if (hasOwn(raw, 'error_message')) {
+    if (raw.error_message !== null && typeof raw.error_message !== 'string') {
+      throw new TypeError('video.error_message must be string or null')
+    }
+    result.error_message = raw.error_message
+  }
+
+  return result
+}
+
 export function adaptTelemetryPacket(rawText: string | object): RawTelemetryPacket | null {
   try {
     const raw = typeof rawText === 'string' ? JSON.parse(rawText) : rawText
@@ -570,6 +618,11 @@ export function adaptTelemetryPacket(rawText: string | object): RawTelemetryPack
         throw new TypeError('replay_metadata must be an object or null')
       }
       packet.replay_metadata = raw.replay_metadata as RawTelemetryPacket['replay_metadata']
+    }
+
+    const includeVideo = eventType === 'SNAPSHOT' || eventType === 'VIDEO_STATUS'
+    if (includeVideo && hasOwn(raw, 'video')) {
+      packet.video = raw.video === null ? null : parseVideoPatch(raw.video)
     }
 
     return packet

@@ -1,32 +1,14 @@
 /**
  * @file kvc_uart_ring.h
- * @brief Ring buffer SPSC (single-producer / single-consumer) dùng cho RX UART.
+ * @brief Ring buffer SPSC (single-producer / single-consumer) dung cho RX UART.
  *
- * Thuộc Task KVC-M2-20261025-001.
- *
- * MÔ HÌNH ĐỒNG THỜI
- * -----------------
- * - Producer: chỉ có ISR của một cổng UART ghi (push).
- * - Consumer: chỉ có main loop đọc (pop).
- * - Kích thước là luỹ thừa của 2 để dùng mặt nạ thay cho phép chia.
- *
- * Trên Cortex-M4, load/store 32-bit đã align là nguyên tử ở mức bus, nên
- * `head` (chỉ ISR ghi) và `tail` (chỉ main ghi) không cần critical section.
- * Mỗi biến chỉ có MỘT writer. Điều này đúng khi:
- *   - Ring struct được align tự nhiên (uint32_t/uint16_t theo kiểu khai báo).
- *   - Không có ISR khác cùng ghi vào ring đó.
- *   - Trình biên dịch không tách một store thành nhiều store (đúng với
- *     uint32_t/uint16_t aligned trên ARM).
- *
- * Header-only + `static inline` để KHÔNG phải thêm file .c vào
- * mcu_uav.uvprojx (ngoài allowed files của task M2).
- *
- * GIỚI HẠN
- * --------
- * - `kvc_ring_count()` đọc cả head và tail; nếu gọi từ ISR trong lúc main
- *   đang pop thì giá trị có thể lệch một nhịp. Chỉ dùng cho thống kê.
- * - Không hỗ trợ nhiều producer. Không dùng cho TX.
- * - Ring không tự reset khi tràn: byte mới bị bỏ và `dropped` tăng.
+ * MO HINH DONG THOI:
+ * - Producer: chi co ISR cua mot cong UART ghi (push).
+ * - Consumer: chi co main loop doc (pop).
+ * - Kich thuoc la luy thua cua 2 de dung phep AND bitmask thay cho phep chia.
+ * - Tren Cortex-M4, thao tac load/store 32-bit da align la nguyen tu o muc bus,
+ *   head (ISR) va tail (main) khong can critical section.
+ * - Header-only voi static inline giup toi uu hoa toc do xu ly.
  */
 
 #ifndef KVC_UART_RING_H

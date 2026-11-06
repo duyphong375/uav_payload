@@ -10,24 +10,33 @@ interface MapLayerSwitcherProps {
   mode: MapViewMode
   onToggle: () => void
   disabled?: boolean
+  /**
+   * `true` (mặc định): tự định vị `absolute` trong khung bản đồ.
+   * `false`: nằm trong luồng của overlay rail do MissionPage bố trí, để lưới
+   * bảo đảm nó không đè lên PiP hay dock ở màn hình hẹp.
+   */
+  anchored?: boolean
   className?: string
 }
 
 /**
  * Nút chuyển đổi lớp bản đồ chuẩn phong cách Google Maps (Vệ tinh ↔ Bản đồ)
- * Đặt nổi tại góc dưới bên trái của khung bản đồ.
  */
 export const MapLayerSwitcher: React.FC<MapLayerSwitcherProps> = ({
   mode,
   onToggle,
   disabled = false,
+  anchored = true,
   className = '',
 }) => {
   const is2D = mode === '2D'
-  const positionClass = className || 'bottom-24 right-3 z-[var(--kvc-z-dock)]'
+  const positionClass = anchored ? className || 'bottom-24 right-3 z-[var(--kvc-z-map-overlay)]' : ''
 
   return (
-    <div className={`absolute select-none ${positionClass}`}>
+    <div
+      data-overlay="layer-switcher"
+      className={`${anchored ? 'absolute' : 'shrink-0'} select-none pointer-events-auto ${positionClass}`}
+    >
       <Tooltip>
         <TooltipTrigger asChild>
           <button

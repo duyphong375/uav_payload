@@ -1,0 +1,173 @@
+# A/B ánh sáng mạnh (có `--dump`) — đường blob, CÓ mục tiêu
+
+- **Mã:** `KVC-FPGA-G6.1-20261102-0230`
+- **Nguồn dữ liệu:** file `G6.1_blob_light_bright_20261102-0230.bin` (1.288 byte)
+  trong chính thư mục này; Kilo đọc và phân tích trực tiếp.
+- **Trạng thái bằng chứng:** `HARDWARE-VERIFIED` **cho link IF-01 + camera phát
+  frame + blob phát `class=2`**. **KHÔNG** `HARDWARE-VERIFIED` cho A8 (nhịp khung)
+  và **KHÔNG** chứng minh độ chính xác nhận diện.
+- **Bitstream:** `86CCF5DD…` (`BBOX_SOURCE=1`, `DIAG_MODE=0`), SRAM Program.
+- **Cổng:** COM9, 38400 8N1. **Kit:** Primer 20K (GW2A-18C). **Camera:** OV2640.
+
+> ⚠️ **File này thay §1–§2.5 của bản nháp trước.** Bản nháp dựa trên tóm tắt
+> trong chat; bản này dựa trên `.bin` thật. Bốn số trong bản nháp **sai** và
+> được đính chính ở §2.
+
+---
+
+## 1. Số liệu đọc trực tiếp từ `.bin`
+
+| Chỉ số | Giá trị | Cách kiểm |
+| :--- | :--- | :--- |
+| Byte nhận | **1.288** | `len(bin)` |
+| Khung hợp lệ | **128** (127 `N=0`, 1 `N=1`) | 127×10 + 18 = **1.288** ✓ |
+| CRC sai | **0** | CRC-16/CCITT-FALSE trên toàn bộ |
+| Byte rác | **0** | 1.288 B đều thuộc khung |
+| Timestamp | 219.129 → 249.044 ms, **tăng đơn điệu** | 0 khung trùng/ngược |
+| FPS trung bình | **4,245** | 127 khoảng / 29,915 s |
+| Khoảng giữa khung (mode) | **197 ms** | 41/127 khoảng |
+| Khung `N=1` | **1 / 128 = 0,78 %**, chỉ số #30 | 1-based |
+| BBox | `x=212 y=89 w=243 h=49 class=2 conf=8` | |
+| Suy ra `cnt` | **512…575** (`conf<<6`) | |
+| Diện tích hộp | 11.907 px | 243×49 |
+| **Fill** | **4,3…4,8 %** | `cnt/(w·h)` |
+| **Aspect** | **4,96** | `w/h` |
+
+---
+
+## 2. Đính chính bốn số trong bản nháp
+
+| # | Bản nháp ghi | `.bin` cho thấy | Hệ quả |
+| :---: | :--- | :--- | :--- |
+| 1 | "126/126 khung" | **128 khung** (1.288 B) | Số khung lệch 2 |
+| 2 | "BBox khung #14: x=128 y=82 w=201 h=101 conf=6" | **#30: x=212 y=89 w=243 h=49 conf=8** | **Không có** bbox nào khớp `128/82/201/101/6` trong bất kỳ `.bin` nào của thư mục |
+| 3 | "chu kỳ đều đặn 196–197 ms" | Mode 197 ms nhưng **chỉ 63 % số khoảng**; còn 326 ms (17 %), 394 ms (13 %), 68 ms (7 %) | Nhịp **không** đều |
+| 4 | "p=6 ⇒ ~400 pixel vừa khít MIN_PIXELS" | `conf=8` ⇒ **512…575 px**, cách ngưỡng 400 một khoảng rõ | Không phải "vừa khít" |
+
+Điểm 2 quan trọng: nếu báo cáo dùng số của một lần capture khác thì lần đó
+**không có trong workspace**. Không có `.bin` ⇒ không kiểm chứng được.
+
+---
+
+## 3. Phát hiện mới: nhịp khung nằm trên **lưới 65,6 ms**
+
+Đây là phần đáng chú ý nhất của file `.bin`.
+
+### 3.1 Phân bố khoảng (127 khoảng)
+
+| Khoảng | Số lần | Tỷ lệ | ≈ bội của 65,6 ms |
+| ---: | ---: | ---: | :--- |
+| 67–68 ms | 9 | 7,1 % | **1×** |
+| 196–199 ms | 80 | 63,0 % | **3×** |
+| 324–328 ms | 21 | 16,5 % | **5×** |
+| 393–395 ms | 17 | 13,4 % | **6×** |
+
+Không có khoảng nào ngoài bốn nhóm này. Khớp lưới đơn pha:
+
+```text
+P = 65,605 ms, phase = 7,75 ms   →  rms residual = 1,25 ms trên 128 mốc
+⇒ tần số camera = 1 / 0,065605 = 15,24 Hz
+```
+
+Kiểm chéo bằng nhóm ba liên tiếp đặc trưng (`394, 325, 68`):
+
+```text
+(394 + 325 + 68) ms = 786 ms = 12 × 65,5 ms   ✓
+```
+
+### 3.2 Nghĩa là gì
+
+Trong 29,915 s có **457 slot** 65,6 ms, nhưng chỉ **128 khung IF-01** được phát.
+
+```text
+457 − 128 = 329 slot không phát khung
+tỷ lệ phát = 28,0 %
+```
+
+Không phải "camera chạy 4,2 fps". Đúng hơn là **camera chạy ~15,2 fps nhưng
+FPGA chỉ phát khung IF-01 khoảng 28 % số frame**. Vì `tgl` trong
+`kvc_blob_detect.v:236` chỉ đảo khi `frame_seen = 1`, mỗi khung phát ra đều
+tương ứng **một frame có pixel thật**. 329 frame còn lại **có pixel nhưng không
+sinh khung IF-01**, hoặc camera thật sự bỏ frame.
+
+Ba cơ chế có thể tạo ra mẫu "3×, 5×, 6×, 1×":
+
+1. **`bbox_packetizer` bận.** Một khung `N=0` chiếm 10 byte × 10 bit ÷ 38.400 =
+   **2,60 ms**. Không thể chặn 2 frame (131 ms). **Loại.**
+2. **`data_ready_ctrl` timeout 100 ms.** `frame_valid = bbox_last_src` chỉ đặt
+   `pending_frame`; `start` của packetizer là **cùng tín hiệu** `bbox_last_src`,
+   nên packetizer chạy ngay, không chờ ACK. `pend=1` xuất hiện 4 lần trong soak
+   30 phút, không phải nguyên nhân. **Loại.**
+3. **`camera_rx` byte-pairing mất đồng bộ.** Đây là ứng viên còn lại. `have_high`
+   chỉ được xoá bởi `href_falling`; nếu một dòng có **số byte lẻ** (do
+   `pixel_valid` bị trễ 1 chu kỳ so với `pixel_data`, xem §4), `have_high` sai
+   suốt phần còn lại của dòng ⇒ mất nửa số pixel của dòng đó ⇒ ít pixel khớp
+   màu hơn ⇒ có frame `cnt < 400` ⇒ `q_valid = 0` ⇒ **không phát**. Nhưng `tgl`
+   vẫn đảo, nên phải phát khung `N=0`… **mâu thuẫn**: mọi frame `frame_seen=1`
+   đều phát khung. Vậy (3) cũng không giải thích được.
+
+**Không có cơ chế nào trong RTL hiện tại giải thích được việc mất 72 % khung.**
+Đây là finding mới, không phải kết luận. Cần đo VSYNC bằng LA (Pha 0 của
+`KVC-CAM-PCLK-20261102-001`) để biết camera thật sự phát bao nhiêu VSYNC/s.
+Nếu LA cho ~15 Hz thì mất khung nằm trong FPGA; nếu LA cho ~4,2 Hz thì lưới
+65,6 ms là alias của phép đo, không phải nhịp thật.
+
+### 3.3 Kiểm chứng độc lập bằng soak 30 phút
+
+`G2.7_soak_20261102.txt`: `[RING]FPGA byt` tăng **76.750 B trong 1.788,4 s** =
+**42,92 B/s**. Với khung `N=0` = 10 B ⇒ **4,29 frame/s**. Khớp 4,245 fps của
+`.bin` trong sai số 1 %. Nhịp phát **ổn định suốt 30 phút** (nửa đầu 42,95 B/s,
+nửa sau 42,87 B/s). Vậy đây là hành vi **ổn định**, không phải nhiễu nhất thời.
+
+---
+
+## 4. Lỗi tiềm ẩn trong `camera_rx` — chưa được kích hoạt, nhưng có thật
+
+`camera_rx.v:88-103`: `pixel_valid` được đặt trong **cùng** khối `always` với
+`pixel_data`, nhưng là thanh ghi **riêng**, nên `pixel_valid` cao ở chu kỳ **sau**
+khi `pixel_data` đã cập nhật. Trong `kvc_blob_detect`:
+
+```verilog
+wire acc_en = pixel_valid && frame_active;   // dùng px hiện tại
+if (pixel_valid) px <= px + 1;               // px tăng sau
+```
+
+`px` tại thời điểm `pixel_valid` là chỉ số của pixel **trước đó**, và `px` bị
+reset tại `href_falling` **cùng chu kỳ** pixel cuối được đẩy ra. Với `HREF` đúng
+640 byte/dòng (chẵn) thì không sai; nếu một dòng lẻ byte hoặc `href` xuống giữa
+một pixel, toạ độ X của cả dòng lệch 1. Đây là **rủi ro tiềm ẩn**, không phải
+nguyên nhân của số liệu hôm nay. Ghi lại để không quên khi sửa `camera_rx`.
+
+---
+
+## 5. Điều file này chứng minh / không chứng minh
+
+**Chứng minh:**
+
+1. Link IF-01 sạch: 128/128 khung, 0 CRC, 0 byte rác, timestamp đơn điệu.
+2. Blob phát `class = 2` từ pixel thật (lặp lại kết quả 01/11).
+3. Nhịp phát 4,245 fps **ổn định 30 phút** (soak xác nhận độc lập).
+4. Nhịp khung **nằm trên lưới 65,6 ms** — dữ kiện định lượng mới.
+
+**KHÔNG chứng minh:**
+
+1. PCLK = 750 kHz — cần scope (xem `KVC-CAM-PCLK-20261102-001` Pha 0).
+2. Đèn sáng cải thiện nhận diện — tỷ lệ bắt **1/128 = 0,78 %**, thấp hơn 10,1 %
+   của 01/11.
+3. Nguyên nhân mất 72 % khung — §3.2 liệt kê và **loại** hai giả thuyết, chưa
+   tìm được cơ chế giải thích.
+4. A8 (25–32 fps) — vẫn **FAIL**.
+5. BBox `x=128 y=82 w=201 h=101 conf=6` — **không tồn tại** trong dữ liệu (§2).
+
+---
+
+## 6. Hành động kế tiếp (đã có, không cần chạy lại)
+
+| # | Việc | Chặn bởi |
+| :---: | :--- | :--- |
+| 1 | Pha 0 PLAN-005: đo PCLK pin 15, VSYNC pin 4, đếm HREF/VSYNC bằng LA | có scope |
+| 2 | Nếu VSYNC ≈ 15 Hz ⇒ mất khung trong FPGA: thêm bộ đếm `vsync_cnt` xuất qua `DIAG_MODE` để so với số khung IF-01 | bước 1 |
+| 3 | Nếu VSYNC ≈ 4,2 Hz ⇒ lưới 65,6 ms là alias; bỏ giả thuyết, quay lại đo exposure | bước 1 |
+
+Không chạy lại capture 30 s: `.bin` đã đủ, và mọi kết luận ở trên đọc trực tiếp
+từ nó.

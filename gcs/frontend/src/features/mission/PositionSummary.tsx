@@ -1,14 +1,14 @@
-﻿import React from 'react'
+import React from 'react'
 import {
   ArrowDownUp,
   Camera,
   Clock,
   Crosshair,
-  Database,
   Mountain,
   Signal,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { AMBER_AGE_MS, isAgeStale } from '@/lib/stale'
 import { useMission } from '@/state/MissionProvider'
 
 export const PositionSummary: React.FC<{ className?: string }> = ({ className = '' }) => {
@@ -88,11 +88,11 @@ export const PositionSummary: React.FC<{ className?: string }> = ({ className = 
         {has_target && target && target.pos_valid ? (
           target.coordinate_frame === 'LOCAL_GRID' ? (
             <span className="font-bold text-foreground">
-              #{target.track_id ?? '101'} (X:{target.local_x_cm ?? '—'} Y:{target.local_y_cm ?? '—'}cm)
+              #{target.track_id ?? 'N/A'} (X:{target.local_x_cm ?? '—'} Y:{target.local_y_cm ?? '—'}cm)
             </span>
           ) : (
             <span className="font-bold text-foreground">
-              #{target.track_id ?? '101'} ({formatCoord(target.latitude)}, {formatCoord(target.longitude)})
+              #{target.track_id ?? 'N/A'} ({formatCoord(target.latitude)}, {formatCoord(target.longitude)})
             </span>
           )
         ) : (
@@ -155,30 +155,17 @@ export const PositionSummary: React.FC<{ className?: string }> = ({ className = 
         <Badge
           variant="outline"
           className={`py-0.5 px-1.5 font-mono text-xs font-bold ${
-            is_stale || rx_age_ms > 3000
+            isAgeStale(rx_age_ms, is_stale)
               ? 'border-[var(--kvc-crit-line)] text-[var(--kvc-crit-ink)] bg-[var(--kvc-crit-bg)]'
-              : rx_age_ms > 1000
+              : rx_age_ms > AMBER_AGE_MS
               ? 'border-[var(--kvc-warn-line)] text-[var(--kvc-warn-ink)] bg-[var(--kvc-warn-bg)]'
               : 'border-[var(--kvc-ok-line)] text-[var(--kvc-ok-ink)] bg-[var(--kvc-ok-bg)]'
           }`}
         >
-          {is_stale || rx_age_ms > 3000 ? `${(rx_age_ms / 1000).toFixed(1)}s` : `${rx_age_ms} ms`}
+          {isAgeStale(rx_age_ms, is_stale) ? `${(rx_age_ms / 1000).toFixed(1)}s` : `${rx_age_ms} ms`}
         </Badge>
       </div>
-
-      {/* 7. Nguồn dữ liệu MOCK / REAL (Tím cho MOCK, Xanh cho REAL) */}
-      <Badge
-        variant="outline"
-        className={`font-mono text-xs py-0.5 px-2 font-bold ${
-          source_mode === 'MOCK'
-            ? 'border-[var(--kvc-mock-line)] text-[var(--kvc-mock-ink)] bg-[var(--kvc-mock-bg)]'
-            : 'border-[var(--kvc-ok-line)] text-[var(--kvc-ok-ink)] bg-[var(--kvc-ok-bg)]'
-        }`}
-        title={`Nguồn dữ liệu: ${source_mode}`}
-      >
-        <Database className="h-3 w-3 mr-1" />
-        {source_mode}
-      </Badge>
+      {/* Nguồn MOCK/REAL không lặp ở đây: AppHeader đã hiển thị bộ chuyển nguồn. */}
     </footer>
   )
 }

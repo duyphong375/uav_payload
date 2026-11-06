@@ -27,7 +27,7 @@ _REPLAYABLE_TYPES = {
 }
 _DOMAIN_FIELDS = {
     "telemetry", "target", "has_target", "hardware_link", "diagnostics", "alert",
-    "alerts", "camera_position", "bounding_boxes", "replay_metadata",
+    "alerts", "camera_position", "bounding_boxes", "replay_metadata", "video",
 }
 
 
@@ -185,7 +185,7 @@ class ReplayEngine:
         snapshot = self.hub.store.snapshot(self.hub.diagnostics())
         payload = {key: snapshot[key] for key in (
             "telemetry", "target", "has_target", "hardware_link", "diagnostics",
-            "alerts", "camera_position", "bounding_boxes", "replay_metadata",
+            "alerts", "camera_position", "bounding_boxes", "replay_metadata", "video",
         )}
         return self.hub.publish("SNAPSHOT", persist=False, **payload)
 

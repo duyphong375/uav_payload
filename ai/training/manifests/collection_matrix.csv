@@ -1,0 +1,10 @@
+session_id,source,domain,scene,viewpoint,lighting,water_condition,occlusion,motion,negative_ratio_target,planned_split,notes
+PHONE_S001,phone,scale_model,person_model_on_water,low_angle,daylight,clear,none,static,0.2,train,
+PHONE_S002,phone,scale_model,person_model_on_water,low_angle,backlight,clear,partial,slow,0.2,train,
+PHONE_S003,phone,scale_model,lifebuoy_and_debris,low_angle,indoor_light,muddy,none,slow,0.3,train,
+PHONE_S004,phone,scale_model,person_near_edge,oblique,shadow,muddy,truncated,static,0.2,train,
+WEBCAM_S001,webcam,scale_model,close_person_model,front,indoor_light,synthetic_background,none,static,0.2,train,
+PUBLIC_S001,licensed_video,real,person_on_water,aerial_or_oblique,mixed,mixed,partial,motion,0.2,val,VERIFY_LICENSE
+PUBLIC_S002,licensed_video,real,boat_and_person,aerial_or_oblique,mixed,mixed,none,motion,0.2,val,VERIFY_LICENSE
+PHONE_S005,phone,scale_model,mixed_objects,oblique,low_light,muddy,partial,motion,0.3,test,LOCKED_SESSION
+PHONE_S006,phone,scale_model,no_target_hard_negative,oblique,reflection,muddy,none,static,1.0,test,LOCKED_SESSION

@@ -1,0 +1,27 @@
+# fpga — Gowin project build artifacts
+# Chỉ commit source, constraint, script và tài liệu.
+# Artifact build/synthesis/PnR tái sinh được từ .gprj, không commit.
+
+# Gowin synthesis / PnR output
+impl/
+*.vo
+*.vg
+*.ipc
+*.mod
+*.dec
+*.prj
+*.gprj.user
+
+# IP core temp folders (Gowin IP Generator)
+src/*/temp/
+src/**/temp/
+
+# Synthesis report HTML
+*_syn.rpt.html
+*syn_resource.html
+
+# Simulation output
+*.vcd
+*.fst
+*.vvp
+work/

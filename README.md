@@ -161,7 +161,7 @@ Hệ thống vận hành đồng bộ qua 6 luồng dữ liệu chuyên biệt:
 ## 4. Cây Thư Mục Dự Án Chuẩn Hóa
 
 ```text
-KVC_PRODUCT/
+fpgaODUCT/
 ├── README.md                      # Tài liệu tổng quan và hướng dẫn dự án
 ├── AGENTS.md                      # Quy tắc AI, phân quyền và chuẩn báo cáo
 ├── pytest.ini                     # Cấu hình test: gcs/backend/tests và tests
@@ -181,7 +181,7 @@ KVC_PRODUCT/
 │   │   ├── src/                   # main.cpp, rf_decode, net_policy, ws_route
 │   │   └── host_tests/            # Bộ host test C++ (g++) cho decode & network policy
 │   └── esp32_s3_cam/              # Camera quan sát phụ ESP32-S3-CAM + OV3660 (IF-05)
-├── KVC_PR/                        # Mã nguồn RTL FPGA Gowin Primer 20K
+├── fpga/                        # Mã nguồn RTL FPGA Gowin Primer 20K
 │   ├── src/                       # kvc_top_demo.v, comm/uart_tx.v, comm/bbox_packetizer.v
 │   ├── src/processing/            # kvc_blob_detect.v, pixel_stats.v, vsync_monitor.v
 │   ├── constraints/               # Ràng buộc chân và timing (.cst, .sdc)

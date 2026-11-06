@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file kvc_imu_gy87.h
  * @brief Driver đọc dữ liệu tư thế góc nghiêng (Roll, Pitch) từ cảm biến IMU GY-87 (MPU-6050) qua bus I2C0 cho MCU Sonix SN34F788.
  *
@@ -7,8 +7,6 @@
  * - GND  -> VSS/GND (Cọc J5 trên kit Sonix)
  * - SCL  -> P0.10 (Pin 38 - JP1 Pin 7/8, trên kit đã có sẵn trở pull-up R3 = 1 kΩ lên 3.3V)
  * - SDA  -> P0.11 (Pin 39 - JP1 Pin 9/10, trên kit đã có sẵn trở pull-up R4 = 1 kΩ lên 3.3V)
- *
- * Người phụ trách: Nguyễn Tá Duy Phong
  */
 
 #ifndef KVC_IMU_GY87_H

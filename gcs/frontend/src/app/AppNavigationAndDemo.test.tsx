@@ -30,10 +30,8 @@ describe('KVC-GCS UI Redesign & Rescue Value Chain Verification', () => {
         </MissionProvider>
       </TooltipProvider>
     )
-    expect(screen.getByText('Tổng quan nhiệm vụ tìm kiếm cứu nạn')).toBeDefined()
-    expect(
-      screen.getByText('Bảng theo dõi chuỗi giá trị cứu nạn: Phát hiện → Định vị → Theo dõi → Cảnh báo → Bằng chứng.')
-    ).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Tổng quan' })).toBeDefined()
+    expect(screen.getByText('Mục tiêu cứu nạn')).toBeDefined()
     unmountOverview()
 
     // 2. Alerts Page
@@ -76,10 +74,8 @@ describe('KVC-GCS UI Redesign & Rescue Value Chain Verification', () => {
         </MissionProvider>
       </TooltipProvider>
     )
-    expect(screen.getByText('Thiết bị & kết nối phần cứng')).toBeDefined()
-    expect(
-      screen.getByText('Theo dõi tình trạng liên kết truyền thông, cụm cảm biến và thiết bị suy luận AI trên trạm giám sát GCS.')
-    ).toBeDefined()
+    expect(screen.getByText('Thiết bị & kết nối')).toBeDefined()
+    expect(screen.getByText(/6 module · (tất cả bình thường|\d+ cần chú ý)/)).toBeDefined()
     unmountDevices()
 
     // 5. Settings Page
@@ -92,10 +88,8 @@ describe('KVC-GCS UI Redesign & Rescue Value Chain Verification', () => {
         </MissionProvider>
       </TooltipProvider>
     )
-    expect(screen.getByText('Cài đặt giao diện & Tham số GCS')).toBeDefined()
-    expect(
-      screen.getByText('Tùy biến hiển thị chiến thuật, bố cục trạm điều khiển và cấu hình kết nối mạng mặt đất.')
-    ).toBeDefined()
+    expect(screen.getByRole('heading', { name: 'Cài đặt', level: 1 })).toBeDefined()
+    expect(screen.getByText('Hiển thị · Nguồn dữ liệu · Kết nối mạng')).toBeDefined()
     unmountSettings()
   })
 

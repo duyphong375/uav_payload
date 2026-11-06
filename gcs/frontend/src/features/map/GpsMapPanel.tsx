@@ -1,21 +1,23 @@
-﻿import React, { useRef } from 'react'
+import React, { useRef } from 'react'
 import type L from 'leaflet'
 import { Compass, LocateFixed } from 'lucide-react'
 import { Panel } from '@/components/shared/Panel'
 import { StatusBadge } from '@/components/shared/StatusBadge'
 import { Button } from '@/components/ui/button'
-import { CurrentPositionPanel } from '@/features/mission/CurrentPositionPanel'
 import { useMission } from '@/state/MissionProvider'
 import { Map2DView } from './Map2DView'
 
 export interface GpsMapPanelProps {
   hideHeader?: boolean
   className?: string
+  /** Lớp nền bản đồ do trang cha quyết định (nút chuyển lớp nằm ở overlay rail). */
+  layerMode?: '2D' | '3D'
 }
 
 export const GpsMapPanel: React.FC<GpsMapPanelProps> = ({
   hideHeader = false,
   className = '',
+  layerMode = '2D',
 }) => {
   const { state } = useMission()
   const {
@@ -90,7 +92,11 @@ export const GpsMapPanel: React.FC<GpsMapPanelProps> = ({
     return (
       <div className={`relative w-full h-full min-h-0 flex-1 overflow-hidden select-none ${className}`}>
         <span className="sr-only">Bản đồ định vị WGS-84</span>
-        {/* Bản đồ 2D chính chiếm 100% diện tích */}
+        {/* Bản đồ 2D chính chiếm 100% diện tích.
+            Toạ độ UAV/mục tiêu không lặp lại ở đây: BottomTacticalDock đã hiển
+            thị đầy đủ ở MỌI kích thước màn hình. Trước đây panel vị trí nổi
+            trùng gốc `top-3 left-3` với thanh chọn chế độ xem của MissionPage
+            nên bị vẽ đè lên nhau trên màn hình nhỏ. */}
         <Map2DView
           cameraPosition={camera_position}
           target={target}
@@ -101,10 +107,8 @@ export const GpsMapPanel: React.FC<GpsMapPanelProps> = ({
           rxAgeMs={rx_age_ms}
           mapInstanceRef={mapInstanceRef}
           onResetView={handleResetView}
+          layerMode={layerMode}
         />
-
-        {/* Panel Vị trí nổi chỉ hiển thị trên màn hình nhỏ/hẹp (lg:hidden) */}
-        <CurrentPositionPanel onResetView={handleResetView} floating className="lg:hidden" />
       </div>
     )
   }
@@ -112,7 +116,7 @@ export const GpsMapPanel: React.FC<GpsMapPanelProps> = ({
   return (
     <Panel
       title="Bản đồ định vị WGS-84"
-      infoTip="Bản đồ không gian địa lý thời gian thực: Hiển thị vị trí kinh/vĩ độ của UAV, vệt bay lịch sử và các điểm mục tiêu Người/Tàu thuyền trên nền bản đồ OpenStreetMap / vệ tinh."
+      infoTip="Bản đồ không gian địa lý thời gian thực: Hiển thị vị trí kinh/vĩ độ của UAV, vệt bay lịch sử và các điểm mục tiêu Người / Phao cứu sinh trên nền bản đồ OpenStreetMap / vệ tinh."
       icon={<Compass className="h-4 w-4 text-primary" />}
       noPadding
       className="h-full flex flex-col min-h-0 border-border bg-card shadow-xs"
@@ -141,7 +145,9 @@ export const GpsMapPanel: React.FC<GpsMapPanelProps> = ({
       }
     >
       <div className="relative w-full h-full min-h-0 flex-1 overflow-hidden">
-        {/* Bản đồ 2D chính chiếm 100% diện tích panel */}
+        {/* Bản đồ 2D chính chiếm 100% diện tích panel.
+            Không thêm panel vị trí nổi: dock tác chiến là nguồn duy nhất cho
+            toạ độ UAV/mục tiêu, tránh hai lớp cùng gốc trên/dưới trái. */}
         <Map2DView
           cameraPosition={camera_position}
           target={target}
@@ -152,10 +158,8 @@ export const GpsMapPanel: React.FC<GpsMapPanelProps> = ({
           rxAgeMs={rx_age_ms}
           mapInstanceRef={mapInstanceRef}
           onResetView={handleResetView}
+          layerMode={layerMode}
         />
-
-        {/* Panel Vị trí nổi chỉ hiển thị trên màn hình nhỏ/hẹp (lg:hidden) để giữ bản đồ desktop thoáng đãng */}
-        <CurrentPositionPanel onResetView={handleResetView} floating className="lg:hidden" />
       </div>
     </Panel>
   )

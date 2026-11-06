@@ -1,8 +1,6 @@
-﻿/**
+/**
  * @file main.cpp
- * @brief Firmware Gateway Trạm Mặt Đất ESP32-C3 - Dự án KVC UAV Tìm kiếm Cứu
- * nạn (SAR)
- * @author Đoàn Thanh Trường Thịnh
+ * @brief Firmware Gateway Trạm Mặt Đất ESP32-C3 - Dự án KVC UAV Tìm kiếm Cứu nạn (SAR)
  *
  * ======================================================================================
  * TIẾN ĐỘ THỰC HIỆN:
@@ -64,6 +62,7 @@
 #include "net_policy.h"
 #include "rf_decode.h"
 #include "session_id.h"
+#include "ws_route.h"
 
 using kvc::RfTelemetryPacket32;
 using kvc::bytesToHexString;
@@ -111,21 +110,22 @@ static const long LORA_BAND_HZ = 433E6;
  *   Ưu tiên 2 — SoftAP: nếu không kết nối được STA trong thời gian cho phép
  *               thì tự phát Wi-Fi để laptop bắt vào.
  *
- * Có thể nạp TỐI ĐA 4 mạng, thử lần lượt theo thứ tự khai báo. Nhờ vậy không
- * phải build lại khi chuyển giữa hotspot điện thoại và Wi-Fi phòng Lab:
+ * Mặc định đã nạp sẵn hotspot Laptop 2.4 GHz của dự án; có thể nạp TỐI ĐA 4
+ * mạng, thử lần lượt theo thứ tự khai báo. Nhờ vậy không phải sửa code khi
+ * chuyển giữa hotspot điện thoại/laptop và Wi-Fi phòng Lab:
  *   pio run -e esp32-c3-devkitm-1 \
  *     -D KVC_WIFI_SSID=\"hotspot-dien-thoai\"   -D KVC_WIFI_PASS=\"mat-khau-1\" \
  *     -D KVC_WIFI_SSID2=\"wifi-phong-lab\"      -D KVC_WIFI_PASS2=\"mat-khau-2\"
- * Không truyền flag nào -> bỏ qua STA và chạy SoftAP ngay.
+ * Muốn bỏ hẳn STA thì override SSID mặc định thành chuỗi rỗng.
  *
  * Credential SoftAP là hằng số của dự án (do người dùng chốt), ghi một lần ở đây
  * và vẫn override được bằng build flag khi cần demo mạng khác.
  */
 #ifndef KVC_WIFI_SSID
-#define KVC_WIFI_SSID ""
+#define KVC_WIFI_SSID "Ars vô địch thì đổi tên"
 #endif
 #ifndef KVC_WIFI_PASS
-#define KVC_WIFI_PASS ""
+#define KVC_WIFI_PASS "hihihihi"
 #endif
 #ifndef KVC_WIFI_SSID2
 #define KVC_WIFI_SSID2 ""
@@ -156,6 +156,32 @@ static const long LORA_BAND_HZ = 433E6;
 #define KVC_AP_PASS "kvc123456"
 #endif
 
+/*
+ * Cấu hình SoftAP dự phòng trên Gateway ESP32-C3:
+ * - 1: Bật SoftAP dự phòng khi mất kết nối STA.
+ * - 0: KHÓA SoftAP: Gateway chỉ hoạt động ở chế độ STA kết nối vào Hotspot/Router.
+ *      Khi mất kết nối hoặc chưa có mạng, Gateway kiên trì thử kết nối lại STA,
+ *      tuyệt đối không tự phát SoftAP để tránh chiếm kênh 2.4 GHz và gây nhiễu
+ *      camera ESP32-S3-CAM.
+ */
+#ifndef KVC_ENABLE_SOFTAP
+#define KVC_ENABLE_SOFTAP 0
+#endif
+
+/* 802.11 giới hạn SSID 32 byte và mật khẩu 64 byte. Arduino core cắt âm thầm khi
+ * vượt giới hạn, khiến hai mạng khác nhau có thể trùng SSID sau khi cắt; chặn
+ * ngay lúc biên dịch thay vì để lỗi chỉ hiện khi ra thực địa.
+ * Lưu ý: SSID mặc định của dự án dài đúng 32 byte (23 ký tự UTF-8) — mức tối đa
+ * hợp lệ, không được thêm ký tự nào. */
+static_assert(sizeof(KVC_WIFI_SSID) - 1U <= 32U,
+              "KVC_WIFI_SSID vuot 32 byte (gioi han 802.11)");
+static_assert(sizeof(KVC_WIFI_PASS) - 1U <= 64U,
+              "KVC_WIFI_PASS vuot 64 byte (gioi han WPA2)");
+static_assert(sizeof(KVC_AP_SSID) - 1U <= 32U,
+              "KVC_AP_SSID vuot 32 byte (gioi han 802.11)");
+static_assert(sizeof(KVC_AP_PASS) - 1U <= 64U,
+              "KVC_AP_PASS vuot 64 byte (gioi han WPA2)");
+
 /* Thời gian chờ mỗi mạng ở ưu tiên 1 trong lúc khởi động. */
 static const uint32_t KVC_STA_PER_NET_TIMEOUT_MS = 8000UL;
 /* Tổng ngân sách thời gian cho ưu tiên 1 lúc khởi động. Hết ngân sách thì mở
@@ -164,6 +190,10 @@ static const uint32_t KVC_STA_PER_NET_TIMEOUT_MS = 8000UL;
 static const uint32_t KVC_STA_BOOT_BUDGET_MS = 15000UL;
 /* Chu kỳ thử lại ưu tiên 1 khi đang chạy (kể cả khi đang phát SoftAP). */
 static const uint32_t KVC_STA_RETRY_INTERVAL_MS = 30000UL;
+/* Mất STA liên tục quá ngưỡng này thì mở SoftAP dự phòng ngay, không chờ tới
+ * chu kỳ thử lại. Đủ ngắn để laptop vào lại được, đủ dài để không nhấp nháy AP
+ * khi hotspot chỉ chậm một nhịp. */
+static const uint32_t KVC_STA_DOWN_TO_AP_MS = 5000UL;
 
 /** Một bộ credential Wi-Fi 2.4 GHz (ưu tiên 1). */
 struct WifiCredential {
@@ -188,6 +218,9 @@ static bool s_staConfigured = false;   // Có ít nhất 1 mạng ở ưu tiên 
 static size_t s_netIndex = 0;          // Mạng đang/đã thử gần nhất
 static bool s_apStarted = false;
 static uint32_t s_lastStaAttemptMs = 0;
+/* Mốc STA được quan sát là đang nối gần nhất; dùng để đo thời gian mất STA liên
+ * tục. wifiSupervise() cập nhật mỗi vòng khi STA còn sống. */
+static uint32_t s_staDownSinceMs = 0;
 
 /**
  * @brief Tìm mạng kế tiếp có SSID, bắt đầu từ afterIndex.
@@ -208,6 +241,12 @@ static size_t nextConfiguredNetwork(size_t afterIndex) {
 // Cổng mạng TCP quy định cho dịch vụ WebSocket (Chuẩn IF_ESP32_GCS_WS.md quy
 // định cổng 8080)
 const uint16_t WS_PORT = 8080;
+
+// Đường dẫn duy nhất được chấp nhận (IF-03: ws://<ip>:8080/telemetry). Thư viện
+// links2004/WebSockets nhận mọi path, nên firmware phải tự từ chối path khác để
+// không lệch hợp đồng với Backend. Quy tắc nằm trong ws_route.cpp để host test
+// được.
+const char *WS_PATH = kvc::kTelemetryPath;
 
 // Khởi tạo đối tượng máy chủ WebSocket lắng nghe trên cổng 8080
 WebSocketsServer webSocket = WebSocketsServer(WS_PORT);
@@ -252,6 +291,11 @@ static const uint32_t HEARTBEAT_INTERVAL_MS = 5000;
 // Biến đếm số lượng máy tính / thiết bị GCS đang duy trì kết nối WebSocket tới
 // ESP32
 static uint8_t connectedClientCount = 0;
+
+// Đánh dấu client đã qua kiểm tra path /telemetry. Client sai path bị ngắt ngay
+// trong WStype_CONNECTED, nên khi WStype_DISCONNECTED tới sau đó không được trừ
+// vào connectedClientCount (nếu trừ sẽ làm bộ đếm sai dần).
+static bool s_clientPathAccepted[WEBSOCKETS_SERVER_CLIENT_MAX] = {false};
 
 // Mã định danh phiên làm việc của Gateway. IF-03 mục 3 yêu cầu giá trị này
 // THAY ĐỔI mỗi lần ESP32 khởi động lại. Giá trị được sinh trong setup() từ
@@ -498,11 +542,11 @@ void generateAndSendSelfMockTelemetry() {
     break;
   }
 
-  // KỊCH BẢN 2: PHÁT HIỆN TÀU THUYỀN / PHAO CỨU SINH (BOAT) - TỌA ĐỘ TOÀN CẦU
+  // KỊCH BẢN 2: PHÁT HIỆN PHAO CỨU SINH (LIFEBUOY - MÀU CAM) - TỌA ĐỘ TOÀN CẦU
   // WGS-84
   case 1: {
-    scenarioLabel = "TAU (Boat)";
-    pkt.class_id = 2;            // 2 = Tàu thuyền / Phao cứu nạn (boat)
+    scenarioLabel = "PHAO (Lifebuoy)";
+    pkt.class_id = 2;            // 2 = Phao cứu sinh màu cam (Lifebuoy)
     pkt.confidence = 92;         // 92% độ tin cậy AI
     pkt.target_lat = 160751000;  // 16.075100° N
     pkt.target_lon = 1081512000; // 108.151200° E
@@ -600,6 +644,24 @@ void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t *payload,
 
   // SỰ KIỆN 1: CÓ THIẾT BỊ (LAPTOP GCS) VỪA KẾT NỐI VÀO WEBSOCKET THÀNH CÔNG
   case WStype_CONNECTED: {
+    // payload của WStype_CONNECTED là URL client yêu cầu. Chỉ phục vụ
+    // /telemetry (IF-03); client sai path bị ngắt ngay để Backend luôn tìm thấy
+    // đúng endpoint và không ai lỡ tay nhận telemetry ở path khác.
+    if (num >= (uint8_t)WEBSOCKETS_SERVER_CLIENT_MAX) {
+      break; // Không thể xảy ra với thư viện hiện tại; chặn OOB phòng thủ.
+    }
+    const char *requestPath = (payload != nullptr) ? (const char *)payload : "";
+    const bool pathOk = kvc::isAcceptedTelemetryPath(requestPath, length);
+    if (!pathOk) {
+      s_clientPathAccepted[num] = false;
+      Serial.printf("[WS-REJECT] Client ID %u yeu cau path \"%s\", chi chap "
+                    "nhan \"%s\". Ngat ket noi.\n",
+                    num, requestPath, WS_PATH);
+      webSocket.disconnect(num);
+      break;
+    }
+
+    s_clientPathAccepted[num] = true;
     connectedClientCount++;
     IPAddress clientIp = webSocket.remoteIP(num);
 
@@ -623,8 +685,14 @@ void onWebSocketEvent(uint8_t num, WStype_t type, uint8_t *payload,
 
   // SỰ KIỆN 2: THIẾT BỊ (LAPTOP GCS) NGẮT KẾT NỐI KHỎI WEBSOCKET
   case WStype_DISCONNECTED: {
-    if (connectedClientCount > 0) {
-      connectedClientCount--;
+    if (num >= (uint8_t)WEBSOCKETS_SERVER_CLIENT_MAX) {
+      break;
+    }
+    if (s_clientPathAccepted[num]) {
+      s_clientPathAccepted[num] = false;
+      if (connectedClientCount > 0) {
+        connectedClientCount--;
+      }
     }
     Serial.printf(
         "\n[WS-DISCONNECT] >>> Laptop GCS (Client ID: %u) da ngat ket noi!\n",
@@ -704,12 +772,20 @@ static bool initLoRaHardware() {
 // 9.5. QUẢN LÝ MẠNG: ƯU TIÊN STA (Wi-Fi 2.4 GHz có sẵn), DỰ PHÒNG SOFTAP
 // ======================================================================================
 
+// Định nghĩa ở dưới (mục 9.6); wifiSupervise() cần gọi lại khi đóng SoftAP.
+static void startMdns();
+
 /**
  * @brief Bật SoftAP (dự phòng) và ghi log.
  *
  * Idempotent: gọi nhiều lần không mở lại AP đã chạy.
  */
 static void startSoftAp() {
+#if !KVC_ENABLE_SOFTAP
+  Serial.println("[WIFI-AP]  SoftAP da bi KHOA boi cau hinh KVC_ENABLE_SOFTAP=0 (tranh nhieu 2.4 GHz).");
+  s_apStarted = false;
+  return;
+#else
   if (s_apStarted) {
     return;
   }
@@ -717,6 +793,19 @@ static void startSoftAp() {
   // AP_STA thay vì AP: vẫn giữ được STA để tự nối lại khi router xuất hiện lại.
   WiFi.mode(WIFI_AP_STA);
   s_apStarted = WiFi.softAP(AP_SSID, AP_PASS);
+
+  // Chốt cứng IP 192.168.4.1 theo IF-03 thay vì phụ thuộc giá trị mặc định của
+  // lõi Arduino (mặc định hiện đúng, nhưng đây là hợp đồng với Backend). Gọi
+  // sau softAP() vì AP.create() ghi lại wifi_config và có thể làm DHCP server
+  // cấp lại IP mặc định.
+  if (s_apStarted) {
+    static const IPAddress kApIp(192, 168, 4, 1);
+    static const IPAddress kApGateway(192, 168, 4, 1);
+    static const IPAddress kApNetmask(255, 255, 255, 0);
+    if (!WiFi.softAPConfig(kApIp, kApGateway, kApNetmask)) {
+      Serial.println("[WIFI-AP-WARN] softAPConfig that bai; dung IP mac dinh.");
+    }
+  }
 
   if (s_apStarted) {
     Serial.println("[WIFI-AP]  Phat SoftAP du phong THANH CONG!");
@@ -726,6 +815,7 @@ static void startSoftAp() {
   } else {
     Serial.println("[WIFI-AP-ERR] Khong mo duoc SoftAP! Kiem tra lai cau hinh.");
   }
+#endif
 }
 
 /**
@@ -778,14 +868,19 @@ static void wifiBegin() {
   s_apStarted = false;
   s_netIndex = 0;
   s_lastStaAttemptMs = millis();
+  s_staDownSinceMs = millis();
 
   const size_t first = nextConfiguredNetwork(0);
   s_staConfigured = (first != WIFI_NETWORK_COUNT);
 
   if (!s_staConfigured) {
     Serial.println("[WIFI-STA] Khong co KVC_WIFI_SSID... khi build.");
+#if KVC_ENABLE_SOFTAP
     Serial.println("[WIFI-STA] Chuyen sang uu tien 2: phat SoftAP.");
     startSoftAp();
+#else
+    Serial.println("[WIFI-STA] SoftAP bi KHOA boi cau hinh. Khong phat SoftAP.");
+#endif
     return;
   }
 
@@ -819,36 +914,74 @@ static void wifiBegin() {
     idx = nextConfiguredNetwork(idx + 1);
   }
 
+#if KVC_ENABLE_SOFTAP
   Serial.println("[WIFI-STA] That bai tat ca mang o uu tien 1. Chuyen sang uu tien 2.");
   startSoftAp();
+#else
+  Serial.println("[WIFI-STA] That bai tat ca mang o uu tien 1. SoftAP bi KHOA boi cau hinh, tiep tuc o che do STA.");
+#endif
 }
 
 /**
  * @brief Giữ mạng ổn định trong loop().
  *
- * - Đang chạy STA mà mất kết nối: thử lại định kỳ, luân phiên qua các mạng đã
- *   khai báo (điện thoại tắt hotspot thì tự chuyển sang Wi-Fi khác).
+ * - Đang chạy STA mà mất kết nối: mở SoftAP dự phòng sau KVC_STA_DOWN_TO_AP_MS,
+ *   đồng thời thử lại STA định kỳ, luân phiên qua các mạng đã khai báo.
  * - Đang chạy SoftAP vì ưu tiên 1 thất bại: vẫn thử lại định kỳ, và đóng SoftAP
- *   ngay khi ưu tiên 1 nối được để không phát sóng thừa.
+ *   khi STA nối lại được VÀ không còn client nào bám vào AP. Chờ client rời hết
+ *   để không cắt luồng video S3-CAM / phiên laptop đang chạy.
  */
 static void wifiSupervise(uint32_t now) {
   if (!s_staConfigured) {
     return; // Không có credential thì SoftAP là phương án duy nhất
   }
 
+  const bool staConnected = (WiFi.status() == WL_CONNECTED);
+  if (staConnected) {
+    s_staDownSinceMs = now;
+  }
+
   kvc::NetPolicyState state;
   state.staConfigured = s_staConfigured;
-  state.staConnected = (WiFi.status() == WL_CONNECTED);
+  state.staConnected = staConnected;
   state.apStarted = s_apStarted;
+  state.apStationCount = s_apStarted ? WiFi.softAPgetStationNum() : 0;
   state.lastStaAttemptMs = s_lastStaAttemptMs;
+  state.staDownDurationMs = staConnected ? 0 : (uint32_t)(now - s_staDownSinceMs);
 
-  switch (kvc::netPolicyEvaluate(state, now, KVC_STA_RETRY_INTERVAL_MS)) {
+  switch (kvc::netPolicyEvaluate(state, now, KVC_STA_RETRY_INTERVAL_MS,
+                                 KVC_STA_DOWN_TO_AP_MS)) {
+  case kvc::NetAction::OpenSoftAp:
+#if KVC_ENABLE_SOFTAP
+    // Giãn nhịp thử lại: nếu softAP() thất bại, không gọi lại mỗi vòng loop()
+    // (sẽ spam log và chiếm CPU); chờ thêm một chu kỳ rồi mới thử tiếp.
+    s_staDownSinceMs = now;
+    Serial.printf("[WIFI-STA] Mat STA qua %lu ms. Bat SoftAP du phong.\n",
+                  (unsigned long)KVC_STA_DOWN_TO_AP_MS);
+    startSoftAp();
+    if (s_apStarted) {
+      // Interface AP vừa xuất hiện sau khi mDNS đã khởi tạo: khởi động lại để
+      // kvc-gateway.local phân giải được cả trên mạng dự phòng.
+      MDNS.end();
+      startMdns();
+    }
+#else
+    s_staDownSinceMs = now;
+    Serial.printf("[WIFI-STA] Mat STA qua %lu ms, nhung SoftAP bi KHOA boi cau hinh. Tiep tuc cho thu lai STA.\n",
+                  (unsigned long)KVC_STA_DOWN_TO_AP_MS);
+#endif
+    break;
+
   case kvc::NetAction::CloseSoftAp:
     WiFi.softAPdisconnect(true);
     s_apStarted = false;
     WiFi.mode(WIFI_STA);
-    Serial.println("[WIFI-AP]  Da dong SoftAP: uu tien 1 hoat dong lai.");
+    Serial.println("[WIFI-AP]  Da dong SoftAP: uu tien 1 hoat dong lai va khong con client.");
     Serial.printf("[WIFI-STA] IP: %s\n", WiFi.localIP().toString().c_str());
+    // mDNS đang gắn với interface AP vừa đóng: khởi động lại để tên
+    // kvc-gateway.local phân giải được trên mạng STA.
+    MDNS.end();
+    startMdns();
     break;
 
   case kvc::NetAction::RetrySta: {
@@ -923,7 +1056,7 @@ void setup() {
   Serial.println("\n=======================================================");
   Serial.println("   KVC GATEWAY ESP32 - PHÂN HỆ TRẠM THU MẶT ĐẤT       ");
   Serial.println("   GIAI ĐOẠN 3: KIỂM THỬ THÔNG LUỒNG (SELF-MOCK INGRESS)");
-  Serial.println("   Người thực hiện: Đoàn Thanh Trường Thịnh           ");
+  Serial.println("   KVC SAR Payload Telemetry Gateway                   ");
   Serial.println("=======================================================");
 
   // Mã phiên phải khác nhau sau mỗi lần reboot (IF-03 mục 3). Lấy entropy
@@ -1048,54 +1181,57 @@ void loop() {
           } else {
             String jsonEnv = buildJsonEnvelope(hexPayload, rssiDbm, snrDb);
             webSocket.broadcastTXT(jsonEnv);
-            const RfTelemetryPacket32 *rxPkt =
-                (const RfTelemetryPacket32 *)rxBuffer;
-            bool gnssValid = (rxPkt->sensor_flags & (1U << 0)) != 0;
-            bool altValid = (rxPkt->sensor_flags & (1U << 1)) != 0;
-            bool imuValid = (rxPkt->sensor_flags & (1U << 2)) != 0;
-            bool aiValid = (rxPkt->sensor_flags & (1U << 3)) != 0;
+            /* Copy sang struct căn lề trước khi đọc trường 32-bit: rxBuffer là
+             * mảng byte trên stack, ép kiểu trực tiếp có thể tạo truy cập lệch
+             * căn trên RISC-V. */
+            RfTelemetryPacket32 rxPkt;
+            memcpy(&rxPkt, rxBuffer, sizeof(rxPkt));
+            bool gnssValid = (rxPkt.sensor_flags & (1U << 0)) != 0;
+            bool altValid = (rxPkt.sensor_flags & (1U << 1)) != 0;
+            bool imuValid = (rxPkt.sensor_flags & (1U << 2)) != 0;
+            bool aiValid = (rxPkt.sensor_flags & (1U << 3)) != 0;
 
             // Giám sát tính toàn vẹn chuỗi số Sequence từ UAV
             static uint8_t lastUavSeq = 0;
-            if (lastUavSeq > 0 && rxPkt->seq_num != (uint8_t)(lastUavSeq + 1)) {
-              uint8_t gap = (uint8_t)(rxPkt->seq_num - lastUavSeq - 1);
+            if (lastUavSeq > 0 && rxPkt.seq_num != (uint8_t)(lastUavSeq + 1)) {
+              uint8_t gap = (uint8_t)(rxPkt.seq_num - lastUavSeq - 1);
               Serial.printf("[LORA-GAP] Canh bao: Mat nhay coc %u goi tin! "
                             "(UAV Seq: %u -> %u)\n",
-                            gap, lastUavSeq, rxPkt->seq_num);
+                            gap, lastUavSeq, rxPkt.seq_num);
             }
-            lastUavSeq = rxPkt->seq_num;
+            lastUavSeq = rxPkt.seq_num;
 
             char imuStr[28] = "IMU:N/A";
             if (imuValid) {
               int16_t roll =
-                  (int16_t)(rxPkt->reserved[0] | (rxPkt->reserved[1] << 8));
+                  (int16_t)(rxPkt.reserved[0] | (rxPkt.reserved[1] << 8));
               int16_t pitch =
-                  (int16_t)(rxPkt->reserved[2] | (rxPkt->reserved[3] << 8));
+                  (int16_t)(rxPkt.reserved[2] | (rxPkt.reserved[3] << 8));
               snprintf(imuStr, sizeof(imuStr), "R:%+.1f P:%+.1f",
                        (float)roll / 10.0f, (float)pitch / 10.0f);
             }
 
             char gnssStr[36] = "GPS:NO_FIX";
             if (gnssValid &&
-                (rxPkt->target_lat != 0 || rxPkt->target_lon != 0)) {
+                (rxPkt.target_lat != 0 || rxPkt.target_lon != 0)) {
               snprintf(gnssStr, sizeof(gnssStr), "GPS:%.5f,%.5f",
-                       (double)rxPkt->target_lat / 1e7,
-                       (double)rxPkt->target_lon / 1e7);
+                       (double)rxPkt.target_lat / 1e7,
+                       (double)rxPkt.target_lon / 1e7);
             }
 
             char aiStr[24] = "AI:IDLE";
-            if (aiValid || rxPkt->class_id != 0) {
-              const char *clsName = (rxPkt->class_id == 1)   ? "PERSON"
-                                    : (rxPkt->class_id == 2) ? "BOAT"
-                                                             : "TARGET";
+            if (aiValid || rxPkt.class_id != 0) {
+              const char *clsName = (rxPkt.class_id == 1)   ? "PERSON"
+                                    : (rxPkt.class_id == 2) ? "LIFEBUOY"
+                                                            : "TARGET";
               snprintf(aiStr, sizeof(aiStr), "AI:%s(%u%%)", clsName,
-                       rxPkt->confidence);
+                       rxPkt.confidence);
             }
 
             Serial.printf("[RX-LORA #%03u] Seq:%-3u | %ddBm SNR:%+.1f | "
                           "Alt:%3u cm [%s] | %s | %s | %s\n",
-                          gatewaySequence, rxPkt->seq_num, rssiDbm, snrDb,
-                          rxPkt->alt_dist_cm,
+                          gatewaySequence, rxPkt.seq_num, rssiDbm, snrDb,
+                          rxPkt.alt_dist_cm,
                           altValid ? "ALT_VALID" : "ALT_INVALID", imuStr,
                           gnssStr, aiStr);
           }

@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react'
+import React, { useState } from 'react'
 import {
   Clock,
   FlaskConical,
@@ -11,7 +11,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { InfoTip } from '@/components/shared/InfoTip'
 import { getEsp32PhysicalStatus } from '@/lib/connectionStatus'
-import { AMBER_AGE_MS, isAgeStale } from '@/lib/stale'
+import { isAgeStale } from '@/lib/stale'
 import { GnssSatelliteSheet } from '@/features/telemetry/GnssSatelliteSheet'
 import { ThemeToggle } from '@/features/theme/ThemeToggle'
 import { useMission } from '@/state/MissionProvider'
@@ -54,26 +54,31 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   }
 
   // Màu và nhãn độ trễ tín hiệu (rx_age_ms)
+  // - Cố định độ rộng (w-[114px] shrink-0) và định dạng chuẩn 10 ký tự 'X.Xs (xxx)'
+  //   để loại bỏ hoàn toàn hiện tượng rung giật / co giãn làm xô lệch các nút bên cạnh trên thanh header.
+  // - Chu kỳ phát sóng RF LoRa là ~1000ms; ngưỡng cảnh báo Trễ đặt ở 1.8s để tránh tình trạng
+  //   cứ mỗi giây lại nhấp nháy chuyển màu vàng-xanh liên tục gây rối mắt người vận hành.
   const getAgeStatus = (age: number, stale: boolean) => {
     const safeAge = Math.max(0, age)
+    const secStr = `${(safeAge / 1000).toFixed(1)}s`
     if (isAgeStale(safeAge, stale)) {
       return {
         color: 'text-[var(--kvc-crit-ink)] bg-[var(--kvc-crit-bg)] border-[var(--kvc-crit-line)]',
         dot: 'bg-[var(--kvc-crit)]',
-        label: `${(safeAge / 1000).toFixed(1)}s (MẤT SÓNG)`,
+        label: `${secStr} (Mất)`,
       }
     }
-    if (safeAge > AMBER_AGE_MS) {
+    if (safeAge > 1800) {
       return {
         color: 'text-[var(--kvc-warn-ink)] bg-[var(--kvc-warn-bg)] border-[var(--kvc-warn-line)]',
         dot: 'bg-[var(--kvc-warn)]',
-        label: `${(safeAge / 1000).toFixed(1)}s (Trễ)`,
+        label: `${secStr} (Trễ)`,
       }
     }
     return {
       color: 'text-[var(--kvc-ok-ink)] bg-[var(--kvc-ok-bg)] border-[var(--kvc-ok-line)]',
       dot: 'bg-[var(--kvc-ok)]',
-      label: `${Math.round(safeAge)}ms (Tốt)`,
+      label: `${secStr} (Tốt)`,
     }
   }
 
@@ -243,13 +248,13 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
         )}
 
 
-        {/* Độ trễ tín hiệu telemetry (rx_age) */}
+        {/* Độ trễ tín hiệu telemetry (rx_age) — Cố định min-w-[110px] w-auto px-2.5 shrink-0 chống giật layout & không cắt chữ */}
         <div
-          className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-xs font-mono tabular-nums font-medium ${ageStatus.color}`}
-          title="Độ trễ tín hiệu gói tin gần nhất từ tải UAV"
+          className={`flex items-center justify-center gap-1.5 px-2.5 py-1 min-h-[32px] min-w-[110px] w-auto shrink-0 rounded-kvc-control border text-xs font-mono tabular-nums font-semibold shadow-2xs select-none ${ageStatus.color}`}
+          title={`Độ trễ tín hiệu gói tin gần nhất từ tải UAV: ${Math.round(rx_age_ms)} ms`}
         >
           <Clock className="h-3.5 w-3.5 shrink-0 opacity-80" />
-          <span>{ageStatus.label}</span>
+          <span className="whitespace-nowrap">{ageStatus.label}</span>
         </div>
 
         {/* Trạng thái Định vị GNSS - Nhấp để mở Phần Vệ Tinh chi tiết */}

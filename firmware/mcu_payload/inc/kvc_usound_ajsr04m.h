@@ -30,8 +30,6 @@
  * cộng thêm 0xFF mới cho ra `0xA7`. Firmware bám theo khung mẫu.
  * **Chưa xác minh trên kit** — nếu khung thật không khớp, `s_usound_last_err`
  * sẽ là `KVC_USOUND_ERR_CHECKSUM` (2) và đây là chỗ cần xem lại đầu tiên.
- *
- * Người phụ trách: Nguyễn Tá Duy Phong
  */
 
 #ifndef KVC_USOUND_AJSR04M_H

@@ -4,8 +4,6 @@
  *
  * Bảng sin 0..90° bước 1°, nhân 10000, sinh bằng Python và kiểm bằng
  * `tests/test_kvc_geo_math.c`. Nội suy tuyến tính cho phần lẻ 0,1°.
- *
- * Người phụ trách: Nguyễn Tá Duy Phong
  */
 
 #include "kvc_geo_math.h"

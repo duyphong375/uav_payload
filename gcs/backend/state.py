@@ -9,10 +9,10 @@ from uuid import uuid4
 
 try:
     from .config import Settings
-    from .schemas import Alert, CameraPosition, Diagnostics, Event, HardwareLink, Target, Telemetry
+    from .schemas import Alert, CameraPosition, Diagnostics, Event, HardwareLink, Target, Telemetry, VideoStatus
 except (ImportError, ValueError):
     from config import Settings
-    from schemas import Alert, CameraPosition, Diagnostics, Event, HardwareLink, Target, Telemetry
+    from schemas import Alert, CameraPosition, Diagnostics, Event, HardwareLink, Target, Telemetry, VideoStatus
 
 
 def utc_now():
@@ -38,7 +38,11 @@ class MissionStore:
         inference_device="SIMULATED",
         session_id=None,
     ):
-        self.session_id = session_id or f"SES-{source_mode}-{uuid4()}"
+        if not session_id:
+            now_str = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+            self.session_id = f"SES-{source_mode}-{now_str}-{uuid4().hex[:6]}"
+        else:
+            self.session_id = session_id
         self.source_mode = source_mode
         self.original_source_mode = original_source_mode
         self.inference_device = inference_device
@@ -49,7 +53,12 @@ class MissionStore:
         self.hardware_link = HardwareLink().model_dump()
         self.alerts = {}
         self.replay_metadata = None
-        self.times = {"rx": None, "telemetry": None, "target": None, "camera": None}
+        self.video = VideoStatus().model_dump()
+        self.rf_reject_count = 0
+        self.packets_received_total = 0
+        self.decode_errors_total = 0
+        self.ingress_drops_total = 0
+        self.times = {"rx": None, "telemetry": None, "target": None, "camera": None, "video": None}
 
     def ages(self):
         now = self.now_ms()
@@ -62,6 +71,15 @@ class MissionStore:
             "target_age_ms": age("target"),
             "camera_age_ms": age("camera"),
         }
+
+    def video_with_age(self):
+        """`video` KHÔNG nằm trong `ages()`: `ages()` được merge vào MỌI event,
+        mà `video` chỉ thuộc domain `VIDEO_STATUS`/`SNAPSHOT`. Trả bản sao kèm
+        `last_frame_age_ms` tính tại thời điểm gọi."""
+        if self.times["video"] is None:
+            return {**self.video, "last_frame_age_ms": None}
+        age = max(0, self.now_ms() - self.times["video"])
+        return {**self.video, "last_frame_age_ms": age}
 
     def metadata(self, event_type):
         return {
@@ -85,6 +103,7 @@ class MissionStore:
             "camera_position": copy.deepcopy(self.camera_position),
             "bounding_boxes": copy.deepcopy(self.bounding_boxes),
             "replay_metadata": copy.deepcopy(self.replay_metadata),
+            "video": self.video_with_age(),
         }
         Event.model_validate(result)
         return result
@@ -99,6 +118,7 @@ class MissionStore:
         candidate.hardware_link = dict(self.hardware_link)
         candidate.alerts = copy.deepcopy(self.alerts)
         candidate.replay_metadata = copy.deepcopy(self.replay_metadata)
+        candidate.video = dict(self.video)
         candidate.times = dict(self.times)
         candidate._apply(event)
         self.__dict__.update(candidate.__dict__)
@@ -121,6 +141,11 @@ class MissionStore:
             self.hardware_link = HardwareLink().model_dump()
             self.alerts = {}
             self.replay_metadata = None
+            self.video = VideoStatus().model_dump()
+            self.rf_reject_count = 0
+            self.packets_received_total = 0
+            self.decode_errors_total = 0
+            self.ingress_drops_total = 0
             self.times = dict.fromkeys(self.times)
         else:
             self.original_source_mode = parsed.original_source_mode
@@ -191,6 +216,19 @@ class MissionStore:
                     self.alerts.pop(next(iter(self.alerts)))
         if "replay_metadata" in data:
             self.replay_metadata = copy.deepcopy(data["replay_metadata"])
+        if "video" in data:
+            # VIDEO_STATUS là trạng thái do backend tự đo, không phải telemetry
+            # của tải. Không đụng `times["rx"]`.
+            self.video = VideoStatus.model_validate(data["video"]).model_dump()
+            # `last_frame_age_ms` là tuổi ĐO ĐƯỢC ở nơi có đồng hồ khung (relay).
+            # Neo ngược lại mốc thời gian của store để `video_with_age()` không
+            # tự đặt tuổi = 0 sau mỗi lần publish. Nhờ vậy `/api/video/status`
+            # (`relay.status()`) và `VIDEO_STATUS`/`SNAPSHOT` cùng một con số.
+            reported_age_ms = self.video["last_frame_age_ms"]
+            self.times["video"] = (
+                None if reported_age_ms is None
+                else max(0, self.now_ms() - reported_age_ms)
+            )
         if parsed.event_type in {"TELEMETRY_UPDATE", "TARGET_UPDATE"}:
             self.times["rx"] = self.now_ms()
         if snapshot:
@@ -225,9 +263,13 @@ class Hub:
         logger_status = self.logger.status() if self.logger else None
         logger_drops = logger_status["drops_total"] if logger_status else 0
         return Diagnostics(
+            packets_received_total=self.store.packets_received_total,
+            decode_errors_total=self.store.decode_errors_total,
+            ingress_drops_total=self.store.ingress_drops_total,
             logger_drops_total=logger_drops,
             client_drops_total=self.client_drops,
-            data_loss_latched=self.client_drops > 0 or logger_drops > 0,
+            rf_reject_count=self.store.rf_reject_count,
+            data_loss_latched=self.client_drops > 0 or logger_drops > 0 or self.store.ingress_drops_total > 0,
             logger_status=logger_status["status"] if logger_status else "LOG_DEGRADED",
         ).model_dump()
 
@@ -284,12 +326,22 @@ class Hub:
                     self.fail(client)
         return event
 
-    def rotate_session(self):
-        self.store.new_session()
+    def rotate_session(self, *, source_mode=None, original_source_mode=None,
+                       inference_device=None):
+        # KVC-DUAL-CAMERA-20261102 (T-05): cho phép giữ provenance khi xoay
+        # phiên. Trước đây `new_session()` luôn quay về MOCK/SIMULATED, nên một
+        # phiên REAL bị watchdog xoay sau 60 giây mất sóng sẽ tự nhận nhãn MOCK
+        # — lại là ghi sai nguồn dữ liệu. Người gọi không truyền gì thì giữ
+        # hành vi cũ (MOCK), để API tạo phiên và replay không đổi.
+        self.store.new_session(
+            source_mode=source_mode or "MOCK",
+            original_source_mode=original_source_mode or "MOCK",
+            inference_device=inference_device or "SIMULATED",
+        )
         snapshot = self.store.snapshot(self.diagnostics())
         payload = {key: snapshot[key] for key in (
             "telemetry", "target", "has_target", "hardware_link", "diagnostics",
-            "alerts", "camera_position", "bounding_boxes", "replay_metadata",
+            "alerts", "camera_position", "bounding_boxes", "replay_metadata", "video",
         )}
         return self.publish("SNAPSHOT", **payload)
 
@@ -308,4 +360,5 @@ class Hub:
             "queue_depths": [c.queue.qsize() for c in self.clients],
             "queue_high_water": self.queue_high_water, "alerts_count": len(self.store.alerts),
             "source_task_running": self.source_task is not None and not self.source_task.done(),
+            "video": self.store.video_with_age(),
         }

@@ -17,6 +17,11 @@ try:
 except (ImportError, ValueError):
     from track_registry import get_track_registry
 
+try:
+    from .alerts import evaluate_telemetry_alerts
+except (ImportError, ValueError):
+    from alerts import evaluate_telemetry_alerts
+
 logger = logging.getLogger("kvc.esp32_ingress")
 
 
@@ -123,7 +128,7 @@ def parse_rf_payload(rf_payload_hex: str) -> dict[str, Any]:
 
     target_data = None
     if has_target:
-        lidar_position_valid = lidar_valid and 20 <= lidar_cm <= 800
+        lidar_position_valid = lidar_valid and 20 < lidar_cm <= 800
         has_wgs84_position = gps_valid and lidar_position_valid and lat_scaled != 0 and lon_scaled != 0
         has_local_position = (
             not gps_valid
@@ -231,7 +236,7 @@ def parse_rf_payload(rf_payload_hex: str) -> dict[str, Any]:
         "device_measurement_time_ms": timestamp_ms,
         "telemetry": {
             "battery_pct": battery_pct,
-            "lidar_range_cm": lidar_cm if (lidar_valid and 20 <= lidar_cm <= 800) else None,
+            "lidar_range_cm": lidar_cm if (lidar_valid and 20 < lidar_cm <= 800) else None,
             "gps_valid": gps_valid,
             "lidar_valid": lidar_valid,
             "imu_valid": imu_valid,
@@ -253,13 +258,66 @@ def parse_rf_payload(rf_payload_hex: str) -> dict[str, Any]:
 
 
 def inject_envelope(hub: Any, data: dict[str, Any]) -> dict[str, Any]:
-    """Inject a parsed envelope into the Hub."""
-    hub.store.original_source_mode = "REAL"
+    """Inject a parsed envelope into the Hub.
+
+    KVC-DUAL-CAMERA-20261102 (T-04): frame hỏng CRC bị TỪ CHỐI.
+
+    VÌ SAO CẦN: trước đây hàm này bỏ qua `parsed["crc_valid"]`, nên một frame
+    sai bit vẫn tạo `TARGET_UPDATE` với toạ độ rác. Gateway thật đã lọc CRC
+    trước khi broadcast, nhưng `/api/ingress/envelope` nhận hex thô và đường
+    replay/log có thể phát lại frame hỏng — không được tin tầng trên.
+
+    `sync_valid` cũng được kiểm vì header sai nghĩa là ranh giới frame sai,
+    mọi trường phía sau không đáng tin.
+    """
     rf_hex = data.get("rf_payload_hex")
     if not rf_hex:
+        hub.store.decode_errors_total += 1
         raise ValueError("Missing rf_payload_hex field")
 
-    parsed = parse_rf_payload(rf_hex)
+    try:
+        parsed = parse_rf_payload(rf_hex)
+    except Exception:
+        hub.store.decode_errors_total += 1
+        hub.store.rf_reject_count += 1
+        raise
+
+    if not parsed["sync_valid"] or not parsed["crc_valid"]:
+        hub.store.decode_errors_total += 1
+        hub.store.rf_reject_count += 1
+        raise ValueError(
+            "Rejected RF payload: sync_valid=%s crc_valid=%s (frame %d bytes)"
+            % (parsed["sync_valid"], parsed["crc_valid"], len(rf_hex) // 2)
+        )
+
+    # KVC-DUAL-CAMERA-20261102 (T-05): dữ liệu đi qua đường này là telemetry
+    # THẬT (ESP32 Gateway -> WebSocket hoặc POST /api/ingress/envelope), nên
+    # phiên phải mang nhãn REAL. Trước đây chỉ đặt `original_source_mode` còn
+    # `source_mode` giữ MOCK (vì schema không có REAL), khiến SQLite lưu nguồn
+    # sai và UI phải tự ghi đè ở client.
+    #
+    # Nếu phiên hiện tại chưa phải REAL (ví dụ backend khởi động ở MOCK), phải
+    # XOAY PHIÊN bằng SNAPSHOT chứ không gán trường lẻ: client chỉ nhận event
+    # khi `source_mode` khớp kênh đang chọn và chỉ nhận patch sau SNAPSHOT của
+    # đúng `session_id`. Gán lẻ sẽ khiến mọi gói live bị client bỏ im lặng.
+    #
+    # `inference_device` lấy từ envelope nếu bên gửi khai báo (hữu ích khi test
+    # bằng mock_fpga_bbox.py qua USB-TTL); mặc định là FPGA trên tải.
+    device = data.get("inference_device") or "FPGA_GW2A"
+    if hub.store.source_mode != "REAL":
+        hub.rotate_session(
+            source_mode="REAL",
+            original_source_mode="REAL",
+            inference_device=device,
+        )
+    else:
+        hub.store.original_source_mode = "REAL"
+        hub.store.inference_device = device
+
+    hub.store.packets_received_total += 1
+    if "rx_drop_count" in data and data["rx_drop_count"] is not None:
+        hub.store.ingress_drops_total = int(data["rx_drop_count"])
+
     rssi = data.get("rssi_dbm")
     snr = data.get("snr_db")
 
@@ -309,12 +367,22 @@ def inject_envelope(hub: Any, data: dict[str, Any]) -> dict[str, Any]:
     else:
         hub.publish("TARGET_UPDATE", has_target=False, target=None)
 
+    # Đánh giá cảnh báo tự động trên telemetry vừa nhận
+    alerts_to_publish = evaluate_telemetry_alerts(
+        telem=telem,
+        active_alerts=hub.store.alerts,
+        target=parsed.get("target"),
+        has_target=parsed.get("has_target", False),
+    )
+    for alert_data in alerts_to_publish:
+        hub.publish("ALERT_EVENT", alert=alert_data)
+
     return parsed
 
 
-async def probe_gateway_url(ip: str) -> str | None:
-    """Probe an IP address for active KVC ESP32 Gateway WebSocket."""
-    url = f"ws://{ip}:8080/telemetry"
+async def probe_gateway_url(host: str, port: int = 8080) -> str | None:
+    """Probe a host (IPv4 or mDNS name) for an active KVC ESP32 Gateway WebSocket."""
+    url = f"ws://{host}:{port}/telemetry"
     try:
         async with websockets.connect(url, open_timeout=1.5, close_timeout=0.5) as ws:
             msg = await asyncio.wait_for(ws.recv(), timeout=1.0)
@@ -325,9 +393,23 @@ async def probe_gateway_url(ip: str) -> str | None:
     return None
 
 
+# Tên mDNS do firmware gateway đăng ký (firmware/gateway_esp32/src/main.cpp,
+# `MDNS.begin("kvc-gateway")`). Windows 10+ và Linux/macOS tự phân giải `.local`
+# nên backend không cần thêm thư viện mDNS nào.
+GATEWAY_MDNS_HOST = "kvc-gateway.local"
+
+# IP tĩnh của gateway khi chạy SoftAP (IF-03 §2) — thứ tự này chỉ là gợi ý dò,
+# KHÔNG phải cấu hình: URL ưu tiên vẫn do --esp32-url / KVC_ESP32_WS_URL quyết.
+KNOWN_GATEWAY_HOSTS = ("192.168.4.1",)
+
+
 async def discover_esp32_gateway(preferred_url: str = "") -> str | None:
-    """Auto-discover ESP32 Gateway WebSocket URL across common subnets."""
-    # 0. Check preferred_url if given
+    """Auto-discover ESP32 Gateway WebSocket URL.
+
+    Thứ tự: URL người vận hành đã chỉ định -> mDNS -> SoftAP mặc định -> quét
+    subnet hiện tại của máy. Không quét dải lạ hay IP của máy khác.
+    """
+    # 0. URL ưu tiên (do --esp32-url / KVC_ESP32_WS_URL truyền vào).
     if preferred_url:
         host = preferred_url.replace("ws://", "").replace("http://", "").split("/")[0].split(":")[0]
         if host:
@@ -335,13 +417,18 @@ async def discover_esp32_gateway(preferred_url: str = "") -> str | None:
             if res:
                 return res
 
-    # 1. First probe known static IPs
-    for ip in ("10.136.131.101", "192.168.4.1", "192.168.1.175", "192.168.1.15"):
-        res = await probe_gateway_url(ip)
+    # 1. mDNS: IP do router cấp có thể đổi mỗi lần boot, tên thì không.
+    res = await probe_gateway_url(GATEWAY_MDNS_HOST)
+    if res:
+        return res
+
+    # 2. SoftAP mặc định của gateway.
+    for host in KNOWN_GATEWAY_HOSTS:
+        res = await probe_gateway_url(host)
         if res:
             return res
 
-    # 2. Try local subnet based on machine's current IP
+    # 3. Quét subnet hiện tại của máy (chỉ các hostnumber hay dùng cho gateway).
     try:
         import socket
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -360,7 +447,7 @@ async def discover_esp32_gateway(preferred_url: str = "") -> str | None:
     return None
 
 
-async def run_esp32_ingress(hub: Any, ws_url: str = "ws://10.136.131.101:8080/telemetry") -> None:
+async def run_esp32_ingress(hub: Any, ws_url: str = "ws://192.168.4.1:8080/telemetry") -> None:
     """Async task connecting to ESP32 Gateway WebSocket with automatic reconnect and auto-discovery."""
     reconnect_delay = 2.0
     last_status = None
@@ -393,6 +480,7 @@ async def run_esp32_ingress(hub: Any, ws_url: str = "ws://10.136.131.101:8080/te
                         inject_envelope(hub, envelope)
                     except Exception as err:
                         logger.warning("Error processing packet from ESP32: %s", err)
+                        hub.store.decode_errors_total += 1
         except asyncio.CancelledError:
             break
         except Exception as exc:

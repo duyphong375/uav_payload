@@ -117,8 +117,17 @@ export const MissionProvider: React.FC<{ children: React.ReactNode }> = ({ child
     mockSourceInstance.setScenario(id)
   }
 
-  // Chuyển chế độ nguồn
+  // Chuyển chế độ nguồn (bảo vệ nguồn thật: xác nhận trước khi rời REAL)
   const switchSourceMode = (mode: SourceMode) => {
+    if (state.source_mode === 'REAL' && mode !== 'REAL') {
+      const confirmed =
+        typeof window !== 'undefined'
+          ? window.confirm(
+              'CẢNH BÁO TÁC CHIẾN:\n\nHệ thống đang ở chế độ THẬT (REAL). Rời sang MOCK/REPLAY có thể làm gián đoạn theo dõi mục tiêu cứu nạn.\n\nBạn có chắc chắn muốn chuyển không?'
+            )
+          : true
+      if (!confirmed) return
+    }
     if (typeof window !== 'undefined') {
       localStorage.setItem('kvc_source_mode', mode)
     }

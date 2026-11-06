@@ -5,12 +5,15 @@
  * Kiểm tra:
  * 1. Chưa cấu hình STA -> không hành động (SoftAP là phương án duy nhất).
  * 2. STA nối được, SoftAP chưa phát -> None.
- * 3. STA nối được, SoftAP đang phát -> CloseSoftAp (không phát sóng thừa).
- * 4. STA chưa nối, chưa tới chu kỳ -> None.
- * 5. STA chưa nối, tới chu kỳ -> RetrySta.
- * 6. Không ưu tiên STA khi chưa cấu hình, kể cả đã quá chu kỳ.
- * 7. retryIntervalMs = 0 -> thử lại mỗi lần gọi.
- * 8. Wrap 2^32 của millis() vẫn tính đúng chu kỳ.
+ * 3. STA nối được, SoftAP đang phát nhưng hết client -> CloseSoftAp.
+ * 4. STA nối được, SoftAP còn client -> None (không cắt phiên đang chạy).
+ * 5. STA chưa nối, chưa tới chu kỳ -> None.
+ * 6. STA chưa nối, tới chu kỳ -> RetrySta.
+ * 7. Không ưu tiên STA khi chưa cấu hình, kể cả đã quá chu kỳ.
+ * 8. retryIntervalMs = 0 -> thử lại mỗi lần gọi.
+ * 9. Wrap 2^32 của millis() vẫn tính đúng chu kỳ.
+ * 10. Mất STA khi đang chạy -> OpenSoftAp sau ngưỡng, không mở AP khi còn hạn.
+ * 11. Chọn mạng kế tiếp trong danh sách.
  *
  * Biên dịch (từ thư mục gốc repo):
  *   g++ -std=c++17 -Wall -Wextra -O2 -Ifirmware/gateway_esp32/src `
@@ -39,14 +42,17 @@ using kvc::NetPolicyState;
 using kvc::netPolicyEvaluate;
 
 static constexpr uint32_t kRetry = 30000;
+static constexpr uint32_t kOpenAp = 5000;
 
-/* Trạng thái nền: đã cấu hình STA, chưa nối, chưa phát AP. */
+/* Trạng thái nền: đã cấu hình STA, chưa nối, chưa phát AP, vừa mất STA. */
 static NetPolicyState base() {
     NetPolicyState s;
     s.staConfigured = true;
     s.staConnected = false;
     s.apStarted = false;
+    s.apStationCount = 0;
     s.lastStaAttemptMs = 0;
+    s.staDownDurationMs = 0;
     return s;
 }
 
@@ -58,9 +64,9 @@ static void test_not_configured() {
     s.staConfigured = false;
     s.apStarted = true;
 
-    TEST_ASSERT(netPolicyEvaluate(s, 100000, kRetry) == NetAction::None,
+    TEST_ASSERT(netPolicyEvaluate(s, 100000, kRetry, kOpenAp) == NetAction::None,
                 "khong co credential STA thi khong lam gi");
-    TEST_ASSERT(netPolicyEvaluate(s, 0, kRetry) == NetAction::None,
+    TEST_ASSERT(netPolicyEvaluate(s, 0, kRetry, kOpenAp) == NetAction::None,
                 "khong co credential STA thi khong lam gi o moi moc thoi gian");
 }
 
@@ -71,84 +77,145 @@ static void test_sta_up_no_ap() {
     NetPolicyState s = base();
     s.staConnected = true;
 
-    TEST_ASSERT(netPolicyEvaluate(s, 100000, kRetry) == NetAction::None,
+    TEST_ASSERT(netPolicyEvaluate(s, 100000, kRetry, kOpenAp) == NetAction::None,
                 "STA dang chay va khong co AP thi khong can lam gi");
 }
 
-/* ---------- 3. STA nối được, đang phát AP -> đóng AP ---------- */
+/* ---------- 3. STA nối được, đang phát AP, hết client -> đóng AP ---------- */
 static void test_close_ap_when_sta_recovers() {
-    std::printf("[3] STA noi lai duoc -> dong SoftAP\n");
+    std::printf("[3] STA noi lai duoc + het client -> dong SoftAP\n");
 
     NetPolicyState s = base();
     s.staConnected = true;
     s.apStarted = true;
+    s.apStationCount = 0;
 
-    TEST_ASSERT(netPolicyEvaluate(s, 100000, kRetry) == NetAction::CloseSoftAp,
-                "STA hoat dong lai thi phai dong SoftAP du phong");
+    TEST_ASSERT(netPolicyEvaluate(s, 100000, kRetry, kOpenAp) == NetAction::CloseSoftAp,
+                "STA hoat dong lai va khong con client thi phai dong SoftAP du phong");
 }
 
-/* ---------- 4. Chưa tới chu kỳ thử lại ---------- */
+/* ---------- 4. STA nối được nhưng SoftAP còn client -> giữ AP ---------- */
+static void test_keep_ap_while_clients_attached() {
+    std::printf("[4] STA noi lai duoc nhung con client -> giu SoftAP\n");
+
+    NetPolicyState s = base();
+    s.staConnected = true;
+    s.apStarted = true;
+    s.apStationCount = 2;
+
+    TEST_ASSERT(netPolicyEvaluate(s, 100000, kRetry, kOpenAp) == NetAction::None,
+                "con client bam AP thi khong duoc dong (se cat video/laptop)");
+
+    s.apStationCount = 1;
+    TEST_ASSERT(netPolicyEvaluate(s, 100000, kRetry, kOpenAp) == NetAction::None,
+                "chi can 1 client la van giu AP");
+
+    /* Client cuoi cung roi di -> cho phep dong. */
+    s.apStationCount = 0;
+    TEST_ASSERT(netPolicyEvaluate(s, 100000, kRetry, kOpenAp) == NetAction::CloseSoftAp,
+                "het client thi dong AP duoc");
+}
+
+/* ---------- 5. Chưa tới chu kỳ thử lại ---------- */
 static void test_retry_not_due() {
-    std::printf("[4] Chua toi chu ky thu lai\n");
+    std::printf("[5] Chua toi chu ky thu lai\n");
 
     NetPolicyState s = base();
     s.lastStaAttemptMs = 10000;
 
-    TEST_ASSERT(netPolicyEvaluate(s, 20000, kRetry) == NetAction::None,
+    TEST_ASSERT(netPolicyEvaluate(s, 20000, kRetry, kOpenAp) == NetAction::None,
                 "moi 10 s chua toi chu ky 30 s thi khong thu lai");
-    TEST_ASSERT(netPolicyEvaluate(s, 39999, kRetry) == NetAction::None,
+    TEST_ASSERT(netPolicyEvaluate(s, 39999, kRetry, kOpenAp) == NetAction::None,
                 "39999 - 10000 = 29999 < 30000 nen khong thu lai");
 }
 
-/* ---------- 5. Tới chu kỳ thử lại ---------- */
+/* ---------- 6. Tới chu kỳ thử lại ---------- */
 static void test_retry_due() {
-    std::printf("[5] Toi chu ky thu lai\n");
+    std::printf("[6] Toi chu ky thu lai\n");
 
     NetPolicyState s = base();
     s.lastStaAttemptMs = 10000;
 
-    TEST_ASSERT(netPolicyEvaluate(s, 40000, kRetry) == NetAction::RetrySta,
+    TEST_ASSERT(netPolicyEvaluate(s, 40000, kRetry, kOpenAp) == NetAction::RetrySta,
                 "dung 30000 ms thi phai thu lai");
-    TEST_ASSERT(netPolicyEvaluate(s, 60000, kRetry) == NetAction::RetrySta,
+    TEST_ASSERT(netPolicyEvaluate(s, 60000, kRetry, kOpenAp) == NetAction::RetrySta,
                 "qua chu ky thi phai thu lai");
 
     /* SoftAP đang phát không chặn việc thử lại STA (ưu tiên 1 vẫn được theo đuổi). */
     s.apStarted = true;
-    TEST_ASSERT(netPolicyEvaluate(s, 40000, kRetry) == NetAction::RetrySta,
+    TEST_ASSERT(netPolicyEvaluate(s, 40000, kRetry, kOpenAp) == NetAction::RetrySta,
                 "dang phat SoftAP van phai thu lai STA");
 }
 
-/* ---------- 6. retryIntervalMs = 0 ---------- */
+/* ---------- 7. retryIntervalMs = 0 ---------- */
 static void test_retry_interval_zero() {
-    std::printf("[6] Chu ky thu lai bang 0\n");
+    std::printf("[7] Chu ky thu lai bang 0\n");
 
     NetPolicyState s = base();
     s.lastStaAttemptMs = 5000;
 
-    TEST_ASSERT(netPolicyEvaluate(s, 5000, 0) == NetAction::RetrySta,
+    TEST_ASSERT(netPolicyEvaluate(s, 5000, 0, kOpenAp) == NetAction::RetrySta,
                 "chu ky 0 thi thu lai moi lan goi");
 }
 
-/* ---------- 7. Wrap 2^32 ---------- */
+/* ---------- 8. Wrap 2^32 ---------- */
 static void test_wrap() {
-    std::printf("[7] Wrap millis() qua 2^32\n");
+    std::printf("[8] Wrap millis() qua 2^32\n");
 
     NetPolicyState s = base();
     s.lastStaAttemptMs = 0xFFFFFF00u; /* Sát ngưỡng tràn */
 
     /* 0xFFFFFF00 + 30000 = 0x... tràn về 0x6EE0 -> hiệu không dấu = 30000. */
     const uint32_t now = s.lastStaAttemptMs + 30000u;
-    TEST_ASSERT(netPolicyEvaluate(s, now, kRetry) == NetAction::RetrySta,
+    TEST_ASSERT(netPolicyEvaluate(s, now, kRetry, kOpenAp) == NetAction::RetrySta,
                 "qua nguong tran van phai tinh dung chu ky");
 
     const uint32_t justBefore = s.lastStaAttemptMs + 29999u;
-    TEST_ASSERT(netPolicyEvaluate(s, justBefore, kRetry) == NetAction::None,
+    TEST_ASSERT(netPolicyEvaluate(s, justBefore, kRetry, kOpenAp) == NetAction::None,
                 "truoc nguong tran 1 ms van chua toi chu ky");
 }
 
-/* ---------- 8. Chọn mạng kế tiếp trong danh sách ---------- */
+/* ---------- 10. Mất STA khi đang chạy -> mở SoftAP dự phòng ---------- */
+static void test_open_ap_after_sta_loss() {
+    std::printf("[10] Mat STA khi dang chay -> mo SoftAP du phong\n");
+
+    NetPolicyState s = base();
+    s.lastStaAttemptMs = 1000;
+
+    /* Vừa mất STA: chưa mở AP, và chưa tới chu kỳ thử lại. */
+    s.staDownDurationMs = 0;
+    TEST_ASSERT(netPolicyEvaluate(s, 2000, kRetry, kOpenAp) == NetAction::None,
+                "vua mat STA thi chua mo AP");
+
+    /* Đúng ngưỡng -> mở AP, dù chưa tới chu kỳ thử lại 30 s. */
+    s.staDownDurationMs = kOpenAp;
+    TEST_ASSERT(netPolicyEvaluate(s, 6000, kRetry, kOpenAp) == NetAction::OpenSoftAp,
+                "mat STA du 5 s thi phai mo SoftAP du phong");
+    TEST_ASSERT(netPolicyEvaluate(s, 10000, kRetry, kOpenAp) == NetAction::OpenSoftAp,
+                "qua nguong van phai mo AP neu AP chua bat");
+
+    /* AP đã phát thì không mở lại. */
+    s.apStarted = true;
+    TEST_ASSERT(netPolicyEvaluate(s, 10000, kRetry, kOpenAp) == NetAction::None,
+                "AP dang phat thi khong OpenSoftAp lan nua");
+
+    /* STA sống lại nhưng còn client -> giữ AP. */
+    s.staConnected = true;
+    s.apStationCount = 1;
+    TEST_ASSERT(netPolicyEvaluate(s, 20000, kRetry, kOpenAp) == NetAction::None,
+                "STA song lai nhung con client thi giu AP");
+
+    /* Ngưỡng 0: mở AP ngay khi mất STA. */
+    NetPolicyState z = base();
+    z.lastStaAttemptMs = 1000;
+    z.staDownDurationMs = 0;
+    TEST_ASSERT(netPolicyEvaluate(z, 1001, kRetry, 0) == NetAction::OpenSoftAp,
+                "nguong 0 thi mo AP ngay");
+}
+
+/* ---------- 11. Chọn mạng kế tiếp trong danh sách ---------- */
 static void test_next_network() {
-    std::printf("[8] Chon mang ke tiep (danh sach nhieu mang)\n");
+    std::printf("[11] Chon mang ke tiep (danh sach nhieu mang)\n");
 
     /* 4 ô, chỉ khai báo ô 0 và ô 2 (giống cấu hình 2 mạng rời rạc). */
     const char *const ssids[4] = {"hotspot-dien-thoai", "", "wifi-lab", ""};
@@ -194,10 +261,12 @@ int main() {
     test_not_configured();
     test_sta_up_no_ap();
     test_close_ap_when_sta_recovers();
+    test_keep_ap_while_clients_attached();
     test_retry_not_due();
     test_retry_due();
     test_retry_interval_zero();
     test_wrap();
+    test_open_ap_after_sta_loss();
     test_next_network();
 
     std::printf("================================================================\n");

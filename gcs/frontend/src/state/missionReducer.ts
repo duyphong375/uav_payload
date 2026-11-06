@@ -1,4 +1,4 @@
-﻿import { APP_CONFIG } from '@/config/appConfig'
+import { APP_CONFIG } from '@/config/appConfig'
 import type {
   AlertItem,
   AlertLevel,
@@ -68,12 +68,15 @@ export const INITIAL_MISSION_STATE: MissionState = {
   camera_trail: [],
 
   video: {
-    source_type: 'MOCK',
+    source_type: 'NONE',
+    source_kind: 'NONE',
     url: null,
-    is_connected: true,
+    is_connected: false,
     is_loading: false,
     error_message: null,
-    has_overlay: true,
+    has_overlay: false,
+    frame_count: 0,
+    last_frame_age_ms: null,
   },
   bounding_boxes: [],
 
@@ -115,7 +118,10 @@ export type MissionAction =
   | { type: 'SET_BOUNDING_BOXES'; payload: BoundingBox[] }
   | { type: 'ACKNOWLEDGE_ALERT'; payload: string }
   | { type: 'DISMISS_ALERT'; payload: string }
+  | { type: 'DELETE_ALERT'; payload: string }
   | { type: 'CLEAR_ALERTS' }
+  | { type: 'CLEAR_EVENT_LOGS' }
+  | { type: 'DELETE_EVENT_LOG'; payload: string }
   | { type: 'TICK_AGE'; payload: number }
   | { type: 'RESET_SESSION'; payload?: { session_id?: string; source_mode?: SourceMode } }
   | {
@@ -137,6 +143,13 @@ function resolveAlertMetadata(code: string, message: string): {
 } {
   const upper = (code + ' ' + message).toUpperCase()
 
+  if (upper.includes('LIFEBUOY') || upper.includes('PHAO') || upper.includes('TARGET')) {
+    return {
+      source_category: 'AI',
+      impact: 'Phát hiện mục tiêu cứu nạn (Phao cứu sinh) trong vùng quét tìm kiếm.',
+      remediation: 'Xác nhận tọa độ mục tiêu trên bản đồ/radar và điều phối lực lượng cứu hộ tiếp cận.',
+    }
+  }
   if (upper.includes('GNSS') || upper.includes('GPS')) {
     return {
       source_category: 'GPS',
@@ -158,11 +171,18 @@ function resolveAlertMetadata(code: string, message: string): {
       remediation: 'Kiểm tra khoảng cách LoRa/RF, hướng ăng-ten và nguồn cấp thiết bị phát.',
     }
   }
-  if (upper.includes('BATTERY') || upper.includes('LIDAR') || upper.includes('IMU') || upper.includes('PIN')) {
+  if (upper.includes('TILT') || upper.includes('IMU')) {
     return {
       source_category: 'SENSORS',
-      impact: 'Cảm biến cận đất, góc nghiêng hoặc trạng thái nguồn tải báo bất thường.',
-      remediation: 'Kiểm tra bề mặt phản xạ siêu âm, cảm biến IMU và nguồn cấp tải.',
+      impact: 'UAV bị nghiêng quá mức, nguy cơ mất thăng bằng hoặc lật tải.',
+      remediation: 'Kiểm tra cân bằng trọng tâm tải nhiệm vụ, lực cản gió hoặc bề mặt gá IMU.',
+    }
+  }
+  if (upper.includes('BATTERY') || upper.includes('LIDAR') || upper.includes('PIN')) {
+    return {
+      source_category: 'SENSORS',
+      impact: 'Cảm biến cận đất hoặc trạng thái nguồn tải báo bất thường.',
+      remediation: 'Kiểm tra bề mặt phản xạ siêu âm và nguồn cấp tải.',
     }
   }
   if (upper.includes('LOGGER') || upper.includes('STORAGE') || upper.includes('SD')) {
@@ -196,8 +216,11 @@ function resetSourceData(
     video: {
       ...INITIAL_MISSION_STATE.video,
       source_type: 'NONE',
+      source_kind: 'NONE',
       is_connected: false,
       has_overlay: false,
+      frame_count: 0,
+      last_frame_age_ms: null,
     },
     layout_mode: state.layout_mode,
     map_view_mode: state.map_view_mode,
@@ -242,6 +265,35 @@ function normalizeTarget(target: NonNullable<MissionState['target']>): NonNullab
   return { ...target, origin_id: null }
 }
 
+function extractVideoState(
+  currentVideo: MissionState['video'],
+  packetVideo: {
+    source_kind?: 'NONE' | 'RELAY'
+    stream_path?: string | null
+    is_connected?: boolean
+    error_message?: string | null
+    frame_count?: number
+    last_frame_age_ms?: number | null
+  },
+): MissionState['video'] {
+  const kind = packetVideo.source_kind ?? 'NONE'
+  return {
+    ...currentVideo,
+    source_kind: kind,
+    // URL chỉ suy ra khi backend nói có relay. Không tự ghép host.
+    url: kind === 'RELAY' ? (packetVideo.stream_path ?? null) : null,
+    source_type: kind === 'RELAY' ? 'LIVE' : 'NONE',
+    is_connected: packetVideo.is_connected ?? false,
+    is_loading: false,
+    error_message: packetVideo.error_message ?? null,
+    frame_count: packetVideo.frame_count ?? 0,
+    last_frame_age_ms: packetVideo.last_frame_age_ms ?? null,
+    // Chưa có đồng bộ khung giữa FPGA và camera relay -> overlay coi như
+    // chưa khả dụng cho tới khi có cơ chế ghép cặp thời gian riêng.
+    has_overlay: false,
+  }
+}
+
 export function missionReducer(state: MissionState, action: MissionAction): MissionState {
   switch (action.type) {
     case 'SET_WS_CONNECTED':
@@ -260,7 +312,9 @@ export function missionReducer(state: MissionState, action: MissionAction): Miss
     case 'SET_SOURCE_MODE': {
       if (state.source_mode === action.payload) return state
       const timestampIso = new Date().toISOString()
-      const sessionId = `SES-${action.payload}-${Date.now().toString().slice(-6)}`
+      const now = new Date()
+      const dStr = now.toISOString().replace(/[-:T.]/g, '').slice(0, 14)
+      const sessionId = `SES-${action.payload}-${dStr.slice(0, 8)}-${dStr.slice(8, 14)}`
       const newEventLog: EventLogEntry = {
         id: `ev-src-${Date.now()}`,
         timestamp_iso: timestampIso,
@@ -321,8 +375,23 @@ export function missionReducer(state: MissionState, action: MissionAction): Miss
         alerts: state.alerts.map((a) => (a.id === action.payload ? { ...a, active: false } : a)),
       }
 
+    case 'DELETE_ALERT':
+      return {
+        ...state,
+        alerts: state.alerts.filter((a) => a.id !== action.payload),
+      }
+
     case 'CLEAR_ALERTS':
       return { ...state, alerts: [] }
+
+    case 'CLEAR_EVENT_LOGS':
+      return { ...state, event_logs: [] }
+
+    case 'DELETE_EVENT_LOG':
+      return {
+        ...state,
+        event_logs: state.event_logs.filter((log) => log.id !== action.payload),
+      }
 
     case 'TICK_AGE': {
       // Replay ages are derived from the backend virtual clock. Browser wall time,
@@ -347,6 +416,11 @@ export function missionReducer(state: MissionState, action: MissionAction): Miss
               ? state.camera_position.age_ms + delta
               : state.camera_position.age_ms,
         },
+        video: {
+          ...state.video,
+          last_frame_age_ms:
+            state.video.last_frame_age_ms === null ? null : state.video.last_frame_age_ms + delta,
+        },
       }
     }
 
@@ -360,7 +434,19 @@ export function missionReducer(state: MissionState, action: MissionAction): Miss
       const p = action.payload
 
       // Source được operator chọn. Packet không có quyền đổi nguồn hoặc kích hoạt MOCK cục bộ.
-      if (p.source_mode !== undefined && p.source_mode !== state.source_mode) return state
+      if (p.source_mode !== undefined && p.source_mode !== state.source_mode) {
+        // IF-05: Kênh video phụ độc lập với telemetry LoRa (IF_ESP32_CAM_GCS.md §1).
+        // Nếu gói tin mang trạng thái video (SNAPSHOT hoặc VIDEO_STATUS từ backend
+        // trong khi telemetry chưa kích hoạt REAL), vẫn cập nhật video state mà không
+        // ghi đè telemetry hay thay đổi state.source_mode.
+        if (p.video !== undefined && p.video !== null) {
+          return {
+            ...state,
+            video: extractVideoState(state.video, p.video),
+          }
+        }
+        return state
+      }
 
       const eventType = p.event_type
       const isLegacyInternalPacket = eventType === undefined
@@ -385,6 +471,8 @@ export function missionReducer(state: MissionState, action: MissionAction): Miss
       const updatesDiagnostics =
         isLegacyInternalPacket || isSnapshot || eventType === 'SYSTEM_DIAGNOSTICS'
       const updatesReplay = isLegacyInternalPacket || isSnapshot || eventType === 'REPLAY_TICK'
+      const updatesVideo =
+        isLegacyInternalPacket || isSnapshot || eventType === 'VIDEO_STATUS'
       const historyTimestamp =
         state.source_mode === 'REPLAY' && p.pc_rx_monotonic_ms !== undefined
           ? p.pc_rx_monotonic_ms
@@ -504,6 +592,60 @@ export function missionReducer(state: MissionState, action: MissionAction): Miss
 
       let alerts = baseState.alerts
       let eventLogs = baseState.event_logs
+
+      // Tự động kích hoạt/giải tỏa cảnh báo khi phát hiện phao cứu sinh (LIFEBUOY)
+      if (updatesTarget) {
+        const isLifebuoy = Boolean(hasTarget && target && (target.class_id === 2 || target.class_name === 'lifebuoy'))
+        const buoyIndex = alerts.findIndex((a) => a.code === 'TARGET_LIFEBUOY_DETECTED')
+        const buoyActive = buoyIndex >= 0 && alerts[buoyIndex].active && alerts[buoyIndex].condition_status !== 'RESOLVED'
+
+        if (isLifebuoy && !buoyActive) {
+          const timestampIso = p.pc_rx_time_iso ?? new Date().toISOString()
+          const confStr = target?.confidence ? ` (độ tin cậy ${target.confidence}%)` : ''
+          const newAlert: AlertItem = {
+            id: `alert-buoy-${Date.now()}`,
+            level: 'WARN',
+            code: 'TARGET_LIFEBUOY_DETECTED',
+            message: `Phát hiện Phao cứu sinh (Lifebuoy)${confStr} trong khu vực tìm kiếm!`,
+            timestamp_iso: timestampIso,
+            active: true,
+            condition_status: 'ACTIVE',
+            acknowledged: false,
+            source_category: 'AI',
+            occurrence_count: buoyIndex >= 0 ? alerts[buoyIndex].occurrence_count + 1 : 1,
+            first_seen_iso: buoyIndex >= 0 ? alerts[buoyIndex].first_seen_iso : timestampIso,
+            last_seen_iso: timestampIso,
+            impact: 'Phát hiện mục tiêu cứu nạn (Phao cứu sinh) trong vùng quét tìm kiếm.',
+            remediation: 'Xác nhận tọa độ mục tiêu trên bản đồ/radar và điều phối lực lượng cứu hộ tiếp cận.',
+          }
+          alerts = buoyIndex >= 0
+            ? [newAlert, ...alerts.filter((_, i) => i !== buoyIndex)]
+            : [newAlert, ...alerts].slice(0, APP_CONFIG.MAX_ALERTS_HISTORY)
+
+          const eventEntry: EventLogEntry = {
+            id: `ev-buoy-${Date.now()}`,
+            timestamp_iso: timestampIso,
+            level: 'WARN',
+            source: 'AI',
+            code: 'TARGET_LIFEBUOY_DETECTED',
+            message: newAlert.message,
+            session_id: p.session_id ?? baseState.session_id,
+          }
+          eventLogs = [eventEntry, ...eventLogs].slice(0, APP_CONFIG.MAX_EVENT_LOGS)
+        } else if (!isLifebuoy && buoyActive) {
+          const timestampIso = p.pc_rx_time_iso ?? new Date().toISOString()
+          const resolved: AlertItem = {
+            ...alerts[buoyIndex],
+            level: 'INFO',
+            active: false,
+            condition_status: 'RESOLVED',
+            message: 'Mục tiêu phao cứu sinh đã ra khỏi vùng quét của tải nhiệm vụ.',
+            last_seen_iso: timestampIso,
+          }
+          alerts = [resolved, ...alerts.filter((_, i) => i !== buoyIndex)]
+        }
+      }
+
       if (updatesAlert && p.alert) {
         const timestampIso = p.pc_rx_time_iso ?? new Date().toISOString()
         const meta = resolveAlertMetadata(p.alert.code, p.alert.message)
@@ -595,6 +737,13 @@ export function missionReducer(state: MissionState, action: MissionAction): Miss
       const rxAge = hasRxAge ? Math.max(0, p.rx_age_ms ?? 0) : baseState.rx_age_ms
       const staleFromPacket = p.is_stale ?? (hasRxAge ? rxAge > APP_CONFIG.STALE_THRESHOLD_MS : baseState.is_stale)
 
+      // IF-05: trạng thái video do backend đo, chỉ đến từ SNAPSHOT/VIDEO_STATUS.
+      // Bản ghi replay cũ không có trường này -> giữ nguyên, không đoán.
+      let video = baseState.video
+      if (updatesVideo && p.video !== undefined && p.video !== null) {
+        video = extractVideoState(baseState.video, p.video)
+      }
+
       return {
         ...baseState,
         schema_version: p.schema_version ?? baseState.schema_version,
@@ -618,6 +767,7 @@ export function missionReducer(state: MissionState, action: MissionAction): Miss
         camera_trail: cameraTrail,
         hardware_link: hardwareLink,
         bounding_boxes: boundingBoxes,
+        video,
         diagnostics,
         alerts,
         event_logs: eventLogs,

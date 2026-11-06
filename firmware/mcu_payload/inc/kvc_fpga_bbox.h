@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file kvc_fpga_bbox.h
  * @brief Driver thu nhận và giải mã khung BBox từ FPGA OneKiwi qua UART1 trên MCU Sonix SN34F788.
  *
@@ -6,8 +6,6 @@
  * - docs/interfaces/IF_FPGA_MCU_UART.md (IF-01)
  * - docs/hardware/wiring/KVC_MASTER_PINOUT_WIRING.md (Mục 3.5: P2.3 URXD1, P2.2 UTXD1)
  * - firmware/mcu_payload/inc/kvc_pinout.h
- *
- * Người phụ trách phân hệ MCU UAV: Nguyễn Tá Duy Phong
  */
 
 #ifndef KVC_FPGA_BBOX_H

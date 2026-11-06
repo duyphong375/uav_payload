@@ -1,5 +1,9 @@
 // Kiểm tra deny-list theo KVC-GCS-DESIGN-CONTRACT §6.
-// Trả về exit code 1 nếu có vi phạm mới.
+// Trả về exit code 1 nếu có vi phạm MỚI so với baseline đã ghi nhận.
+//
+// Baseline (đo trên working tree PLAN-KVC-SORTIX-001): 1 vi phạm DL-5 ở
+// components/ui/sheet.tsx — file shadcn nằm ngoài allowed files của task,
+// nên được phép tồn tại. Mọi vi phạm khác đều làm script fail.
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -32,7 +36,16 @@ const CHECKS = [
     id: 'DL-3 font < 11px',
     re: /text-\[(?:[0-9]|10)px\]/g,
     files: /\.tsx$/,
-    allow: [/\.test\.tsx$/],
+    allow: [/\.test\.tsx?$/],
+  },
+]
+
+/** Vi phạm đã biết, được miễn trừ có ghi lý do. */
+const BASELINE = [
+  {
+    id: 'DL-5 backdrop-blur',
+    file: 'components/ui/sheet.tsx',
+    reason: 'File shadcn ngoài allowed files của PLAN-KVC-SORTIX-001.',
   },
 ]
 
@@ -64,10 +77,29 @@ function walk(dir) {
 
 walk('src')
 
+const normalized = (p) => p.replace(/\\/g, '/')
+const isBaselined = (hit) =>
+  BASELINE.some((b) => b.id === hit.id && normalized(hit.file).endsWith(b.file))
+
+const allowed = hits.filter(isBaselined)
+const fresh = hits.filter((h) => !isBaselined(h))
+
 const byId = {}
-for (const h of hits) byId[h.id] = (byId[h.id] || 0) + 1
+for (const h of fresh) byId[h.id] = (byId[h.id] || 0) + 1
 
 console.log('=== DENY-LIST ===')
 if (hits.length === 0) console.log('  0 vi phạm')
-for (const h of hits) console.log(`  [${h.id}] ${h.file}:${h.line}  ${h.text}`)
-console.log('TỔNG:', hits.length, byId)
+for (const h of allowed) console.log(`  [BASELINE ${h.id}] ${h.file}:${h.line}`)
+for (const h of fresh) console.log(`  [${h.id}] ${h.file}:${h.line}  ${h.text}`)
+console.log(
+  `TỔNG: ${hits.length} (baseline ${allowed.length}, mới ${fresh.length})`,
+  byId
+)
+for (const b of BASELINE) console.log(`  baseline cho phép: ${b.id} @ ${b.file} — ${b.reason}`)
+
+if (fresh.length > 0) {
+  console.error(`\nDENY-LIST FAILED: ${fresh.length} vi phạm mới`)
+  process.exitCode = 1
+} else {
+  console.log('\nDENY-LIST PASSED: không có vi phạm mới')
+}

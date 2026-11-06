@@ -20,13 +20,20 @@ describe('MissionPage - Giám sát định vị tải nhiệm vụ UAV', () => {
       </TooltipProvider>
     )
 
-    // 1. Tiêu đề và nhãn bắt buộc
-    expect(screen.getByText('Giám sát định vị tải nhiệm vụ')).toBeDefined()
-    expect(screen.getByText(/Nguồn: MOCK/i)).toBeDefined()
+    // 1. Tiêu đề trang do AppHeader đảm nhiệm; trang chỉ còn công cụ khung nhìn.
+    //    Không lặp lại tiêu đề/nguồn trong thanh nổi.
+    expect(screen.queryByText('Giám sát định vị')).toBeNull()
+    expect(screen.queryByText(/Nguồn: /i)).toBeNull()
     // MOCK LOCAL không có WebSocket theo thiết kế → không được báo "MẤT KẾT NỐI"
     expect(screen.queryByText('MẤT KẾT NỐI')).toBeNull()
     // Không còn vùng điều khiển phát lại nào trên trang tác chiến
     expect(screen.queryByRole('region', { name: 'Điều khiển phát lại' })).toBeNull()
+    // Nút chuyển khung nhìn vẫn còn đủ 3 lựa chọn
+    expect(screen.getByRole('button', { name: /Xem Bản đồ WGS-84/i })).toBeDefined()
+    expect(screen.getByRole('button', { name: /Xem Radar Local/i })).toBeDefined()
+    expect(screen.getByRole('button', { name: /Xem Video Stream từ ESP32-S3-CAM/i })).toBeDefined()
+    // Chế độ "Song song" (SPLIT) đã bị xoá hoàn toàn
+    expect(screen.queryByRole('button', { name: /Xem Chia đôi Bản đồ và Radar/i })).toBeNull()
 
     // 2. Nút "Đặt lại khung nhìn" có mặt
     expect(screen.getAllByRole('button', { name: /Đặt lại khung nhìn/i }).length).toBeGreaterThan(0)
@@ -149,7 +156,7 @@ describe('MissionPage - Giám sát định vị tải nhiệm vụ UAV', () => {
     expect(screen.queryByText('Video tham chiếu')).toBeNull()
   })
 
-  it('hỗ trợ chuyển đổi dạng thanh thu gọn (collapsible top bar) để tối đa diện tích bản đồ', () => {
+  it('hỗ trợ ẩn/hiện thanh điều khiển để xem bản đồ trọn vẹn', () => {
     render(
       <TooltipProvider>
         <MissionProvider>
@@ -160,22 +167,20 @@ describe('MissionPage - Giám sát định vị tải nhiệm vụ UAV', () => {
       </TooltipProvider>
     )
 
-    // Ban đầu thanh điều khiển ở dạng mở rộng
-    expect(screen.getByText('Giám sát định vị tải nhiệm vụ')).toBeDefined()
+    // Mặc định mở: có nút chuyển khung nhìn và nút thu gọn
+    expect(screen.getByRole('button', { name: /Xem Bản đồ WGS-84/i })).toBeDefined()
     const collapseBtn = screen.getByRole('button', { name: /Thu gọn thanh điều khiển/i })
     expect(collapseBtn).toBeDefined()
 
-    // Bấm nút Thu gọn để chuyển sang dạng thanh thu
     fireEvent.click(collapseBtn)
 
-    // Ở dạng thanh thu, tiêu đề đầy đủ được ẩn đi để giải phóng diện tích bản đồ
-    expect(screen.queryByText('Giám sát định vị tải nhiệm vụ')).toBeNull()
-    const expandBtn = screen.getByRole('button', { name: /Mở rộng thanh điều khiển/i })
-    expect(expandBtn).toBeDefined()
+    // Thu gọn: các nút khung nhìn biến mất khỏi DOM
+    expect(screen.queryByRole('button', { name: /Xem Bản đồ WGS-84/i })).toBeNull()
+    expect(screen.getByRole('button', { name: /Mở rộng thanh điều khiển/i })).toBeDefined()
 
-    // Bấm nút Mở rộng để khôi phục thanh điều khiển đầy đủ
-    fireEvent.click(expandBtn)
-    expect(screen.getByText('Giám sát định vị tải nhiệm vụ')).toBeDefined()
+    // Mở rộng lại
+    fireEvent.click(screen.getByRole('button', { name: /Mở rộng thanh điều khiển/i }))
+    expect(screen.getByRole('button', { name: /Xem Bản đồ WGS-84/i })).toBeDefined()
   })
 
   it('TargetDetailsPanel hiển thị thông tin bàn giao SAR và hỗ trợ thao tác đánh dấu sự kiện', () => {

@@ -202,3 +202,66 @@ def test_session_api_reports_ram_pending_then_committed(tmp_path):
         assert status["logger"]["committed_total"] == 1
         assert status["diagnostics"]["logger_status"] == "OK"
     assert not app.state.logger.status()["writer_running"]
+
+
+def test_delete_session_and_delete_all_sessions(tmp_path):
+    logger = SQLiteLogger(tmp_path, queue_capacity=8)
+    logger.start()
+    t1 = logger.enqueue(event(1, "SES-TEST-A"), storage_session_id="SES-TEST-A", is_valid=True)
+    t2 = logger.enqueue(event(2, "SES-TEST-B"), storage_session_id="SES-TEST-B", is_valid=True)
+    assert t1.result(3).committed
+    assert t2.result(3).committed
+
+    assert len(logger.sessions()) == 2
+    assert (tmp_path / "SES-TEST-A.db").exists()
+    assert (tmp_path / "SES-TEST-B.db").exists()
+
+    # Delete SES-TEST-A while writer is running
+    assert logger.delete_session("SES-TEST-A") is True
+    assert not (tmp_path / "SES-TEST-A.db").exists()
+    assert len(logger.sessions()) == 1
+    assert logger.sessions()[0]["session_id"] == "SES-TEST-B"
+
+    # Delete non-existent session
+    assert logger.delete_session("SES-NONEXISTENT") is False
+
+    # Delete all except active
+    t3 = logger.enqueue(event(3, "SES-TEST-C"), storage_session_id="SES-TEST-C", is_valid=True)
+    assert t3.result(3).committed
+    assert len(logger.sessions()) == 2
+
+    deleted = logger.delete_all_sessions(active_session_id="SES-TEST-C")
+    assert "SES-TEST-B" in deleted
+    assert "SES-TEST-C" not in deleted
+    assert not (tmp_path / "SES-TEST-B.db").exists()
+    assert (tmp_path / "SES-TEST-C.db").exists()
+
+    assert logger.stop()
+
+
+def test_delete_session_rest_endpoints(tmp_path):
+    app = create_app(Settings(enable_mock=False, storage_dir=tmp_path))
+    with TestClient(app) as client:
+        initial = client.get("/api/sessions").json()["active_session_id"]
+
+        # Attempting to delete active session should fail with 400
+        res = client.delete(f"/api/sessions/{initial}")
+        assert res.status_code == 400
+        assert "không thể xóa phiên đang hoạt động" in res.json()["detail"].lower()
+
+        # Create a new session so initial is no longer active
+        created = client.post("/api/sessions/new").json()["new_session_id"]
+        assert created != initial
+
+        # Write at least one record to initial to persist it
+        res_del_nonexistent = client.delete("/api/sessions/SES-GHOST-999")
+        assert res_del_nonexistent.status_code == 404
+
+        # Delete with invalid ID
+        res_del_invalid = client.delete("/api/sessions/..bad..")
+        assert res_del_invalid.status_code == 400
+
+        # Delete all sessions (excluding active)
+        res_del_all = client.delete("/api/sessions")
+        assert res_del_all.status_code == 200
+        assert "deleted_count" in res_del_all.json()

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file kvc_telemetry.h
  * @brief Định nghĩa cấu trúc khung truyền LoRa Telemetry 32 byte (IF-02) và hàm CRC-16 cho MCU Sonix SN34F788.
  * 
@@ -6,9 +6,6 @@
  * - docs/interfaces/IF_MCU_LORA_RF.md (IF-02)
  * - firmware/gateway_esp32/src/main.cpp (Đầu thu Gateway trạm mặt đất)
  * - docs/hardware/wiring/KVC_MASTER_PINOUT_WIRING.md
- *
- * Người phụ trách phân hệ MCU UAV: Nguyễn Tá Duy Phong
- * Người phụ trách phân hệ Gateway: Đoàn Thanh Trường Thịnh
  */
 
 #ifndef KVC_TELEMETRY_H

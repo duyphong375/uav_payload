@@ -7,12 +7,19 @@ import { useMission } from '@/state/MissionProvider'
 interface FloatingMapControlsProps {
   onResetView: () => void
   onFocusTarget: () => void
+  /**
+   * `true` (mặc định): cụm nút tự định vị `absolute bottom-3 right-3`.
+   * `false`: nằm trong luồng của overlay rail do MissionPage bố trí, cùng hàng
+   * với dock để hai khối đẩy nhau thay vì đè nhau.
+   */
+  anchored?: boolean
   className?: string
 }
 
 export const FloatingMapControls: React.FC<FloatingMapControlsProps> = ({
   onResetView,
   onFocusTarget,
+  anchored = true,
   className = '',
 }) => {
   const { state } = useMission()
@@ -28,7 +35,10 @@ export const FloatingMapControls: React.FC<FloatingMapControlsProps> = ({
 
   return (
     <div
-      className={`kvc-on-overlay absolute bottom-3 right-3 z-[var(--kvc-z-panel)] flex flex-col gap-1.5 p-1 rounded-kvc-panel bg-[var(--kvc-overlay)] border border-[var(--kvc-line-strong)] shadow-sm select-none pointer-events-auto ${className}`}
+      data-overlay="map-controls"
+      className={`kvc-on-overlay ${
+        anchored ? 'absolute bottom-3 right-3 z-[var(--kvc-z-panel)]' : 'shrink-0'
+      } flex flex-col gap-1.5 p-1 rounded-kvc-panel bg-[var(--kvc-overlay)] border border-[var(--kvc-line-strong)] shadow-sm select-none pointer-events-auto ${className}`}
       aria-label="Cụm điều khiển khung nhìn nổi"
     >
       {/* Nút Đặt lại khung nhìn về Tâm UAV */}

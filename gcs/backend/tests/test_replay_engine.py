@@ -1,4 +1,4 @@
-﻿"""Replay virtual-clock, seek, API/session isolation and hardware-boundary tests."""
+"""Replay virtual-clock, seek, API/session isolation and hardware-boundary tests."""
 
 import asyncio
 import sqlite3
@@ -55,7 +55,7 @@ def fixture_events(session_id="SES-REPLAY-FIXTURE"):
     diagnostics = {
         "packets_received_total": 1, "decode_errors_total": 0,
         "ingress_drops_total": 0, "logger_drops_total": 0,
-        "client_drops_total": 0, "data_loss_latched": False,
+        "client_drops_total": 0, "rf_reject_count": 0, "data_loss_latched": False,
         "logger_status": "OK",
     }
     return [

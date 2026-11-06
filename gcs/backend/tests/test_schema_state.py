@@ -19,10 +19,15 @@ def test_strict_schema_and_domain_isolation():
             hub.publish("TELEMETRY_UPDATE", telemetry={"battery_pct": invalid})
     with pytest.raises(ValidationError):
         hub.publish("LINK_STATUS", target=target(1))
+    # KVC-DUAL-CAMERA-20261102 (T-05): "REAL" nay là nhãn hợp lệ của hợp đồng
+    # nên KHÔNG còn bị từ chối. Ràng buộc còn lại là MOCK phải đi với SIMULATED.
+    Event.model_validate({**hub.store.metadata("TARGET_UPDATE"), "source_mode": "REAL",
+                          "inference_device": "FPGA_GW2A"})
     with pytest.raises(ValidationError):
-        Event.model_validate({**hub.store.metadata("TARGET_UPDATE"), "source_mode": "REAL"})
+        Event.model_validate({**hub.store.metadata("TARGET_UPDATE"), "source_mode": "MOCK",
+                              "inference_device": "FPGA_GW2A"})
     with pytest.raises(ValidationError):
-        Event.model_validate({**hub.store.metadata("TARGET_UPDATE"), "inference_device": "FPGA_GW2A"})
+        Event.model_validate({**hub.store.metadata("TARGET_UPDATE"), "source_mode": "BOGUS"})
     with pytest.raises(ValidationError):
         Event.model_validate({**hub.store.metadata("SNAPSHOT"), "telemetry": {}})
 

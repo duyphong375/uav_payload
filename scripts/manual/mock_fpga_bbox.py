@@ -179,7 +179,7 @@ def main():
                 p2_y = int(320 + math.cos(t_sec * 0.6) * 50)
                 bboxes.append(build_bbox_item(x_center=p2_x, y_center=p2_y, width=40, height=55, class_id=1, confidence=92))
 
-                # Phao cứu sinh / Thuyền bè hỗ trợ (Class 2: Boat)
+                # Phao cứu sinh màu cam (Class 2: Lifebuoy)
                 p3_x = int(320 + math.sin(t_sec * 0.5) * 140)
                 p3_y = int(240 + math.cos(t_sec * 0.5) * 80)
                 bboxes.append(build_bbox_item(x_center=p3_x, y_center=p3_y, width=35, height=35, class_id=2, confidence=98))

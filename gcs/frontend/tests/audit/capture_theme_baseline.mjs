@@ -5,7 +5,8 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const BASE = process.env.KVC_BASE_URL || 'http://127.0.0.1:5173'
-const OUT = resolve(process.env.KVC_SHOT_DIR || '../review/KVC-GCS-UI/00-baseline')
+// Script chạy với cwd = gcs/frontend, nên '../../review' mới trỏ tới review/ của repo.
+const OUT = resolve(process.env.KVC_SHOT_DIR || '../../review/KVC-GCS-UI/02-consistency')
 
 const ROUTES = [
   ['mission', '#/mission'],
@@ -160,7 +161,7 @@ for (const theme of THEMES) {
 
 await browser.close()
 
-writeFileSync(resolve(OUT, 'contrast-before.json'), JSON.stringify(report, null, 2))
+writeFileSync(resolve(OUT, 'contrast.json'), JSON.stringify(report, null, 2))
 const total = report.reduce((s, r) => s + r.contrastFailures, 0)
 const checked = report.reduce((s, r) => s + r.contrastChecked, 0)
 console.log(JSON.stringify({ out: OUT, shots: report.length, contrastFailures: total, contrastChecked: checked }, null, 2))

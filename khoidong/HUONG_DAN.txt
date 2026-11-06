@@ -1,0 +1,22 @@
+THƯ MỤC KHỞI ĐỘNG HỆ THỐNG KVC SAR UAV GROUND STATION
+=====================================================
+
+1. [0_CHAY_TAT_CA.bat]
+   - Kích đúp vào file này để khởi động hệ thống chuẩn (nhẹ và mượt):
+     + Bật Backend (cổng 8000)
+     + Bật Frontend Web (cổng 5173)
+     + Tự động mở trình duyệt web: http://localhost:5173
+
+2. [1_chay_backend.bat]
+   - Chạy riêng Backend FastAPI (dùng Python trong .venv).
+   - Địa chỉ API: http://127.0.0.1:8000
+   - WebSocket Telemetry: ws://127.0.0.1:8000/ws/telemetry
+
+3. [2_chay_frontend.bat]
+   - Chạy riêng Frontend Web GCS (Vite / React).
+   - Địa chỉ Web: http://localhost:5173
+
+4. [3_chay_ai_worker.bat] (Tùy chọn)
+   - Chạy riêng AI Inference Worker (YOLO11n trên NVIDIA RTX 4060) khi cần kiểm thử nhận diện.
+   - Nguồn video đầu vào: http://127.0.0.1:8000/video/stream (từ Backend relay)
+   - Luồng video đầu ra đã vẽ bounding box: http://127.0.0.1:8090/

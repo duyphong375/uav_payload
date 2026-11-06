@@ -64,6 +64,12 @@
   --kvc-radius-control: 6px;
   --kvc-radius-panel: 10px;
 
+  /* Mật độ hiển thị — mặc định comfortable (PLAN-002 §13.2).
+   * Tên token theo đúng hợp đồng: panel-padding / card-gap / table-cell-padding. */
+  --kvc-density-panel-padding: 16px;
+  --kvc-density-card-gap: 16px;
+  --kvc-density-table-cell-padding: 10px 12px;
+
   /* Z scale */
   --kvc-z-map: 0;
   --kvc-z-map-overlay: 10;
@@ -71,6 +77,28 @@
   --kvc-z-panel: 30;
   --kvc-z-banner: 40;
   --kvc-z-modal: 50;
+}
+
+/* Mật độ compact: 10px / 8px / 6×8px theo PLAN-002 §13.2.
+ * Header luôn 56px — không đổi theo mật độ. */
+[data-density='compact'] {
+  --kvc-density-panel-padding: 10px;
+  --kvc-density-card-gap: 8px;
+  --kvc-density-table-cell-padding: 6px 8px;
+}
+
+/* Lớp tiêu thụ token mật độ. Khai báo ngoài @layer nên thắng utility
+ * Tailwind cùng thuộc tính; component chỉ cần gắn class, không hardcode px. */
+.kvc-density-panel {
+  padding: var(--kvc-density-panel-padding);
+}
+
+.kvc-density-gap {
+  gap: var(--kvc-density-card-gap);
+}
+
+.kvc-density-cell {
+  padding: var(--kvc-density-table-cell-padding);
 }
 
 .dark {
@@ -129,6 +157,13 @@
   --kvc-line: oklch(0.32 0.015 250);
   --kvc-line-strong: oklch(0.44 0.018 250);
 
+  /* Surface phải tối lại trong scope này. Trước đây thiếu 3 dòng dưới nên
+   * component con (ô cảm biến, ống đo, la bàn) vẽ nền sáng của light theme
+   * lên chữ sáng của overlay → chữ gần như vô hình. */
+  --kvc-surface: oklch(0.22 0.016 250);
+  --kvc-surface-2: oklch(0.27 0.016 250);
+  --kvc-bg: oklch(0.2 0.02 250);
+
   --kvc-accent-ink: oklch(0.7 0.15 235);
   --kvc-ok-ink: oklch(0.72 0.15 155);
   --kvc-warn-ink: oklch(0.78 0.15 70);
@@ -136,13 +171,8 @@
   --kvc-mock-ink: oklch(0.72 0.16 300);
 }
 
-/* Serif cho riêng trang Nhật ký phiên. Class thường thua utility Tailwind,
- * nên chỗ cần số thẳng cột vẫn giữ font-mono như bình thường. */
-.kvc-serif {
-  font-family: var(--font-kvc-serif);
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.005em;
-}
+/* Một hệ phông duy nhất (Geist) cho cả 6 trang — PLAN-KVC-GCS-UI-CONSISTENCY-002.
+ * Số/mã/toạ độ dùng font-mono; không còn font serif cục bộ. */
 
 @media (prefers-reduced-motion: reduce) {
   *,

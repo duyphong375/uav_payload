@@ -146,16 +146,52 @@ describe('TelemetryClient transport ownership', () => {
     expect(fetchMock.mock.calls[3][1].body).toBe(JSON.stringify({ speed: 2 }))
   })
 
-  it('accepts backend snapshot when connected in REAL mode and normalizes source_mode', () => {
+  it('delivers a REAL backend snapshot unchanged and never relabels MOCK as REAL', () => {
     const client = new TelemetryClient()
     const packets = vi.fn()
     client.onPacket(packets)
     client.connect('REAL')
     const ws = FakeSocket.instances[0]
     ws.open()
-    ws.message(snapshot())
+    // KVC-DUAL-CAMERA-20261102 (T-05): backend có nhãn REAL thật, client chỉ
+    // chuyển tiếp. Snapshot MOCK không còn bị "nâng cấp" thành REAL.
+    const real = { ...snapshot(), source_mode: 'REAL', original_source_mode: 'REAL', inference_device: 'FPGA_GW2A' }
+    ws.message(real)
     expect(packets).toHaveBeenCalledTimes(1)
     expect(packets.mock.calls[0][0].source_mode).toBe('REAL')
+    expect(packets.mock.calls[0][0].inference_device).toBe('FPGA_GW2A')
+    ws.message({ ...snapshot(), session_id: 'SES-MOCK' })
+    expect(packets).toHaveBeenCalledTimes(1)
+    client.disconnect()
+  })
+
+  it('delivers VIDEO_STATUS independently of expectedSource and snapshotSession', () => {
+    const client = new TelemetryClient()
+    const packets = vi.fn()
+    client.onPacket(packets)
+    client.connect('REAL')
+    const ws = FakeSocket.instances[0]
+    ws.open()
+
+    const videoStatus = {
+      event_type: 'VIDEO_STATUS',
+      schema_version: '1.0.0',
+      session_id: 'SES-MOCK-1',
+      source_mode: 'MOCK',
+      sequence_number: 10,
+      video: {
+        source_kind: 'RELAY',
+        stream_path: '/video/stream',
+        is_connected: true,
+        frame_count: 50,
+        last_frame_age_ms: 100,
+        error_message: null,
+      },
+    }
+    ws.message(videoStatus)
+    expect(packets).toHaveBeenCalledTimes(1)
+    expect(packets.mock.calls[0][0].event_type).toBe('VIDEO_STATUS')
+    expect(packets.mock.calls[0][0].video?.stream_path).toBe('/video/stream')
     client.disconnect()
   })
 })

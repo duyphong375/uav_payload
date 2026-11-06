@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 import {
   AlertCircle,
   AlertTriangle,
@@ -6,8 +6,10 @@ import {
   Clock,
   HelpCircle,
   Layers,
+  Trash2,
   Wrench,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -90,8 +92,8 @@ export const AlertItemCard: React.FC<AlertItemCardProps> = ({ alert }) => {
             </div>
           </div>
 
-          {/* Thao tác Tiếp nhận */}
-          <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
+          {/* Thao tác Tiếp nhận & Xóa */}
+          <div className="flex items-center gap-1.5 self-start sm:self-center shrink-0">
             {alert.acknowledged ? (
               <div className="flex items-center gap-1.5 text-xs text-[var(--kvc-ok-ink)] font-medium px-2 py-1 rounded-md bg-[var(--kvc-ok-bg)] border border-[var(--kvc-ok-line)]">
                 <CheckCircle2 className="h-3.5 w-3.5" />
@@ -109,6 +111,21 @@ export const AlertItemCard: React.FC<AlertItemCardProps> = ({ alert }) => {
                 Tiếp nhận cảnh báo
               </Button>
             )}
+
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                dispatch({ type: 'DELETE_ALERT', payload: alert.id })
+                toast.success(`Đã xóa cảnh báo [${alert.code}]`)
+              }}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive hover:bg-destructive/10 border-border hover:border-destructive/30 cursor-pointer gap-1"
+              title="Xóa cảnh báo này"
+              aria-label={`Xóa cảnh báo ${alert.code}`}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Xóa</span>
+            </Button>
           </div>
         </div>
 

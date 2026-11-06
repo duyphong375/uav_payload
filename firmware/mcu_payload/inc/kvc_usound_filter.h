@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file kvc_usound_filter.h
  * @brief Bộ lọc trung vị trượt + chặn ngoại lai + giữ mẫu cho cảm biến siêu âm.
  *
@@ -37,8 +37,6 @@
  *
  * Khi filter trả `KVC_USOUND_OK` do GIỮ MẪU CŨ, `*out_held` = true. Cờ này
  * dành cho chẩn đoán; telemetry hiện vẫn bật `ALT_VALID` như hành vi cũ.
- *
- * Người phụ trách: Nguyễn Tá Duy Phong
  */
 
 #ifndef KVC_USOUND_FILTER_H

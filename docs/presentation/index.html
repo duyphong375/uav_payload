@@ -1,0 +1,1204 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KVC — Slide Thuyết Trình Tải Nhiệm Vụ UAV Cứu Nạn Bão Lũ (15 Slide + 3 Dự Phòng)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-page: #f1f5f9;
+      --bg-slide: #ffffff;
+      --border: #e2e8f0;
+      --border-dark: #cbd5e1;
+      --text-main: #0f172a;
+      --text-muted: #475569;
+      --text-light: #64748b;
+      --accent: #ea580c; /* Cam cứu hộ dã chiến */
+      --blue: #0284c7;   /* Xanh kỹ thuật */
+      --green: #16a34a;  /* Xanh lá xác thực */
+      --amber: #d97706;  /* Vàng cảnh báo */
+      --tag-bg: #f8fafc;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-page);
+      color: var(--text-main);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* Container tỷ lệ 16:9 chuẩn */
+    .deck-container {
+      width: 94vw;
+      height: 52.875vw;
+      max-height: 88vh;
+      max-width: 156.44vh;
+      background: var(--bg-slide);
+      border: 1px solid var(--border-dark);
+      border-radius: 8px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+    }
+
+    .slide {
+      display: none;
+      width: 100%;
+      height: 100%;
+      padding: 32px 48px;
+      flex-direction: column;
+      position: absolute;
+      top: 0;
+      left: 0;
+      background: #ffffff;
+    }
+
+    .slide.active { display: flex; }
+
+    /* Header thanh lịch, đơn giản */
+    .slide-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 18px;
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 12px;
+    }
+
+    .slide-badge {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 3px;
+    }
+
+    .slide-title {
+      font-size: 23px;
+      font-weight: 800;
+      color: var(--text-main);
+      line-height: 1.2;
+    }
+
+    .slide-meta {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .slide-time {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-light);
+      background: var(--tag-bg);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+
+    .slide-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-main);
+      background: #f1f5f9;
+      padding: 3px 10px;
+      border-radius: 4px;
+      border: 1px solid var(--border-dark);
+    }
+
+    /* Content Layout */
+    .slide-content {
+      flex: 1;
+      display: grid;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .grid-2 { grid-template-columns: 1fr 1fr; }
+    .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .grid-1-2 { grid-template-columns: 1fr 2fr; }
+    .grid-2-1 { grid-template-columns: 2fr 1fr; }
+
+    /* Clean Engineering Card */
+    .card {
+      background: #ffffff;
+      border: 1px solid var(--border-dark);
+      border-radius: 6px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card.highlight-box {
+      background: #f8fafc;
+      border-left: 4px solid var(--accent);
+    }
+
+    .card.blue-box {
+      border-left: 4px solid var(--blue);
+    }
+
+    .card.green-box {
+      border-left: 4px solid var(--green);
+    }
+
+    .card-title {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 6px;
+    }
+
+    /* Danh sách nội dung */
+    .card ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .card li {
+      font-size: 12.8px;
+      line-height: 1.45;
+      color: var(--text-muted);
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+
+    .bullet {
+      color: var(--text-main);
+      font-weight: bold;
+      line-height: 1.2;
+    }
+
+    .hl {
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    /* Nhãn mức bằng chứng bắt buộc */
+    .ev-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 3px;
+      display: inline-block;
+      white-space: nowrap;
+    }
+    .ev-hw { background: #dcfce7; color: #15803d; border: 1px solid #86efac; }
+    .ev-sim { background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; }
+    .ev-built { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    .ev-design { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+    .ev-source { background: #f3e8ff; color: #7e22ce; border: 1px solid #d8b4fe; }
+
+    /* Bảng kỹ thuật */
+    table.spec-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    table.spec-table th, table.spec-table td {
+      border: 1px solid var(--border-dark);
+      padding: 6px 9px;
+      text-align: left;
+    }
+
+    table.spec-table th {
+      background: #f8fafc;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    /* Code Box đơn giản */
+    .code-box {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      background: #f8fafc;
+      border: 1px solid var(--border-dark);
+      border-radius: 4px;
+      padding: 8px 10px;
+      color: #0f172a;
+      line-height: 1.5;
+    }
+
+    /* Slide 1 - Trang Bìa */
+    .title-slide {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      height: 100%;
+      padding: 30px 40px;
+    }
+
+    .title-badge {
+      display: inline-block;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+      background: #fff7ed;
+      border: 1px solid #ffedd5;
+      padding: 4px 10px;
+      border-radius: 4px;
+      margin-bottom: 16px;
+    }
+
+    .title-main {
+      font-size: 34px;
+      font-weight: 800;
+      line-height: 1.2;
+      color: var(--text-main);
+      margin-bottom: 12px;
+    }
+
+    .title-sub {
+      font-size: 16px;
+      color: var(--text-muted);
+      line-height: 1.45;
+      margin-bottom: 24px;
+    }
+
+    .title-metrics {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 28px;
+    }
+
+    .metric-pill {
+      border: 1px solid var(--border-dark);
+      background: #f8fafc;
+      padding: 8px 16px;
+      border-radius: 6px;
+    }
+
+    .metric-pill span {
+      display: block;
+      font-size: 11px;
+      color: var(--text-light);
+      text-transform: uppercase;
+      font-weight: 600;
+    }
+
+    .metric-pill strong {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 18px;
+      color: var(--text-main);
+    }
+
+    .title-footer {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      border-top: 1px solid var(--border-dark);
+      padding-top: 16px;
+      width: 100%;
+    }
+
+    .footer-col h4 {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: var(--text-light);
+      margin-bottom: 4px;
+    }
+
+    .footer-col p { font-size: 12.5px; color: var(--text-main); font-weight: 500; }
+
+    /* Thanh điều hướng */
+    .nav-bar {
+      position: fixed;
+      bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: #ffffff;
+      border: 1px solid var(--border-dark);
+      padding: 6px 16px;
+      border-radius: 24px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      z-index: 100;
+    }
+
+    .nav-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+    }
+    .nav-btn:hover { background: #f1f5f9; color: var(--text-main); }
+
+    .progress-bar-container {
+      width: 140px;
+      height: 4px;
+      background: #e2e8f0;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: var(--accent);
+      width: 5.5%;
+      transition: width 0.2s ease;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="deck-container">
+
+    <!-- SLIDE 1: BÌA ĐỊNH VỊ ĐỀ TÀI -->
+    <div class="slide active">
+      <div class="title-slide">
+        <div class="title-badge">Cuộc thi Thiết kế FPGA và MCU mở rộng khu vực Miền Trung 2026</div>
+        <h1 class="title-main">KVC — HỆ THỐNG TẢI NHIỆM VỤ UAV<br>TÌM KIẾM CỨU NẠN BÃO LŨ</h1>
+        <p class="title-sub">Thiết kế tích hợp FPGA Gowin GW2A (Thị giác biên) và MCU Sonix SN34F788 (Định vị 3D) kết hợp truyền tin vô tuyến LoRa 433 MHz</p>
+        
+        <div class="title-metrics">
+          <div class="metric-pill">
+            <span>Đầu vào xử lý AI</span>
+            <strong>160 × 160</strong>
+          </div>
+          <div class="metric-pill">
+            <span>Kích thước gói tin</span>
+            <strong>32 Byte</strong>
+          </div>
+          <div class="metric-pill">
+            <span>Kênh vô tuyến</span>
+            <strong>LoRa 433 MHz</strong>
+          </div>
+          <div class="metric-pill">
+            <span>Tính sẵn sàng</span>
+            <strong>100% Offline</strong>
+          </div>
+        </div>
+
+        <div class="title-footer">
+          <div class="footer-col">
+            <h4>Đơn vị dự thi</h4>
+            <p>Đội KVC — Đại học Bách Khoa – Đại học Đà Nẵng</p>
+          </div>
+          <div class="footer-col">
+            <h4>Thành viên & Vai trò</h4>
+            <p>Vững (RTL/FPGA) • Phong (MCU) • Thịnh (Gateway) • Kiên (Camera) • Cường (Dữ liệu)</p>
+          </div>
+          <div class="footer-col">
+            <h4>Ranh giới kỹ thuật cốt lõi</h4>
+            <p>Tải nhiệm vụ (Payload), không can thiệp Flight Controller, 32 byte thay video</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: BÀI TOÁN VÀ RÀNG BUỘC -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Khối 1: Tổng quan</div>
+          <div class="slide-title">Bài toán cứu nạn thực địa và ràng buộc thiết kế</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-time">1:30</span>
+          <span class="slide-num">02 / 15</span>
+        </div>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card highlight-box">
+          <div class="card-title">Ba nút thắt cứu nạn bão lũ miền Trung</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Hạ tầng tê liệt hoàn toàn:</span> Mất điện lưới, trạm BTS ngập úng, không có 4G/5G/Internet.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Nghịch lý video số:</span> Video HD cần hàng Mbps, sóng cao tần bị mưa bão suy hao nặng, trễ lớn hoặc đứt sóng.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Áp lực thời gian:</span> Cứu hộ viên cần vị trí (tọa độ) trong vài phút, không cần xem video đẹp; mắt người không quét kịp diện rộng.</li>
+          </ul>
+          <div style="margin-top: 14px;">
+            <table class="spec-table">
+              <thead>
+                <tr><th>Tiêu chí</th><th>Truyền video truyền thống</th><th>Giải pháp đề tài KVC</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Băng thông yêu cầu</td><td>Hàng Megabit/giây (Mbps)</td><td><span class="hl">Vài chục bit/giây (bps)</span></td></tr>
+                <tr><td>Khả năng xuyên mưa bão</td><td>Kém, dễ mất link</td><td><span class="hl">LoRa 433 MHz đâm xuyên xa</span></td></tr>
+                <tr><td>Vận hành trạm mặt đất</td><td>Cần đường truyền Internet/Cloud</td><td><span class="hl">100% Offline, nguồn pin riêng</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Ràng buộc thiết kế & Phạm vi PoC</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Ràng buộc kỹ thuật rút ra:</span>
+              <br>• Xử lý ảnh tại chỗ trên UAV (Edge Computing).
+              <br>• Gói tin cứu nạn siêu nhỏ (Zero-Video trên kênh tầm xa).
+              <br>• Trạm đất tự chủ nguồn, không phụ thuộc máy tính để thu nhận.
+            </li>
+            <li><span class="bullet">▪</span> <span class="hl">Phạm vi nghiệm thu PoC:</span>
+              <br>• Nhận diện trên video lũ lụt có sẵn <span class="ev-tag ev-source">SOURCE-VERIFIED</span>
+              <br>• Thử nghiệm bể bơi chứng minh luồng đo đạc <span class="ev-tag ev-sim">SIMULATED</span>
+              <br>• Vận hành trực tiếp tại gian thi, <span class="hl">không dùng sa bàn</span>.
+            </li>
+            <li><span class="bullet">▪</span> <span class="hl">Ngoài phạm vi:</span> Chế tạo khung bay, chứng chỉ DO-254/DO-178C, IP67.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 3: KIẾN TRÚC TỔNG THỂ HAI NỬA -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Khối 1: Tổng quan</div>
+          <div class="slide-title">Kiến trúc tổng thể: Hai nửa hệ thống và bus vật lý</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-time">2:00</span>
+          <span class="slide-num">03 / 15</span>
+        </div>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card blue-box">
+          <div class="card-title">Phân định ranh giới phần cứng & Bus truyền dẫn</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">NỬA 1: TẢI NHIỆM VỤ UAV (AIR UNIT)</span>
+              <br>① Camera OV2640 DVP 8-bit ──[DVP]──> FPGA OneKiwi 20K
+              <br>② FPGA ──[UART 38.400 bps + DATA_READY]──> MCU Sonix SN34F788
+              <br>③ Cảm biến: Siêu âm AJ-SR04M [UART 9600] + IMU GY-87 [I2C 400kHz] + GNSS [UART 9600]
+              <br>④ MCU ──[SPI + DIO0]──> LoRa Ra-02 TX (433 MHz)
+            </li>
+            <li><span class="bullet">▪</span> <span class="hl">KÊNH VÔ TUYẾN TẦM XA:</span> Sóng LoRa 433 MHz (Gói nhị phân 32 byte)</li>
+            <li><span class="bullet">▪</span> <span class="hl">NỬA 2: TRẠM MẶT ĐẤT (GROUND STATION)</span>
+              <br>⑤ LoRa Ra-02 RX ──[SPI]──> Gateway ESP32-C3 (OLED + Nguồn riêng)
+              <br>⑥ ESP32-C3 ──[Wi-Fi SoftAP / WebSocket v1]──> Laptop GCS Offline
+            </li>
+            <li><span class="bullet">▪</span> <span class="hl">Kênh phụ IF-05:</span> ESP32-S3-CAM phát MJPEG qua Wi-Fi (nét đứt, không qua LoRa).</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">Bảng phân công nhiệm vụ 5 khối cốt lõi</div>
+          <table class="spec-table">
+            <thead><tr><th>Khối phần cứng</th><th>Nhiệm vụ bắt buộc</th><th>Mức bằng chứng</th></tr></thead>
+            <tbody>
+              <tr><td><span class="hl">FPGA Primer 20K</span></td><td>Trích xuất BBox streaming từ pixel</td><td><span class="ev-tag ev-hw">HARDWARE-VERIFIED</span></td></tr>
+              <tr><td><span class="hl">MCU Sonix M4F</span></td><td>Dung hợp cảm biến, giải định vị 3D</td><td><span class="ev-tag ev-built">BUILT</span></td></tr>
+              <tr><td><span class="hl">LoRa Ra-02 (SX1278)</span></td><td>Truyền telemetry 32 byte xuyên bão</td><td><span class="ev-tag ev-hw">HARDWARE-VERIFIED</span> (TX)</td></tr>
+              <tr><td><span class="hl">ESP32-C3 Gateway</span></td><td>Thu RF, OLED hiện trường, SoftAP</td><td><span class="ev-tag ev-built">BUILT</span></td></tr>
+              <tr><td><span class="hl">Laptop GCS</span></td><td>Dashboard, SQLite WAL, Nhật ký</td><td><span class="ev-tag ev-source">SOURCE-VERIFIED</span></td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:10px; font-size:11.5px; color:var(--text-light);">
+            * Ghi chú: Các khối được đánh số trùng khớp với chi tiết kỹ thuật ở Slide 5–10.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 4: NGUYÊN LÝ CỐT LÕI -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Khối 1: Tổng quan</div>
+          <div class="slide-title">Nguyên lý cốt lõi: Chỉ truyền kết luận, không truyền dữ liệu thô</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-time">1:15</span>
+          <span class="slide-num">04 / 15</span>
+        </div>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card highlight-box">
+          <div class="card-title">Thông điệp cốt lõi của đề tài KVC</div>
+          <div style="padding: 12px 0;">
+            <p style="font-size:19px; font-weight:800; color:var(--accent); line-height:1.35;">
+              "Biến một luồng video băng thông lớn thành một tọa độ cứu nạn duy nhất gói gọn trong 32 byte."
+            </p>
+          </div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Giảm băng thông 5 bậc độ lớn:</span> Từ ~2.000.000 bps (video) xuống đúng 256 bps (LoRa 32 byte @ 1 Hz).</li>
+            <li><span class="bullet">▪</span> <span class="hl">Miễn nhiễm suy hao:</span> Không phụ thuộc chất lượng đường truyền video; dữ liệu cứu nạn vẫn về an toàn.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Ranh giới an toàn:</span> Payload độc lập, không can thiệp bay, không arm/disarm, không sửa waypoint.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">Chuỗi chuyển hóa 4 bước dữ liệu</div>
+          <div class="code-box" style="margin-bottom:12px;">
+[Ảnh quang học thô]  OV2640 DVP: 640×480 RGB565 (~614 KB/khung)
+        │
+        ▼ (Xử lý thời gian thực trên FPGA - 0 trễ)
+[Tọa độ Bounding Box] X, Y, W, H, Conf, Class (18 Byte khung IF-01)
+        │
+        ▼ (Chiếu tia 3D kết hợp cảm biến trên MCU Sonix)
+[Tọa độ cứu nạn 3D]   Local X/Y (cm) hoặc WGS-84 Lat/Lon (32 Byte IF-02)
+        │
+        ▼ (Truyền vô tuyến LoRa 433 MHz về trạm đất)
+[Hành động cứu hộ]    Cứu hộ viên xuất ca-nô tiếp cận nạn nhân tức thì
+          </div>
+          <p style="font-size:12px; color:var(--text-light);">
+            Ẩn dụ kiến trúc: <strong>FPGA</strong> = Mắt & Nhận thức; <strong>MCU</strong> = Định vị & Đóng gói; <strong>LoRa</strong> = Dây dẫn vô tuyến; <strong>ESP32</strong> = Cổng vào; <strong>Laptop</strong> = Bản đồ chỉ huy.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 5: TẢI UAV (1) - FPGA -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Khối 2: Thiết kế tải UAV</div>
+          <div class="slide-title">Tải UAV (1) — FPGA OneKiwi Primer 20K + OV2640</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-time">2:15</span>
+          <span class="slide-num">05 / 15</span>
+        </div>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card">
+          <div class="card-title">Pipeline xử lý ảnh RTL & Đo kiểm trên bo <span class="ev-tag ev-hw">HARDWARE-VERIFIED</span></div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Pipeline phần cứng:</span> OV2640 DVP ──> Camera RX ──> Resize/Letterbox 160×160 (RGB, pad 114, /255) ──> kvc_blob_detect ──> NMS (MAX_BOXES=12) ──> FIFO CDC ──> UART 38.400 bps.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Thuật toán hiện hành (kvc_blob_detect.v):</span> Phân ngưỡng RGB565 + color dominance streaming từ pixel thật (không mock).</li>
+            <li><span class="bullet">▪</span> <span class="hl">Tài nguyên tối ưu:</span> Tiêu thụ đúng <span class="hl">0 BSRAM, 0 DSP</span> (chỉ dùng 1.616 LUTs / 20.736, 7%).</li>
+            <li><span class="bullet">▪</span> <span class="hl">Số đo xung nhịp:</span> Fmax đạt <span class="hl">113,277 MHz</span>, TNS = 0. Suite 22/22 Testbench PASS.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Đo kiểm bo thật:</span> MCU nhận 720 Byte (BB v1 crc0), fe=0, oe=0, drop=0.</li>
+          </ul>
+        </div>
+        <div class="card highlight-box">
+          <div class="card-title">Giới hạn kỹ thuật trung thực (Bắt buộc công bố)</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Chưa chứa YOLO11n:</span> Bitstream hiện tại trên bo chạy thuật toán Blob detect streaming; mô hình YOLO11n INT8 đang hoàn thiện pipeline nạp Flash SPI.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Nhận diện đối tượng:</span> Thuật toán Blob hiện bắt vùng màu cam (phao/áo cứu sinh), luôn gán <span class="hl">class_id = 2</span>; chưa phân loại hình dáng "người".</li>
+            <li><span class="bullet">▪</span> <span class="hl">Dải phát hiện thực tế:</span> <span class="ev-tag ev-sim">SIMULATED</span> Mô hình hình học tính toán đạt dải hoạt động hiệu quả 1,5 – 15,0 m AGL.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Tần số khung hình:</span> Đường blob thực tế đạt 5,08 – 7,48 frame/s do nhịp VSYNC camera quyết định (không phải 100 Hz của đường mock testbench).</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 6: TẢI UAV (2) - MCU & ĐỊNH VỊ -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Khối 2: Thiết kế tải UAV</div>
+          <div class="slide-title">Tải UAV (2) — MCU Sonix + Cảm biến + Định vị 3D</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-time">2:15</span>
+          <span class="slide-num">06 / 15</span>
+        </div>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card blue-box">
+          <div class="card-title">Thuật toán chiếu tia 3D (Ray-Plane Intersection)</div>
+          <div class="code-box" style="margin-bottom:8px;">
+p_local = t_cam + λ · R_cam · v_pixel
+Trong đó λ giải từ giao điểm tia quang học với mặt phẳng nước Z = 0
+          </div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Luồng xử lý bare-metal:</span> Parser UART1 + Ring buffer SPSC 4096B ──> Đồng bộ timestamp ──> AHRS bù góc nghiêng ──> Giải giao điểm 3D ──> Đóng gói LoRa.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Bù góc nghiêng IMU:</span> Chùm siêu âm mở rộng ~75° (vệt đo 4,6 m ở độ cao 3 m). Cần Roll/Pitch từ GY-87 để xác định mặt phẳng phản xạ thực.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Quy tắc an toàn:</span> Thiếu điều kiện định vị ──> Gán POS_VALID = 0 ──> Hiển thị INVALID/N/A trên Dashboard, không gán tọa độ giả.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">Cụm cảm biến & Bằng chứng kiểm thử</div>
+          <table class="spec-table">
+            <thead><tr><th>Cảm biến</th><th>Giao tiếp</th><th>Vai trò & Giới hạn</th><th>Mức bằng chứng</th></tr></thead>
+            <tbody>
+              <tr><td><span class="hl">AJ-SR04M</span></td><td>UART 9600</td><td>Đo cao độ nước; trần nâng 700 cm (B-7); cờ alt_quality GOOD/FAIR/POOR</td><td><span class="ev-tag ev-hw">HARDWARE-VERIFIED</span></td></tr>
+              <tr><td><span class="hl">GY-87 (MPU)</span></td><td>I2C0 400k</td><td>Roll/Pitch bù nghiêng; hoãn HMC5883L; loại bỏ BMP180</td><td><span class="ev-tag ev-built">BUILT</span></td></tr>
+              <tr><td><span class="hl">NEO-M10</span></td><td>UART 9600</td><td>Tọa độ WGS-84; Yaw từ course khi bay ngang ≥ 0,5 knot</td><td><span class="ev-tag ev-built">BUILT</span></td></tr>
+            </tbody>
+          </table>
+          <p style="margin-top:10px; font-size:12px; color:var(--text-muted);">
+            Trạng thái Firmware: Keil rebuild 0 Error / 8 Warning (warning có sẵn vendor SDK); Host C test 9/9 PASS; Đã bring-up kit Sonix thật.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 7: TẢI UAV (3) - LORA 32 BYTE -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Khối 2: Thiết kế tải UAV</div>
+          <div class="slide-title">Tải UAV (3) — Đóng gói LoRa 32 byte (Hợp đồng IF-02)</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-time">1:30</span>
+          <span class="slide-num">07 / 15</span>
+        </div>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card">
+          <div class="card-title">Bố cục khung wire IF-02 (Cố định 32 byte Little-Endian)</div>
+          <div class="code-box">
+[0-1]   Sync Header      : 0xAA 0x55 (2B)
+[2-3]   Msg ID & Seq Num : 0x01 (Target) / 0x02 (Heartbeat) & 0..255 (2B)
+[4-7]   Timestamp        : Uptime MCU tải (4B, ms)
+[8-15]  Target WGS-84    : Lat / Lon (8B, int32 x 10^7)
+[16-19] Target Local     : X / Y Local (4B, int16 cm)
+[20-21] Distance         : Cự ly siêu âm (2B, uint16 cm)
+[22-23] Class & Conf     : Class ID (1=person, 2=lifebuoy) & Conf (0..100)
+[24-25] Flags & Reserved : 8-bit sensor flags & Byte 25 luôn 0 (Bỏ đo pin)
+[26-29] Reserved         : Dự phòng / Góc nghiêng IMU (4B)
+[30-31] Checksum         : CRC-16/CCITT-FALSE tính trên byte 0–29 (2B)
+          </div>
+          <p style="font-size:11.5px; color:var(--text-light); margin-top:6px;">
+            ABI đã được HUMAN phê duyệt ngày 29/10/2026. Golden vector GV-02: CRC = 0xE260.
+          </p>
+        </div>
+        <div class="card highlight-box">
+          <div class="card-title">Tính toán Airtime & Kỷ luật truyền thông</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Cấu hình RF 433 MHz:</span> BW = 125 kHz, SF7/SF8, CR = 4/5, Preamble 8, Ra-02 (SX1278).</li>
+            <li><span class="bullet">▪</span> <span class="hl">Thời gian chiếm sóng (Time-on-Air):</span>
+              <br>• Tại SF7: Đúng <span class="hl">71,9 ms</span>/gói tin 32 byte.
+              <br>• Tại SF8: Đúng <span class="hl">133,6 ms</span>/gói tin 32 byte.
+            </li>
+            <li><span class="bullet">▪</span> <span class="hl">Tần suất phát quy định:</span>
+              <br>• Heartbeat: 1 Hz (đang chạy trong firmware).
+              <br>• Target Event: 2–5 Hz khi có mục tiêu (<span class="ev-tag ev-design">DESIGN</span>, chưa triển khai).
+            </li>
+            <li><span class="bullet">▪</span> <span class="hl">Cảnh báo kỹ thuật:</span> Không phát 10 Hz — 10 Hz chiếm tới 71,9% airtime (SF7) và vượt 100% (SF8), vi phạm nghiêm trọng quy chuẩn vô tuyến.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 8: GATEWAY (1) - ESP32-C3 -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Khối 3: Thiết kế trạm mặt đất</div>
+          <div class="slide-title">Gateway (1) — ESP32-C3 + LoRa RX: Độc lập dã chiến</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-time">1:30</span>
+          <span class="slide-num">08 / 15</span>
+        </div>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card green-box">
+          <div class="card-title">Nguyên tắc: "Hệ thống không chết khi Laptop chết"</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Nguồn điện độc lập:</span> Pin Li-ion 18650 2S (7.4V) + Mạch Buck MP1584 hạ áp 5V + Tụ lọc 220 µF. Không lấy nguồn từ USB laptop khi cứu hộ.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Màn hình OLED SSD1306 0.96 inch:</span> Đọc ngay giá trị phần cứng RSSI (dBm, offset 0x1A), SNR (dB, offset 0x19), số gói nhận và <span class="hl">tọa độ nạn nhân</span> trực tiếp ngoài trời.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Chuỗi xử lý ngắt:</span> DIO0 IRQ ──> SPI đọc 32B ──> Kiểm CRC-16 ──> Đọc RSSI/SNR ──> Xuất OLED ──> Đẩy qua WebSocket v1.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">Chính sách mạng & Trạng thái thẩm định</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Chính sách mạng hai tầng:</span>
+              <br>• Ưu tiên 1 (STA Mode): Tự động bắt vào Wi-Fi 2.4 GHz của đội cứu hộ.
+              <br>• Ưu tiên 2 (SoftAP Fallback): Tự phát mạng nội bộ 'KVC_GROUND_STATION' (192.168.4.1).
+              <br>• Tự động đóng SoftAP ngay khi STA kết nối lại.
+            </li>
+            <li><span class="bullet">▪</span> <span class="hl">Trạng thái xác thực:</span>
+              <br>• Host test rf_decode / net_policy PASS.
+              <br>• PlatformIO build 0 Error.
+              <br>• Phía phát LoRa TX: <span class="ev-tag ev-hw">HARDWARE-VERIFIED</span> (TxDone ok=17, fail=0).
+              <br>• Phía nhận Gateway RX: <span class="ev-tag ev-built">BUILT</span> Chưa chạy trên bo thật (chờ bàn giao bo Gateway từ owner Thịnh).
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 9: GATEWAY (2) - GCS BACKEND & DASHBOARD -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Khối 3: Thiết kế trạm mặt đất</div>
+          <div class="slide-title">Gateway (2) — GCS Backend + Web Dashboard Offline</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-time">1:45</span>
+          <span class="slide-num">09 / 15</span>
+        </div>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card">
+          <div class="card-title">Kiến trúc phần mềm & Bảo vệ dữ liệu</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Luồng dữ liệu:</span> Ingress WebSocket ──> State Reducer ──> WebSocket local ──> Web UI.</li>
+            <li><span class="bullet">▪</span> <span class="hl">SQLite WAL mode:</span> Thiết lập synchronous=FULL, commit tức thời theo sự kiện mục tiêu; chống hỏng dữ liệu khi laptop sập nguồn.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Nhật ký phiên (Session Log):</span> Thay thế tính năng Replay từ 02/11/2026; cho phép đọc phiên đã commit, lọc actor/mức/nguồn, ẩn mục và xuất file CSV.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Hoàn toàn 100% Offline:</span> Toàn bộ thư viện Leaflet, fonts và assets đóng gói local; không gọi bất kỳ CDN Internet nào.</li>
+          </ul>
+        </div>
+        <div class="card blue-box">
+          <div class="card-title">Giao diện Dashboard chỉ huy & Chỉ số kiểm thử</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Ba vùng hiển thị tác chiến:</span>
+              <br>• Radar Local: Bán kính và góc tương đối quanh UAV (hệ cm).
+              <br>• Bản đồ Leaflet WGS-84: Tọa độ toàn cầu, ghim vị trí mục tiêu.
+              <br>• Bảng danh sách mục tiêu & Cảnh báo âm thanh khi phát hiện.
+            </li>
+            <li><span class="bullet">▪</span> <span class="hl">Minh bạch nguồn dữ liệu:</span> Nhãn REAL / MOCK / RELAY hiển thị trực tiếp trên UI, không mập mờ dữ liệu giả lập.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Kết quả kiểm thử tự động:</span>
+              <br>• Frontend React: <span class="hl">173 test / 27 file PASS</span>, Typecheck exit 0, Lint 0 error.
+              <br>• Backend FastAPI: <span class="hl">84 test PASS</span> (bao gồm 17 test hợp đồng dây dẫn).
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 10: GATEWAY (3) - ESP32-S3-CAM KÊNH PHỤ -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Khối 3: Thiết kế trạm mặt đất</div>
+          <div class="slide-title">Gateway (3) — ESP32-S3-CAM: Phân tầng năng lực hai camera</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-time">1:15</span>
+          <span class="slide-num">10 / 15</span>
+        </div>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card highlight-box">
+          <div class="card-title">Quyết định kiến trúc: Phân tầng năng lực (HUMAN duyệt 02/11)</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">KÊNH TỌA ĐỘ (CỐT LÕI):</span> OV2640 ──> FPGA ──> MCU ──> LoRa. Khóa 1 nạn nhân ưu tiên để giải bài toán định vị chính xác.</li>
+            <li><span class="bullet">▪</span> <span class="hl">KÊNH VIDEO (PHỤ TRỢ):</span> ESP32-S3-CAM ──> Wi-Fi ──> GCS Relay. Hỗ trợ quan sát nhiều đối tượng bằng mô hình YOLO11n trên laptop (<span class="ev-tag ev-source">PC_REFERENCE</span>), <span class="hl">không sinh tọa độ cứu nạn</span>.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Ràng buộc hình học:</span> Cờ has_overlay luôn false — BBox từ FPGA không đúng hình học với cảm biến OV3660, và hai đồng hồ độc lập lệch 100–500 ms. Tuyệt đối không vẽ đè BBox lên video rồi coi là đồng bộ.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">Đường truyền Relay 3 tầng & Hiện trạng</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Luồng dữ liệu:</span> S3-CAM --[MJPEG cổng 81]--> Backend (video_relay.py) --[Same-Origin]--> Browser. Trình duyệt không gọi thẳng camera (tránh lỗi CORS và mixed content).</li>
+            <li><span class="bullet">▪</span> <span class="hl">Chịu tải:</span> Camera phục vụ 1 + số_người_xem; nguồn cấp 5V riêng LM2596 (600–800 mA).</li>
+            <li><span class="bullet">▪</span> <span class="hl">Trạng thái xác thực:</span>
+              <br>• Mã nguồn & Build: <span class="ev-tag ev-built">BUILT</span> PlatformIO biên dịch sạch.
+              <br>• Thử nghiệm mô phỏng: <span class="ev-tag ev-sim">SIMULATED</span> Đo đạt 29,75/30 khung/s trên camera TCP giả.
+              <br>• Chưa chạy trên bo thật: <span class="hl">Chưa HARDWARE-VERIFIED</span>.
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 11: GIAO TIẾP VÀ TÍCH HỢP MA TRẬN IF -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Khối 4: Tích hợp & Đánh giá</div>
+          <div class="slide-title">Giao tiếp & Tích hợp: Kỷ luật hợp đồng ma trận IF-01…IF-05</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-time">1:30</span>
+          <span class="slide-num">11 / 15</span>
+        </div>
+      </div>
+      <div class="slide-content grid-2-1">
+        <div class="card">
+          <div class="card-title">Ma trận 5 giao diện chuẩn hóa của hệ thống KVC</div>
+          <table class="spec-table">
+            <thead><tr><th>Mã IF</th><th>Điểm kết nối</th><th>Đặc tả giao thức</th><th>Mức bằng chứng</th><th>Thay đổi cần duyệt</th></tr></thead>
+            <tbody>
+              <tr><td><span class="hl">IF-01</span></td><td>FPGA ↔ MCU</td><td>UART 38.400 bps, 8N1, N≤12, CRC-16</td><td><span class="ev-tag ev-hw">HARDWARE-VERIFIED</span></td><td>HUMAN</td></tr>
+              <tr><td><span class="hl">IF-02</span></td><td>MCU ↔ ESP32</td><td>LoRa 433 MHz, gói cố định 32 byte</td><td><span class="ev-tag ev-hw">HARDWARE-VERIFIED</span> (TX)</td><td>HUMAN</td></tr>
+              <tr><td><span class="hl">IF-03</span></td><td>ESP32 ↔ Laptop</td><td>WebSocket v1 (7 trường JSON chuẩn)</td><td><span class="ev-tag ev-source">SOURCE-VERIFIED</span></td><td>HUMAN</td></tr>
+              <tr><td><span class="hl">IF-04</span></td><td>Backend ↔ UI</td><td>REST + WebSocket nội bộ laptop</td><td><span class="ev-tag ev-source">SOURCE-VERIFIED</span></td><td>Owner GCS</td></tr>
+              <tr><td><span class="hl">IF-05</span></td><td>S3-CAM ↔ Backend</td><td>HTTP MJPEG cổng 81 (boundary token)</td><td><span class="ev-tag ev-sim">SIMULATED</span> + <span class="ev-tag ev-built">BUILT</span></td><td>HUMAN</td></tr>
+            </tbody>
+          </table>
+          <p style="font-size:11.5px; color:var(--text-light); margin-top:8px;">
+            Nguyên tắc bất biến: Không tự ý thay đổi baud, packet layout, CRC, IRQ, pinout khi chưa có phê duyệt.
+          </p>
+        </div>
+        <div class="card highlight-box">
+          <div class="card-title">Bằng chứng tích hợp thực tế</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Lỗi thật đã sửa (L-01):</span> FrameExtractor ghép nhầm khung MJPEG bị cắt xén dẫn tới sai lệch frame_count -> Sửa bằng thuật toán dò FF D8 lồng trước FF D9.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Kết quả bài Soak 30 phút:</span>
+              <br>• Phát thành công 1.466 gói LoRa.
+              <br>• Tỷ lệ mất gói: 0 fail.
+              <br>• FPGA nhận 76.750 B với fe=oe=drop=0.
+              <br>• 0 lần reset hệ thống ngoài ý muốn.
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 12: TRIỂN KHAI & MỨC BẰNG CHỨNG -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Khối 4: Tích hợp & Đánh giá</div>
+          <div class="slide-title">Triển khai & Mức bằng chứng: Tạo uy tín bằng số đo thật</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-time">1:30</span>
+          <span class="slide-num">12 / 15</span>
+        </div>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card green-box">
+          <div class="card-title">Những hạng mục ĐÃ CÓ BẰNG CHỨNG đo đạc</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">RTL FPGA:</span> 22/22 Testbench PASS, Fmax 113,277 MHz TNS=0.</li>
+            <li><span class="bullet">▪</span> <span class="hl">UART FPGA ➔ PC:</span> 1.102/1.102 frame không lỗi CRC (capture_01.bin).</li>
+            <li><span class="bullet">▪</span> <span class="hl">UART FPGA ➔ MCU:</span> Nhận 720 B (blob) và 197.844 B (mock) fe=oe=drop=0.</li>
+            <li><span class="bullet">▪</span> <span class="hl">LoRa TX phát sóng:</span> MCU phát SX1278 TxDone ok=17, fail=0; GV-02 PASS.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Đo thời gian dài (Soak test):</span> Chạy ổn định 30 phút liên tục.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Phần mềm GCS:</span> 173 frontend test, 84 backend test, 9 MCU host test PASS.</li>
+          </ul>
+        </div>
+        <div class="card highlight-box">
+          <div class="card-title">Những hạng mục CÒN THIẾU (Minh bạch khoa học)</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Mô hình AI:</span> Bitstream hiện tại chưa nạp YOLO11n (đang chạy blob detect).</li>
+            <li><span class="bullet">▪</span> <span class="hl">Ảnh camera thật:</span> Đang chờ đo kiểm tín hiệu VSYNC/PCLK thực địa (G6.1).</li>
+            <li><span class="bullet">▪</span> <span class="hl">Bắt gói LoRa thật:</span> Chưa có log capture frame MCU ↔ Gateway ESP32-C3.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Gateway trạm đất:</span> ESP32-C3 nhận sóng thật chưa hoàn thành (NOT RUN).</li>
+            <li><span class="bullet">▪</span> <span class="hl">Camera phụ:</span> ESP32-S3-CAM chưa nạp bo thực tế; AI chưa qua locked-test.</li>
+          </ul>
+          <div style="margin-top:12px; padding:6px 10px; background:#f1f5f9; border-radius:4px;">
+            <p style="font-size:12px; font-weight:700; color:var(--text-main);">
+              Thông điệp: "Không có tỷ lệ % hoàn thành mơ hồ — chỉ có cấp độ bằng chứng thực nghiệm."
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 13: ĐÁNH GIÁ KẾT QUẢ - KỊCH BẢN 3 BƯỚC -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Khối 4: Tích hợp & Đánh giá</div>
+          <div class="slide-title">Đánh giá kết quả: Kịch bản 3 hoạt động minh chứng</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-time">1:30</span>
+          <span class="slide-num">13 / 15</span>
+        </div>
+      </div>
+      <div class="slide-content grid-3">
+        <div class="card">
+          <div class="card-title">1. Video lũ lụt có sẵn <span class="ev-tag ev-source">PC_REFERENCE</span></div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Nội dung:</span> Chiếu video lũ lụt thực tế có đối tượng trôi dạt, hiển thị BBox và confidence.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Đo kiểm âm tính:</span> Có đoạn video không có người để quan sát báo động giả.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Giới hạn minh bạch:</span> Suy luận AI chạy trên laptop; không suy ra tọa độ địa lý.</li>
+          </ul>
+        </div>
+        <div class="card blue-box">
+          <div class="card-title">2. Video thử nghiệm bể bơi <span class="ev-tag ev-sim">SIMULATED</span></div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Nội dung:</span> Quay toàn cảnh lắp đặt gá tải thật + màn hình Dashboard ghi cùng phiên.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Minh chứng luồng:</span> Camera ──> Tải ──> LoRa ──> ESP32 ──> Dashboard.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Giới hạn:</span> Kênh video S3-CAM là kênh độc lập, không vẽ qua LoRa.</li>
+          </ul>
+        </div>
+        <div class="card green-box">
+          <div class="card-title">3. Test trực tiếp tại bàn thi <span class="ev-tag ev-hw">LIVE HARDWARE</span></div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Không dùng sa bàn:</span> Cấp nguồn bộ kit mang tới, kết nối Dashboard offline.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Quy trình live:</span> Đưa đầu vào ──> Quan sát chuỗi ──> Thử ngắt/khôi phục link ──> Mở Nhật ký phiên và xuất file CSV.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Quy tắc tọa độ:</span> Thiếu GNSS fix để INVALID/N/A, không gán tọa độ giả.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 14: HẠN CHẾ VÀ HƯỚNG PHÁT TRIỂN -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Khối 4: Tích hợp & Đánh giá</div>
+          <div class="slide-title">Hạn chế kỹ thuật & Lộ trình hoàn thiện hệ thống</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-time">1:15</span>
+          <span class="slide-num">14 / 15</span>
+        </div>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card">
+          <div class="card-title">Bốn nhóm hạn chế thực tế & Giải pháp khắc phục</div>
+          <table class="spec-table">
+            <thead><tr><th>Nhóm</th><th>Hạn chế hiện tại</th><th>Hướng khắc phục</th></tr></thead>
+            <tbody>
+              <tr><td><span class="hl">AI trên FPGA</span></td><td>Chưa có YOLO11n; blob chỉ nhận màu cam class_id=2</td><td>Đưa CNN vào top (BBOX_SOURCE=2), ước tính 4–6 tuần</td></tr>
+              <tr><td><span class="hl">Định vị 3D</span></td><td>fx_px=554 chưa hiệu chuẩn bàn cờ; Yaw chỉ có khi bay ngang</td><td>Hiệu chuẩn camera (G6.3); bổ sung Yaw từ GNSS course</td></tr>
+              <tr><td><span class="hl">Đa mục tiêu</span></td><td>Gói IF-02 mới khóa 1 mục tiêu ưu tiên; chưa có CCL</td><td>Phase 2: Bổ sung track registry + Kalman filter trên GCS</td></tr>
+              <tr><td><span class="hl">Phần cứng</span></td><td>Chưa capture frame LoRa thật giữa MCU ↔ ESP32</td><td>Capture frame thật, đo PRR thực địa và nạp bo S3-CAM</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card blue-box">
+          <div class="card-title">Lộ trình triển khai (3 mốc thời gian)</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Ưu tiên 2 tuần tới:</span> Hoàn tất nạp bitstream CNN lên FPGA ──> Capture gói LoRa thật hai đầu ──> Locked-test AI ──> Tổng duyệt live.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Kế hoạch 1 tháng:</span> Tích hợp cảm biến Optical Flow để có góc Yaw khi UAV bay đứng yên; đóng gói vỏ gá in 3D chống rung.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Mở rộng dài hạn sau cuộc thi:</span> Đóng gói bản đồ vệ tinh offline có bản quyền; giao thức LoRa ACK hai chiều; hộp chuẩn IP65.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 15: KẾT LUẬN & Q&A -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Khối 4: Tích hợp & Đánh giá</div>
+          <div class="slide-title">Kết luận đề tài & Sẵn sàng giải đáp phản biện</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-time">0:30</span>
+          <span class="slide-num">15 / 15</span>
+        </div>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card highlight-box">
+          <div class="card-title">Ba khẳng định kỹ thuật có bằng chứng</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Kiến trúc End-to-End hoàn chỉnh:</span> Đã thiết kế trọn vẹn chuỗi thu nhận ảnh, xử lý biên, định vị không gian và truyền tin dã chiến.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Nền tảng đo kiểm thực tế:</span> Đạt các số đo cứng Fmax 113 MHz, 197k byte UART không lỗi, 84 backend tests và 173 frontend tests PASS.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Minh bạch khoa học tuyệt đối:</span> Mọi tuyên bố đều gắn nhãn DESIGN, SIMULATED, BUILT hoặc HARDWARE-VERIFIED.</li>
+          </ul>
+          <div style="margin-top:16px; padding:12px; background:#fff7ed; border:1px solid #ffedd5; border-radius:6px;">
+            <p style="font-size:15px; font-weight:800; color:var(--accent); line-height:1.4;">
+              "KVC biến một luồng video thành một tọa độ cứu nạn trong 32 byte — và nói rõ phần nào đã chứng minh được."
+            </p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Kính mời Ban Giám Khảo đặt câu hỏi & Vận hành Demo</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Ba việc đội đang tiếp tục hoàn thiện:</span>
+              <br>1. Nạp mô hình CNN INT8 vào bitstream FPGA.
+              <br>2. Bắt gói tin LoRa thật giữa MCU và Gateway.
+              <br>3. Đo kiểm locked-test độc lập cho mô hình nhận diện.
+            </li>
+            <li><span class="bullet">▪</span> Nhóm xin chân thành cảm ơn Ban Giám Khảo và Ban Tổ Chức Cuộc thi!</li>
+            <li><span class="bullet">▪</span> Sẵn sàng chuyển giao phần vận hành trực tiếp bộ thiết bị tại bàn thi.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE D1: DỰ PHÒNG 1 (UART CHI TIẾT) -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Slide dự phòng D1 (Dùng khi hỏi về mất byte / Framing)</div>
+          <div class="slide-title">Khung UART FPGA ↔ MCU chi tiết & Cơ chế chống tràn bộ đệm</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-num">D1 / 18</span>
+        </div>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card">
+          <div class="card-title">Đặc tả khung truyền kết quả AI (IF-01)</div>
+          <div class="code-box">
+[Sync: 0x5A 0xA5 (2B)] + [Version: 1B] + [Count: 1B (N ≤ 12)]
++ [Timestamp: 4B] + [Danh sách BBox: N × 8B] + [CRC-16: 2B]
+
+Cấu trúc mỗi BBox 8 byte:
+- X_center (2B) : Tọa độ X tâm BBox
+- Y_center (2B) : Tọa độ Y tâm BBox
+- Width    (1B) : Chiều rộng BBox
+- Height   (1B) : Chiều cao BBox
+- Class_ID (1B) : 1=person, 2=lifebuoy
+- Conf     (1B) : Độ tin cậy (0–100%)
+          </div>
+          <p style="font-size:12px; color:var(--text-light); margin-top:8px;">
+            Khung N=0 chiếm 10 byte; N=1 (blob) chiếm 18 byte; N=2 chiếm 26 byte.
+          </p>
+        </div>
+        <div class="card blue-box">
+          <div class="card-title">Cơ chế phần cứng chống nghẽn & Sửa lỗi UART</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Ngắt & Ring Buffer:</span> Phía MCU sử dụng UART1_IRQHandler kết hợp Ring Buffer SPSC 4096 byte; không mất byte khi MCU bận phát LoRa.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Đồng bộ tín hiệu:</span> Chân DATA_READY từ FPGA tích cực mức cao để đánh thức MCU.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Lỗi P0 đã khắc phục (P1-fix):</span> Module uart_tx cũ hạ tx_busy sớm ở đầu stop bit khiến mỗi byte chỉ có 9 bit-time (gây 926 lỗi framing). Đã sửa thành bit_cnt 0..9 (đủ 10 bit-time 8N1).</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE D2: DỰ PHÒNG 2 (OFFSET IF-02 CHI TIẾT) -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Slide dự phòng D2 (Dùng khi hỏi về CRC / Endian)</div>
+          <div class="slide-title">Bảng Offset đầy đủ giao thức IF-02 & Golden Vector GV-02</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-num">D2 / 18</span>
+        </div>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card">
+          <div class="card-title">Bảng 32 Byte Wire ABI IF-02</div>
+          <table class="spec-table">
+            <thead><tr><th>Offset</th><th>Kích thước</th><th>Tên trường</th><th>Kiểu dữ liệu</th></tr></thead>
+            <tbody>
+              <tr><td>0–1</td><td>2 byte</td><td>Sync Header</td><td>uint8[2] = 0xAA, 0x55</td></tr>
+              <tr><td>2</td><td>1 byte</td><td>Message ID</td><td>uint8 (0x01: Target, 0x02: Heartbeat)</td></tr>
+              <tr><td>3</td><td>1 byte</td><td>Sequence Number</td><td>uint8 (0..255)</td></tr>
+              <tr><td>4–7</td><td>4 byte</td><td>Timestamp</td><td>uint32 (ms)</td></tr>
+              <tr><td>8–11</td><td>4 byte</td><td>Target Latitude</td><td>int32 (độ × 10^7)</td></tr>
+              <tr><td>12–15</td><td>4 byte</td><td>Target Longitude</td><td>int32 (độ × 10^7)</td></tr>
+              <tr><td>16–17</td><td>2 byte</td><td>Target X Local</td><td>int16 (cm)</td></tr>
+              <tr><td>18–19</td><td>2 byte</td><td>Target Y Local</td><td>int16 (cm)</td></tr>
+              <tr><td>20–21</td><td>2 byte</td><td>Altitude Distance</td><td>uint16 (cm, trần 700 cm)</td></tr>
+              <tr><td>22</td><td>1 byte</td><td>Class ID</td><td>uint8 (1=person, 2=lifebuoy)</td></tr>
+              <tr><td>23</td><td>1 byte</td><td>Confidence</td><td>uint8 (0–100%)</td></tr>
+              <tr><td>24</td><td>1 byte</td><td>Sensor Status Flags</td><td>uint8 (GNSS, ALT, IMU, AI)</td></tr>
+              <tr><td>25</td><td>1 byte</td><td>Status Reserved</td><td>uint8 = 0 (Đã bỏ đo pin)</td></tr>
+              <tr><td>26–29</td><td>4 byte</td><td>Reserved / IMU</td><td>uint8[4]</td></tr>
+              <tr><td>30–31</td><td>2 byte</td><td>CRC-16 Checksum</td><td>uint16 (Poly 0x1021, Init 0xFFFF)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card highlight-box">
+          <div class="card-title">Quy tắc Endian & Golden Vector GV-02</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Thứ tự byte:</span> Toàn bộ các trường số nguyên nhiều byte (uint16, int16, uint32, int32) lưu theo thứ tự <span class="hl">Little-Endian</span> (Low-byte trước).</li>
+            <li><span class="bullet">▪</span> <span class="hl">Thuật toán CRC:</span> CRC-16/CCITT-FALSE (Poly 0x1021, Init 0xFFFF, RefIn/RefOut false, XorOut 0x0000) tính trên đúng 30 byte đầu (offset 0..29).</li>
+            <li><span class="bullet">▪</span> <span class="hl">Golden Vector GV-02:</span> Với frame chuẩn có byte 25 = 0, kết quả CRC-16 chuẩn hóa là <span class="hl">0xE260</span>. Cả MCU và ESP32 đều kiểm tra khớp mã này trước khi chấp nhận gói.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE D3: DỰ PHÒNG 3 (STATE MACHINE MẤT LINK) -->
+    <div class="slide">
+      <div class="slide-header">
+        <div>
+          <div class="slide-badge">Slide dự phòng D3 (Dùng khi hỏi về mất link / Timeout)</div>
+          <div class="slide-title">State Machine Reconnect WebSocket & Chính sách Stale 3 giây</div>
+        </div>
+        <div class="slide-meta">
+          <span class="slide-num">D3 / 18</span>
+        </div>
+      </div>
+      <div class="slide-content grid-2">
+        <div class="card blue-box">
+          <div class="card-title">Cơ chế mạng Gateway ESP32-C3</div>
+          <div class="code-box">
+[Khởi động ESP32] ──> Thử kết nối STA Wi-Fi trạm cứu hộ (2.4 GHz)
+       │
+       ├──> (Thành công) ──> Giữ chế độ STA, mở WebSocket Server
+       │
+       └──> (Thất bại / Timeout) ──> Bật SoftAP 'KVC_GROUND_STATION'
+                                     IP: 192.168.4.1, mở WebSocket Server
+                                     (Tự động đóng SoftAP khi STA nối lại)
+          </div>
+          <p style="font-size:12px; color:var(--text-muted); margin-top:10px;">
+            ESP32 sinh gateway_session_id ngẫu nhiên lúc boot. Laptop nhận diện gateway khởi động lại khi session_id đổi và xóa sequence cũ.
+          </p>
+        </div>
+        <div class="card">
+          <div class="card-title">Chính sách xử lý mất kết nối trên GCS</div>
+          <ul>
+            <li><span class="bullet">▪</span> <span class="hl">Chính sách Stale 3 giây:</span> Nếu quá 3,0 giây không nhận được gói tin mới từ gateway, Dashboard lập tức chuyển trạng thái sang STALE và cảnh báo trên giao diện, không hiển thị dữ liệu cũ như dữ liệu mới.</li>
+            <li><span class="bullet">▪</span> <span class="hl">Tự động kết nối lại (Auto-reconnect):</span> Client GCS tự động thử kết nối lại với thuật toán Exponential Backoff (1–5 giây).</li>
+            <li><span class="bullet">▪</span> <span class="hl">Bộ đệm chống mất gói:</span> Thiết kế mục tiêu dự kiến bộ đệm FIFO 64 gói tại ESP32 khi laptop tạm thời ngắt kết nối.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Thanh điều khiển phía dưới -->
+  <div class="nav-bar">
+    <button class="nav-btn" id="prevBtn" title="Slide trước (←)">&#8592;</button>
+    <div class="progress-bar-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <span id="counter" style="font-family:'JetBrains Mono', monospace; font-size:12px; font-weight:700; color:#334155;">1 / 18</span>
+    <button class="nav-btn" id="nextBtn" title="Slide sau (→ hoặc Space)">&#8594;</button>
+    <button class="nav-btn" id="fsBtn" title="Toàn màn hình (F)">&#x26F6;</button>
+  </div>
+
+  <script>
+    const slides = document.querySelectorAll('.slide');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const fsBtn = document.getElementById('fsBtn');
+    const counter = document.getElementById('counter');
+    const progressBar = document.getElementById('progressBar');
+    let currentIdx = 0;
+
+    function showSlide(idx) {
+      if (idx < 0) idx = 0;
+      if (idx >= slides.length) idx = slides.length - 1;
+      slides[currentIdx].classList.remove('active');
+      currentIdx = idx;
+      slides[currentIdx].classList.add('active');
+
+      const isBackup = currentIdx >= 15;
+      const displayStr = isBackup 
+        ? `D${currentIdx - 14} / 18 (Dự phòng)` 
+        : `${currentIdx + 1} / 15`;
+        
+      counter.textContent = displayStr;
+      progressBar.style.width = `${((currentIdx + 1) / slides.length) * 100}%`;
+    }
+
+    prevBtn.addEventListener('click', () => showSlide(currentIdx - 1));
+    nextBtn.addEventListener('click', () => showSlide(currentIdx + 1));
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        showSlide(currentIdx + 1);
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        showSlide(currentIdx - 1);
+      } else if (e.key === 'f' || e.key === 'F') {
+        toggleFullscreen();
+      }
+    });
+
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    fsBtn.addEventListener('click', toggleFullscreen);
+  </script>
+</body>
+</html>

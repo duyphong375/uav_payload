@@ -28,6 +28,7 @@ gcs/backend/data/sessions/
 # Embedded build outputs (keep source, project and constraints)
 .pio/
 impl/
+impl_diag_*/
 Objects/
 Listings/
 *.fs
@@ -35,6 +36,7 @@ Listings/
 *.elf
 *.axf
 *.hex
+!fpga/verification/data/**/*.hex
 *.o
 *.vcd
 *.fst
@@ -93,3 +95,15 @@ scripts/kvc-review.ps1
 *.key
 *.pfx
 *.lic
+
+# Firmware Wi-Fi credentials (firmware/esp32_s3_cam/include/wifi_secrets.h)
+# File .example thì được commit; file thật thì không.
+firmware/esp32_s3_cam/include/wifi_secrets.h
+firmware/esp32_cam/include/wifi_secrets.h
+
+# Temporary root test outputs and batch artifacts
+/Ban
+khoidong/Ban
+/is_connected
+/a.out
+/*.bin

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file kvc_georef.c
  * @brief Cài đặt phép chiếu BBox xuống mặt nước. Xem kvc_georef.h.
  *
@@ -9,8 +9,6 @@
  * float, ép int32/int16). Mục tiêu là tách module mà KHÔNG làm thay đổi kết quả
  * trên kit — mọi khác biệt hành vi chỉ nằm ở nhánh thiếu Yaw/GNSS, tức đúng
  * phạm vi finding P1 được sửa.
- *
- * Người phụ trách: Nguyễn Tá Duy Phong
  */
 
 #include "kvc_georef.h"

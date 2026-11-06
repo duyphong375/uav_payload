@@ -1,0 +1,649 @@
+# Soak COM9 @ 9600 trong 10.0 phút
+# Bắt đầu: 2026-11-02 12:32:28
+# Lệnh: soak_mcu_log.py --port COM9 --minutes 10.0
+# ====================================================================
+[    1.30] [M3] t=70133 US=162cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=64/0
+[    2.30] [M3] t=71133 US=162cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=65/0
+[    3.29] [M3] t=72133 US=162cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=66/0
+[    4.14] [M3] t=73133 US=162cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=67/0
+[    4.17] [RING]FPGA  pend=0 drop=0 oe=0 fe=3376 byt=3376 isr=3376
+[    4.24] GNSS  pend=0 drop=0 oe=0 fe=0 byt=24954 isr=24954
+[    4.34] USND  pend=0 drop=0 oe=0 fe=469 byt=469 isr=469 val=116 ok=68 bad=0 trg=68 raw=1624
+[    5.34] [M3] t=74183 US=162cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=68/0
+[    6.34] [M3] t=75183 US=163cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=69/0
+[    7.33] [M3] t=76183 US=163cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=70/0
+[    8.33] [M3] t=77183 US=163cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=71/0
+[    9.33] [M3] t=78183 US=163cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=72/0
+[   10.33] [M3] t=79183 US=162cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=73/0
+[   11.33] [M3] t=80183 US=162cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=74/0
+[   12.02] [M3] t=81183 US=162cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=75/0
+[   12.06] [RING]FPGA  pend=0 drop=0 oe=0 fe=3770 byt=3770 isr=3770
+[   12.12] GNSS  pend=0 drop=0 oe=0 fe=0 byt=27906 isr=27906
+[   12.20] USND  pend=0 drop=0 oe=0 fe=561 byt=561 isr=561 val=139 ok=76 bad=0 trg=76 raw=1624
+[   13.32] [M3] t=82183 US=162cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=76/0
+[   14.32] [M3] t=83183 US=160cm ok | IMU r=3 p=-30 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=77/0
+[   15.32] [M3] t=84183 US=73cm ok | IMU r=3 p=-29 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=78/0
+[   16.31] [M3] t=85183 US=73cm ok | IMU r=3 p=-28 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=79/0
+[   17.31] [M3] t=86183 US=73cm ok | IMU r=4 p=-28 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=80/0
+[   18.24] [M3] t=87183 US=299cm ok | IMU r=4 p=-28 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=81/0
+[   18.27] [RING]FPGA  pend=0 drop=0 oe=0 fe=4081 byt=4081 isr=4081
+[   18.34] GNSS  pend=0 drop=0 oe=0 fe=0 byt=30120 isr=30120
+[   18.43] USND  pend=0 drop=0 oe=0 fe=589 byt=589 isr=589 val=146 ok=82 bad=0 trg=82 raw=3009
+[   19.87] [M3] t=88316 US=300cm ok | IMU r=4 p=-28 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr0 late_max=0 tx=82/0
+[   23.56] [M3] t=89761 US=300cm ok | IMU r=4 p=-28 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr1 late_max=55 tx=84/0
+[   27.46] [M3] t=91932 US=0cm err/5 last=300 | IMU r=4 p=-28 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr1 late_max=55 tx=85/0
+[   28.46] [M3] t=97357 US=302cm ok | IMU r=4 p=-28 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr5 late_max=541 tx=89/0
+[   29.47] [M3] t=98357 US=302cm ok | IMU r=4 p=-28 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr5 late_max=541 tx=90/0
+[   31.61] [M3] t=99365 US=302cm ok | IMU r=4 p=-28 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr5 late_max=541 tx=91/0
+[   32.37] [M3] t=101089 US=0cm err/5 last=302 | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr5 late_max=541 tx=92/0
+[   33.94] [M3] t=102088 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr6 late_max=541 tx=93/0
+[   34.37] [M3] t=103088 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr6 late_max=541 tx=94/0
+[   35.30] [M3] t=104088 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr6 late_max=541 tx=95/0
+[   35.49] [M3] t=105088 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr6 late_max=541 tx=96/0
+[   35.52] [RING]FPGA  pend=0 drop=0 oe=0 fe=4944 byt=4944 isr=4944
+[   35.59] GNSS  pend=0 drop=0 oe=0 fe=0 byt=36521 isr=36521
+[   35.67] USND  pend=0 drop=0 oe=0 fe=1018 byt=1018 isr=1018 val=253 ok=92 bad=0 trg=97 raw=3024
+[   37.44] [M3] t=106088 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr6 late_max=541 tx=97/0
+[   41.13] [M3] t=107088 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr6 late_max=541 tx=98/0
+[   41.96] [M3] t=108088 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr6 late_max=541 tx=99/0
+[   43.12] [M3] t=111881 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr8 late_max=541 tx=102/0
+[   44.12] [M3] t=113051 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr8 late_max=541 tx=103/0
+[   45.87] [M3] t=114050 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr8 late_max=541 tx=104/0
+[   46.99] [M3] t=115808 US=300cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr9 late_max=541 tx=106/0
+[   47.99] [M3] t=116924 US=300cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr9 late_max=541 tx=107/0
+[   48.15] [M3] t=117923 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr9 late_max=541 tx=108/0
+[   48.22] [RING]FPGA  pend=0 drop=0 oe=0 fe=5578 byt=5578 isr=5578
+[   48.25] GNSS  pend=0 drop=0 oe=0 fe=0 byt=41190 isr=41190
+[   48.34] USND  pend=0 drop=0 oe=0 fe=1270 byt=1270 isr=1270 val=316 ok=102 bad=0 trg=108 raw=3039
+[   50.00] [M3] t=118943 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr9 late_max=541 tx=109/0
+[   52.08] [M3] t=119942 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr9 late_max=541 tx=110/0
+[   53.36] [M3] t=121882 US=0cm err/5 last=302 | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr9 late_max=541 tx=111/0
+[   56.02] [M3] t=122881 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr10 late_max=541 tx=112/0
+[   56.22] [M3] t=123881 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr10 late_max=541 tx=113/0
+[   57.23] [M3] t=126183 US=300cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr11 late_max=541 tx=115/0
+[   58.22] [M3] t=127183 US=300cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr11 late_max=541 tx=116/0
+[   59.22] [M3] t=128183 US=300cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr11 late_max=541 tx=117/0
+[   59.91] [M3] t=129183 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr11 late_max=541 tx=118/0
+[   59.94] [RING]FPGA  pend=0 drop=0 oe=0 fe=6166 byt=6166 isr=6166
+[   60.01] GNSS  pend=0 drop=0 oe=0 fe=0 byt=45618 isr=45618
+[   60.09] USND  pend=0 drop=0 oe=0 fe=1494 byt=1494 isr=1494 val=372 ok=111 bad=0 trg=119 raw=3024
+[   61.22] [M3] t=130183 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr11 late_max=541 tx=119/0
+[   64.49] [M3] t=131183 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr11 late_max=541 tx=120/0
+[   65.01] [M3] t=132961 US=0cm err/5 last=302 | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr11 late_max=541 tx=121/0
+[   66.02] [M3] t=135000 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr13 late_max=541 tx=123/0
+[   67.02] [M3] t=136000 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr13 late_max=541 tx=124/0
+[   68.34] [M3] t=137000 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr13 late_max=541 tx=125/0
+[   69.34] [M3] t=138325 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr13 late_max=541 tx=126/0
+[   70.34] [M3] t=139324 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr13 late_max=541 tx=127/0
+[   70.74] [M3] t=140324 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr13 late_max=541 tx=128/0
+[   70.77] [RING]FPGA  pend=0 drop=0 oe=0 fe=6709 byt=6709 isr=6709
+[   70.84] GNSS  pend=0 drop=0 oe=0 fe=0 byt=49691 isr=49691
+[   70.92] USND  pend=0 drop=0 oe=0 fe=1690 byt=1690 isr=1690 val=421 ok=119 bad=0 trg=129 raw=3009
+[   72.33] [M3] t=141324 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr13 late_max=541 tx=129/0
+[   75.55] [M3] t=142324 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr13 late_max=541 tx=130/0
+[   76.45] [M3] t=144040 US=0cm err/5 last=302 | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr13 late_max=541 tx=131/0
+[   77.46] [M3] t=146463 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr15 late_max=541 tx=133/0
+[   78.46] [M3] t=147463 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr15 late_max=541 tx=134/0
+[   79.46] [M3] t=148463 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr15 late_max=541 tx=135/0
+[   80.45] [M3] t=149463 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr15 late_max=541 tx=136/0
+[   80.92] [M3] t=150463 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr15 late_max=541 tx=137/0
+[   80.96] [RING]FPGA  pend=0 drop=0 oe=0 fe=7219 byt=7219 isr=7219
+[   81.02] GNSS  pend=0 drop=0 oe=0 fe=0 byt=53383 isr=53383
+[   81.10] USND  pend=0 drop=0 oe=0 fe=1864 byt=1864 isr=1864 val=464 ok=126 bad=0 trg=138 raw=3024
+[   82.45] [M3] t=151463 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr15 late_max=541 tx=138/0
+[   83.45] [M3] t=152463 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr15 late_max=541 tx=139/0
+[   85.24] [M3] t=153463 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr15 late_max=541 tx=140/0
+[   88.83] [M3] t=155287 US=302cm ok | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr16 late_max=541 tx=142/0
+[  101.54] [M3] t=157350 US=0cm err/5 last=302 | IMU r=4 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr16 late_max=541 tx=143/0
+[  102.57] [M3] t=171623 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr26 late_max=543 tx=153/0
+[  103.56] [M3] t=172623 US=301cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr26 late_max=543 tx=154/0
+[  104.07] [M3] t=173623 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr26 late_max=543 tx=155/0
+[  104.10] [RING]FPGA  pend=0 drop=0 oe=0 fe=8379 byt=8379 isr=8379
+[  104.30] GNSS  pend=0 drop=0 oe=0 fe=0 byt=61870 isr=61870
+[  104.37] USND  pend=0 drop=0 oe=0 fe=2496 byt=2496 isr=2496 val=622 ok=133 bad=0 trg=155 raw=3024
+[  105.73] [M3] t=174623 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr26 late_max=543 tx=156/0
+[  107.86] [M3] t=175799 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr26 late_max=543 tx=157/0
+[  109.54] [M3] t=177743 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr26 late_max=543 tx=158/0
+[  110.54] [M3] t=179618 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr27 late_max=543 tx=160/0
+[  111.54] [M3] t=180618 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr27 late_max=543 tx=161/0
+[  112.54] [M3] t=181618 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr27 late_max=543 tx=162/0
+[  113.09] [M3] t=182618 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr27 late_max=543 tx=163/0
+[  113.12] [RING]FPGA  pend=0 drop=0 oe=0 fe=8832 byt=8832 isr=8832
+[  113.19] GNSS  pend=0 drop=0 oe=0 fe=0 byt=65191 isr=65191
+[  113.27] USND  pend=0 drop=0 oe=0 fe=2624 byt=2624 isr=2624 val=654 ok=141 bad=0 trg=164 raw=3009
+[  114.53] [M3] t=183618 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr27 late_max=543 tx=164/0
+[  115.53] [M3] t=184618 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr27 late_max=543 tx=165/0
+[  116.99] [M3] t=185618 US=300cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr27 late_max=543 tx=166/0
+[  119.45] [M3] t=187095 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr28 late_max=543 tx=168/0
+[  120.83] [M3] t=189372 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr28 late_max=543 tx=169/0
+[  122.07] [M3] t=190371 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr29 late_max=543 tx=170/0
+[  122.81] [M3] t=191371 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr29 late_max=543 tx=171/0
+[  123.45] [M3] t=192371 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr29 late_max=543 tx=172/0
+[  123.62] [M3] t=193371 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr29 late_max=543 tx=173/0
+[  123.69] [RING]FPGA  pend=0 drop=0 oe=0 fe=9360 byt=9360 isr=9360
+[  123.72] GNSS  pend=0 drop=0 oe=0 fe=0 byt=69144 isr=69144
+[  123.80] USND  pend=0 drop=0 oe=0 fe=2807 byt=2807 isr=2807 val=699 ok=150 bad=0 trg=174 raw=3009
+[  125.96] [M3] t=194371 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr29 late_max=543 tx=174/0
+[  126.39] [M3] t=195371 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr29 late_max=543 tx=175/0
+[  127.63] [M3] t=196371 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr29 late_max=543 tx=176/0
+[  130.10] [M3] t=197371 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr29 late_max=543 tx=177/0
+[  130.30] [M3] t=198371 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr29 late_max=543 tx=178/0
+[  131.30] [M3] t=200427 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr30 late_max=543 tx=180/0
+[  132.30] [M3] t=201427 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr30 late_max=543 tx=181/0
+[  137.27] [M3] t=202427 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr30 late_max=543 tx=182/0
+[  137.63] [M3] t=207414 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr33 late_max=543 tx=186/0
+[  137.66] [RING]FPGA  pend=0 drop=0 oe=0 fe=10061 byt=10061 isr=10061
+[  137.73] GNSS  pend=0 drop=0 oe=0 fe=0 byt=74308 isr=74308
+[  137.81] USND  pend=0 drop=0 oe=0 fe=3119 byt=3119 isr=3119 val=777 ok=160 bad=0 trg=186 raw=3024
+[  142.01] [M3] t=208488 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr33 late_max=543 tx=187/0
+[  143.48] [M3] t=210649 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr33 late_max=543 tx=188/0
+[  144.49] [M3] t=213645 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr36 late_max=543 tx=191/0
+[  145.49] [M3] t=214645 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr36 late_max=543 tx=192/0
+[  146.49] [M3] t=215645 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr36 late_max=543 tx=193/0
+[  147.48] [M3] t=216645 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr36 late_max=543 tx=194/0
+[  148.02] [M3] t=217645 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr36 late_max=543 tx=195/0
+[  148.56] [RING]FPGA  pend=0 drop=0 oe=0 fe=10582 byt=10582 isr=10582
+[  148.60] GNSS  pend=0 drop=0 oe=0 fe=0 byt=78106 isr=78106
+[  148.70] USND  pend=0 drop=0 oe=0 fe=3295 byt=3295 isr=3295 val=821 ok=167 bad=0 trg=195 raw=3024
+[  152.12] [M3] t=218878 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr36 late_max=543 tx=196/0
+[  152.65] [M3] t=220788 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr36 late_max=543 tx=197/0
+[  153.66] [M3] t=222838 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr38 late_max=543 tx=199/0
+[  154.66] [M3] t=223838 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr38 late_max=543 tx=200/0
+[  155.66] [M3] t=224838 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr38 late_max=543 tx=201/0
+[  156.66] [M3] t=225838 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr38 late_max=543 tx=202/0
+[  158.89] [M3] t=226838 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr38 late_max=543 tx=203/0
+[  159.38] [M3] t=228867 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr38 late_max=543 tx=204/0
+[  159.42] [RING]FPGA  pend=0 drop=0 oe=0 fe=11151 byt=11151 isr=11151
+[  159.48] GNSS  pend=0 drop=0 oe=0 fe=0 byt=82196 isr=82196
+[  159.56] USND  pend=0 drop=0 oe=0 fe=3503 byt=3503 isr=3503 val=873 ok=174 bad=0 trg=205 raw=3009
+[  162.16] [M3] t=230070 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr39 late_max=543 tx=206/0
+[  163.62] [M3] t=231938 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr39 late_max=543 tx=207/0
+[  166.85] [M3] t=232937 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr40 late_max=543 tx=208/0
+[  167.86] [M3] t=237070 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr42 late_max=543 tx=212/0
+[  169.10] [M3] t=238070 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr42 late_max=543 tx=213/0
+[  170.10] [M3] t=239314 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr42 late_max=543 tx=214/0
+[  171.10] [M3] t=240313 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr42 late_max=543 tx=215/0
+[  172.02] [M3] t=241313 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr42 late_max=543 tx=216/0
+[  172.05] [RING]FPGA  pend=0 drop=0 oe=0 fe=11784 byt=11784 isr=11784
+[  172.12] GNSS  pend=0 drop=0 oe=0 fe=0 byt=86970 isr=86970
+[  172.22] USND  pend=0 drop=0 oe=0 fe=3763 byt=3763 isr=3763 val=937 ok=185 bad=0 trg=217 raw=3024
+[  174.71] [M3] t=242451 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr42 late_max=543 tx=217/0
+[  177.90] [M3] t=244242 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr42 late_max=543 tx=218/0
+[  178.41] [M3] t=245241 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr43 late_max=543 tx=219/0
+[  179.41] [M3] t=248649 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr45 late_max=543 tx=222/0
+[  180.41] [M3] t=249649 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr45 late_max=543 tx=223/0
+[  181.41] [M3] t=250649 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr45 late_max=543 tx=224/0
+[  183.87] [M3] t=251649 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr45 late_max=543 tx=225/0
+[  185.16] [M3] t=253702 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr45 late_max=543 tx=226/0
+[  188.49] [M3] t=255413 US=300cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr46 late_max=543 tx=228/0
+[  188.86] [M3] t=257242 US=0cm err/5 last=300 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr46 late_max=543 tx=229/0
+[  189.17] [M3] t=259131 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr48 late_max=543 tx=231/0
+[  189.20] [RING]FPGA  pend=0 drop=0 oe=0 fe=12644 byt=12644 isr=12644
+[  189.27] GNSS  pend=0 drop=0 oe=0 fe=0 byt=93259 isr=93259
+[  189.35] USND  pend=0 drop=0 oe=0 fe=4185 byt=4185 isr=4185 val=1042 ok=194 bad=0 trg=231 raw=3024
+[  192.70] [M3] t=261321 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr48 late_max=543 tx=232/0
+[  193.81] [M3] t=262978 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr50 late_max=543 tx=234/0
+[  196.05] [M3] t=264077 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr50 late_max=543 tx=235/0
+[  197.23] [M3] t=266120 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr50 late_max=543 tx=236/0
+[  198.08] [M3] t=267119 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr51 late_max=543 tx=237/0
+[  199.02] [M3] t=268119 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr51 late_max=543 tx=238/0
+[  200.21] [M3] t=269119 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr51 late_max=543 tx=239/0
+[  200.61] [M3] t=270119 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr51 late_max=543 tx=240/0
+[  200.65] [RING]FPGA  pend=0 drop=0 oe=0 fe=13217 byt=13217 isr=13217
+[  200.71] GNSS  pend=0 drop=0 oe=0 fe=0 byt=97561 isr=97561
+[  200.79] USND  pend=0 drop=0 oe=0 fe=4395 byt=4395 isr=4395 val=1094 ok=202 bad=0 trg=241 raw=3024
+[  202.03] [M3] t=271119 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr51 late_max=543 tx=241/0
+[  203.10] [M3] t=272119 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr51 late_max=543 tx=242/0
+[  203.96] [M3] t=273119 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr51 late_max=543 tx=243/0
+[  207.86] [M3] t=274119 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr51 late_max=543 tx=244/0
+[  208.37] [M3] t=275119 US=303cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr51 late_max=543 tx=245/0
+[  209.37] [M3] t=278677 US=303cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr53 late_max=543 tx=248/0
+[  209.86] [M3] t=279677 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr53 late_max=543 tx=249/0
+[  210.07] [RING]FPGA  pend=0 drop=0 oe=0 fe=13681 byt=13681 isr=13681
+[  210.10] GNSS  pend=0 drop=0 oe=0 fe=0 byt=101008 isr=101008
+[  210.19] USND  pend=0 drop=0 oe=0 fe=4539 byt=4539 isr=4539 val=1130 ok=208 bad=0 trg=249 raw=3024
+[  211.37] [M3] t=280677 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr53 late_max=543 tx=250/0
+[  212.36] [M3] t=281677 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr53 late_max=543 tx=251/0
+[  213.36] [M3] t=282677 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr53 late_max=543 tx=252/0
+[  214.46] [M3] t=283677 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr53 late_max=543 tx=253/0
+[  215.46] [M3] t=284782 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr53 late_max=543 tx=254/0
+[  218.92] [M3] t=285782 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr53 late_max=543 tx=255/0
+[  222.56] [M3] t=287735 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr53 late_max=543 tx=256/0
+[  222.99] [M3] t=292909 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr57 late_max=543 tx=260/0
+[  223.26] [RING]FPGA  pend=0 drop=0 oe=0 fe=14339 byt=14339 isr=14339
+[  223.29] GNSS  pend=0 drop=0 oe=0 fe=0 byt=105805 isr=105805
+[  223.38] USND  pend=0 drop=0 oe=0 fe=4816 byt=4816 isr=4816 val=1199 ok=215 bad=0 trg=260 raw=3024
+[  224.57] [M3] t=293909 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr57 late_max=543 tx=261/0
+[  225.57] [M3] t=294909 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr57 late_max=543 tx=262/0
+[  226.56] [M3] t=295909 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr57 late_max=543 tx=263/0
+[  230.05] [M3] t=296909 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr57 late_max=543 tx=264/0
+[  235.08] [M3] t=298893 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr57 late_max=543 tx=265/0
+[  236.08] [M3] t=305447 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr62 late_max=543 tx=270/0
+[  237.08] [M3] t=306447 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr62 late_max=543 tx=271/0
+[  237.24] [M3] t=307447 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr62 late_max=543 tx=272/0
+[  237.31] [RING]FPGA  pend=0 drop=0 oe=0 fe=15055 byt=15055 isr=15055
+[  237.34] GNSS  pend=0 drop=0 oe=0 fe=0 byt=110971 isr=110971
+[  237.43] USND  pend=0 drop=0 oe=0 fe=5134 byt=5134 isr=5134 val=1278 ok=223 bad=0 trg=272 raw=3024
+[  240.73] [M3] t=308447 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr62 late_max=543 tx=273/0
+[  241.39] [M3] t=310586 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr62 late_max=543 tx=274/0
+[  244.96] [M3] t=311585 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr63 late_max=543 tx=275/0
+[  247.05] [M3] t=312585 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr63 late_max=543 tx=276/0
+[  248.05] [M3] t=317441 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr66 late_max=543 tx=280/0
+[  249.04] [M3] t=318441 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr66 late_max=543 tx=281/0
+[  250.00] [M3] t=319441 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr66 late_max=543 tx=282/0
+[  250.03] [RING]FPGA  pend=0 drop=0 oe=0 fe=15694 byt=15694 isr=15694
+[  250.10] GNSS  pend=0 drop=0 oe=0 fe=0 byt=115768 isr=115768
+[  250.20] USND  pend=0 drop=0 oe=0 fe=5393 byt=5393 isr=5393 val=1342 ok=231 bad=0 trg=283 raw=3009
+[  251.21] [M3] t=320613 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr66 late_max=543 tx=283/0
+[  254.55] [M3] t=321613 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr66 late_max=543 tx=284/0
+[  257.80] [M3] t=323457 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr66 late_max=543 tx=285/0
+[  258.82] [M3] t=328236 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr69 late_max=543 tx=289/0
+[  259.81] [M3] t=329236 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr69 late_max=543 tx=290/0
+[  260.81] [M3] t=330236 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr69 late_max=543 tx=291/0
+[  263.71] [M3] t=331236 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr69 late_max=543 tx=292/0
+[  264.12] [M3] t=333076 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr69 late_max=543 tx=293/0
+[  265.51] [M3] t=334571 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr71 late_max=543 tx=295/0
+[  265.68] [M3] t=335949 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr71 late_max=543 tx=296/0
+[  267.40] [RING]FPGA  pend=0 drop=0 oe=0 fe=16480 byt=16480 isr=16480
+[  267.43] GNSS  pend=0 drop=0 oe=0 fe=0 byt=121622 isr=121622
+[  267.53] USND  pend=0 drop=0 oe=0 fe=5761 byt=5761 isr=5761 val=1434 ok=240 bad=0 trg=296 raw=3024
+[  269.08] [M3] t=337999 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr72 late_max=543 tx=298/0
+[  270.07] [M3] t=339523 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr72 late_max=543 tx=299/0
+[  271.07] [M3] t=340522 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr72 late_max=543 tx=300/0
+[  272.07] [M3] t=341522 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr72 late_max=543 tx=301/0
+[  275.19] [M3] t=342522 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr72 late_max=543 tx=302/0
+[  275.82] [M3] t=344257 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr72 late_max=543 tx=303/0
+[  276.83] [M3] t=346291 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr74 late_max=543 tx=305/0
+[  279.12] [M3] t=347291 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr74 late_max=543 tx=306/0
+[  279.48] [M3] t=349207 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr74 late_max=543 tx=307/0
+[  279.51] [RING]FPGA  pend=0 drop=0 oe=0 fe=17172 byt=17172 isr=17172
+[  279.58] GNSS  pend=0 drop=0 oe=0 fe=0 byt=126589 isr=126589
+[  279.66] USND  pend=0 drop=0 oe=0 fe=6064 byt=6064 isr=6064 val=1509 ok=250 bad=0 trg=308 raw=3024
+[  280.92] [M3] t=350392 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr75 late_max=543 tx=309/0
+[  281.91] [M3] t=351391 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr75 late_max=543 tx=310/0
+[  282.91] [M3] t=352391 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr75 late_max=543 tx=311/0
+[  284.65] [M3] t=353391 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr75 late_max=543 tx=312/0
+[  285.65] [M3] t=355134 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr75 late_max=543 tx=313/0
+[  288.44] [M3] t=356134 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr75 late_max=543 tx=314/0
+[  288.78] [M3] t=358937 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr76 late_max=543 tx=317/0
+[  288.81] [RING]FPGA  pend=0 drop=0 oe=0 fe=17638 byt=17638 isr=17638
+[  288.88] GNSS  pend=0 drop=0 oe=0 fe=0 byt=130159 isr=130159
+[  288.96] USND  pend=0 drop=0 oe=0 fe=6208 byt=6208 isr=6208 val=1545 ok=258 bad=0 trg=317 raw=3009
+[  290.55] [M3] t=360043 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr76 late_max=543 tx=318/0
+[  291.63] [M3] t=361043 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr76 late_max=543 tx=319/0
+[  292.63] [M3] t=362132 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr76 late_max=543 tx=320/0
+[  293.63] [M3] t=363132 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr76 late_max=543 tx=321/0
+[  296.42] [M3] t=364132 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr76 late_max=543 tx=322/0
+[  298.70] [M3] t=366285 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr76 late_max=543 tx=323/0
+[  298.90] [M3] t=367284 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr77 late_max=543 tx=324/0
+[  299.49] [M3] t=369419 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr78 late_max=543 tx=326/0
+[  299.52] [RING]FPGA  pend=0 drop=0 oe=0 fe=18174 byt=18174 isr=18174
+[  299.58] GNSS  pend=0 drop=0 oe=0 fe=0 byt=133977 isr=133977
+[  299.67] USND  pend=0 drop=0 oe=0 fe=6396 byt=6396 isr=6396 val=1592 ok=266 bad=0 trg=327 raw=3024
+[  300.90] [M3] t=370419 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr78 late_max=543 tx=327/0
+[  301.89] [M3] t=371419 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr78 late_max=543 tx=328/0
+[  302.89] [M3] t=372419 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr78 late_max=543 tx=329/0
+[  303.89] [M3] t=373419 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr78 late_max=543 tx=330/0
+[  307.33] [M3] t=374419 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr78 late_max=543 tx=331/0
+[  309.42] [M3] t=376363 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr78 late_max=543 tx=332/0
+[  310.70] [M3] t=379977 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr81 late_max=543 tx=335/0
+[  312.64] [M3] t=381246 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr81 late_max=543 tx=336/0
+[  313.42] [M3] t=382702 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr81 late_max=543 tx=337/0
+[  313.58] [M3] t=383701 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr82 late_max=543 tx=338/0
+[  313.65] [RING]FPGA  pend=0 drop=0 oe=0 fe=18881 byt=18881 isr=18881
+[  313.68] GNSS  pend=0 drop=0 oe=0 fe=0 byt=139242 isr=139242
+[  313.77] USND  pend=0 drop=0 oe=0 fe=6692 byt=6692 isr=6692 val=1666 ok=275 bad=0 trg=339 raw=3009
+[  315.34] [M3] t=384701 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr82 late_max=543 tx=339/0
+[  319.03] [M3] t=385701 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr82 late_max=543 tx=340/0
+[  319.75] [M3] t=386701 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr82 late_max=543 tx=341/0
+[  320.75] [M3] t=390323 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr84 late_max=543 tx=344/0
+[  323.16] [M3] t=391323 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr84 late_max=543 tx=345/0
+[  323.83] [M3] t=393165 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr84 late_max=543 tx=346/0
+[  324.99] [M3] t=394412 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr85 late_max=543 tx=348/0
+[  328.62] [M3] t=395571 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr85 late_max=543 tx=349/0
+[  329.60] [M3] t=397704 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr85 late_max=543 tx=350/0
+[  329.95] [M3] t=400201 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr87 late_max=543 tx=352/0
+[  330.02] [RING]FPGA  pend=0 drop=0 oe=0 fe=19702 byt=19702 isr=19702
+[  330.08] GNSS  pend=0 drop=0 oe=0 fe=0 byt=145288 isr=145288
+[  330.16] USND  pend=0 drop=0 oe=0 fe=7091 byt=7091 isr=7091 val=1765 ok=285 bad=0 trg=353 raw=3039
+[  333.48] [M3] t=401201 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr87 late_max=543 tx=353/0
+[  334.86] [M3] t=404094 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr88 late_max=543 tx=356/0
+[  335.85] [M3] t=405459 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr88 late_max=543 tx=357/0
+[  336.85] [M3] t=406458 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr88 late_max=543 tx=358/0
+[  337.85] [M3] t=407458 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr88 late_max=543 tx=359/0
+[  341.21] [M3] t=408458 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr88 late_max=543 tx=360/0
+[  345.14] [M3] t=410325 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr88 late_max=543 tx=361/0
+[  346.07] [M3] t=415776 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr92 late_max=543 tx=365/0
+[  346.10] [RING]FPGA  pend=0 drop=0 oe=0 fe=20509 byt=20509 isr=20509
+[  346.17] GNSS  pend=0 drop=0 oe=0 fe=0 byt=151192 isr=151192
+[  346.27] USND  pend=0 drop=0 oe=0 fe=7477 byt=7477 isr=7477 val=1861 ok=293 bad=0 trg=366 raw=3024
+[  347.27] [M3] t=416912 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr92 late_max=543 tx=366/0
+[  354.31] [M3] t=417912 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr92 late_max=543 tx=367/0
+[  355.31] [M3] t=424966 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr96 late_max=543 tx=372/0
+[  356.31] [M3] t=425966 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr96 late_max=543 tx=373/0
+[  357.31] [M3] t=426966 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr96 late_max=543 tx=374/0
+[  358.31] [M3] t=427966 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr96 late_max=543 tx=375/0
+[  359.30] [M3] t=428966 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr96 late_max=543 tx=376/0
+[  360.40] [M3] t=429966 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr96 late_max=543 tx=377/0
+[  366.68] [M3] t=431070 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr96 late_max=543 tx=378/0
+[  369.19] [M3] t=437363 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr100 late_max=543 tx=383/0
+[  369.54] [M3] t=439536 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr100 late_max=543 tx=384/0
+[  369.58] [RING]FPGA  pend=0 drop=0 oe=0 fe=21686 byt=21686 isr=21686
+[  369.64] GNSS  pend=0 drop=0 oe=0 fe=0 byt=159864 isr=159864
+[  369.73] USND  pend=0 drop=0 oe=0 fe=8123 byt=8123 isr=8123 val=2022 ok=304 bad=0 trg=385 raw=3024
+[  373.89] [M3] t=440535 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr101 late_max=543 tx=385/0
+[  381.50] [M3] t=441535 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr101 late_max=543 tx=386/0
+[  382.52] [M3] t=452243 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr108 late_max=543 tx=394/0
+[  387.60] [M3] t=453243 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr108 late_max=543 tx=395/0
+[  390.07] [M3] t=458335 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr111 late_max=543 tx=399/0
+[  391.04] [M3] t=460501 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr111 late_max=543 tx=400/0
+[  391.90] [M3] t=461500 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr112 late_max=543 tx=401/0
+[  392.96] [M3] t=462500 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr112 late_max=543 tx=402/0
+[  393.22] [M3] t=463500 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr112 late_max=543 tx=403/0
+[  393.25] [RING]FPGA  pend=0 drop=0 oe=0 fe=22873 byt=22873 isr=22873
+[  393.31] GNSS  pend=0 drop=0 oe=0 fe=0 byt=168535 isr=168535
+[  393.40] USND  pend=0 drop=0 oe=0 fe=8776 byt=8776 isr=8776 val=2185 ok=315 bad=0 trg=404 raw=3009
+[  396.04] [M3] t=464500 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr112 late_max=543 tx=404/0
+[  398.02] [M3] t=466798 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr113 late_max=543 tx=406/0
+[  399.04] [M3] t=468579 US=0cm err/5 last=302 | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr113 late_max=543 tx=407/0
+[  400.05] [M3] t=469578 US=302cm ok | IMU r=4 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=408/0
+[  400.94] [M3] t=470578 US=300cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=409/0
+[  402.03] [M3] t=471578 US=71cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=410/0
+[  403.03] [M3] t=472578 US=71cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=411/0
+[  403.19] [M3] t=473578 US=71cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=412/0
+[  403.26] [RING]FPGA  pend=0 drop=0 oe=0 fe=23373 byt=23373 isr=23373
+[  403.29] GNSS  pend=0 drop=0 oe=0 fe=0 byt=172225 isr=172225
+[  403.38] USND  pend=0 drop=0 oe=0 fe=8931 byt=8931 isr=8931 val=2223 ok=322 bad=0 trg=413 raw=730
+[  404.93] [M3] t=474578 US=73cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=413/0
+[  406.04] [M3] t=475578 US=73cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=414/0
+[  406.93] [M3] t=476578 US=73cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=415/0
+[  407.93] [M3] t=477578 US=73cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=416/0
+[  408.93] [M3] t=478578 US=74cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=417/0
+[  409.17] [M3] t=479578 US=74cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=418/0
+[  409.21] [RING]FPGA  pend=0 drop=0 oe=0 fe=23673 byt=23673 isr=23673
+[  409.27] GNSS  pend=0 drop=0 oe=0 fe=0 byt=174439 isr=174439
+[  409.36] USND  pend=0 drop=0 oe=0 fe=8959 byt=8959 isr=8959 val=2229 ok=328 bad=0 trg=419 raw=759
+[  410.93] [M3] t=480578 US=74cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=419/0
+[  411.93] [M3] t=481578 US=75cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=420/0
+[  412.95] [M3] t=482578 US=75cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=421/0
+[  413.95] [M3] t=483578 US=75cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=422/0
+[  414.95] [M3] t=484578 US=75cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=423/0
+[  415.12] [M3] t=485578 US=75cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=424/0
+[  415.18] [RING]FPGA  pend=0 drop=0 oe=0 fe=23971 byt=23971 isr=23971
+[  415.22] GNSS  pend=0 drop=0 oe=0 fe=0 byt=176653 isr=176653
+[  415.31] USND  pend=0 drop=0 oe=0 fe=8983 byt=8983 isr=8983 val=2235 ok=334 bad=0 trg=425 raw=789
+[  416.96] [M3] t=486578 US=78cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=425/0
+[  417.97] [M3] t=487578 US=78cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=426/0
+[  418.98] [M3] t=488578 US=78cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=427/0
+[  420.00] [M3] t=489578 US=80cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=428/0
+[  420.90] [M3] t=490578 US=80cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=429/0
+[  421.25] [M3] t=491578 US=77cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=430/0
+[  421.28] [RING]FPGA  pend=0 drop=0 oe=0 fe=24278 byt=24278 isr=24278
+[  421.35] GNSS  pend=0 drop=0 oe=0 fe=0 byt=178867 isr=178867
+[  421.43] USND  pend=0 drop=0 oe=0 fe=9007 byt=9007 isr=9007 val=2241 ok=340 bad=0 trg=431 raw=774
+[  422.92] [M3] t=492578 US=77cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=431/0
+[  423.92] [M3] t=493578 US=77cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=432/0
+[  424.92] [M3] t=494578 US=77cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=433/0
+[  425.93] [M3] t=495578 US=75cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=434/0
+[  426.94] [M3] t=496578 US=75cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=435/0
+[  427.22] [M3] t=497578 US=75cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=436/0
+[  427.26] [RING]FPGA  pend=0 drop=0 oe=0 fe=24578 byt=24578 isr=24578
+[  427.32] GNSS  pend=0 drop=0 oe=0 fe=0 byt=181113 isr=181113
+[  427.41] USND  pend=0 drop=0 oe=0 fe=9031 byt=9031 isr=9031 val=2247 ok=346 bad=0 trg=437 raw=730
+[  428.94] [M3] t=498578 US=73cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=437/0
+[  429.94] [M3] t=499578 US=71cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=438/0
+[  430.97] [M3] t=500578 US=71cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=439/0
+[  431.86] [M3] t=501578 US=71cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=440/0
+[  432.87] [M3] t=502578 US=71cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=441/0
+[  433.28] [M3] t=503578 US=71cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=442/0
+[  433.31] [RING]FPGA  pend=0 drop=0 oe=0 fe=24881 byt=24881 isr=24881
+[  433.38] GNSS  pend=0 drop=0 oe=0 fe=0 byt=183375 isr=183375
+[  433.46] USND  pend=0 drop=0 oe=0 fe=9055 byt=9055 isr=9055 val=2253 ok=352 bad=0 trg=443 raw=700
+[  434.88] [M3] t=504578 US=71cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=443/0
+[  435.89] [M3] t=505578 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=444/0
+[  436.90] [M3] t=506578 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=445/0
+[  437.92] [M3] t=507578 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=446/0
+[  438.93] [M3] t=508578 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=447/0
+[  439.28] [M3] t=509578 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=448/0
+[  439.32] [RING]FPGA  pend=0 drop=0 oe=0 fe=25182 byt=25182 isr=25182
+[  439.38] GNSS  pend=0 drop=0 oe=0 fe=0 byt=185597 isr=185597
+[  439.47] USND  pend=0 drop=0 oe=0 fe=9079 byt=9079 isr=9079 val=2259 ok=358 bad=0 trg=449 raw=700
+[  440.93] [M3] t=510578 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=449/0
+[  441.92] [M3] t=511578 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=450/0
+[  442.92] [M3] t=512578 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=451/0
+[  443.94] [M3] t=513578 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=452/0
+[  444.93] [M3] t=514578 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=453/0
+[  445.55] [M3] t=515578 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=454/0
+[  445.58] [RING]FPGA  pend=0 drop=0 oe=0 fe=25496 byt=25496 isr=25496
+[  445.65] GNSS  pend=0 drop=0 oe=0 fe=0 byt=188003 isr=188003
+[  445.96] USND  pend=0 drop=0 oe=0 fe=9103 byt=9103 isr=9103 val=2265 ok=364 bad=0 trg=455 raw=700
+[  446.99] [M3] t=516863 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=456/0
+[  447.99] [M3] t=517863 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=457/0
+[  448.98] [M3] t=518863 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=458/0
+[  449.98] [M3] t=519863 US=68cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=459/0
+[  450.98] [M3] t=520863 US=68cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=460/0
+[  451.61] [M3] t=521863 US=68cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=461/0
+[  451.64] [RING]FPGA  pend=0 drop=0 oe=0 fe=25800 byt=25800 isr=25800
+[  451.85] GNSS  pend=0 drop=0 oe=0 fe=0 byt=190274 isr=190274
+[  451.92] USND  pend=0 drop=0 oe=0 fe=9130 byt=9130 isr=9130 val=2271 ok=370 bad=0 trg=461 raw=700
+[  452.97] [M3] t=522863 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=462/0
+[  453.97] [M3] t=523863 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=463/0
+[  454.97] [M3] t=524863 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=464/0
+[  455.97] [M3] t=525863 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=465/0
+[  456.96] [M3] t=526863 US=70cm ok | IMU r=4 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=466/0
+[  457.51] [M3] t=527863 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=467/0
+[  457.55] [RING]FPGA  pend=0 drop=0 oe=0 fe=26096 byt=26096 isr=26096
+[  457.61] GNSS  pend=0 drop=0 oe=0 fe=0 byt=192402 isr=192402
+[  457.87] USND  pend=0 drop=0 oe=0 fe=9154 byt=9154 isr=9154 val=2277 ok=376 bad=0 trg=467 raw=700
+[  458.96] [M3] t=528863 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=468/0
+[  459.96] [M3] t=529863 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=469/0
+[  460.95] [M3] t=530863 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=470/0
+[  461.95] [M3] t=531863 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=471/0
+[  462.95] [M3] t=532863 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=472/0
+[  463.63] [M3] t=533863 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=473/0
+[  463.90] [RING]FPGA  pend=0 drop=0 oe=0 fe=26403 byt=26403 isr=26403
+[  463.97] GNSS  pend=0 drop=0 oe=0 fe=0 byt=194737 isr=194737
+[  464.04] USND  pend=0 drop=0 oe=0 fe=9178 byt=9178 isr=9178 val=2283 ok=382 bad=0 trg=473 raw=700
+[  465.06] [M3] t=534981 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=474/0
+[  466.06] [M3] t=535981 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=475/0
+[  467.06] [M3] t=536981 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=476/0
+[  468.05] [M3] t=537981 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=477/0
+[  469.05] [M3] t=538981 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=478/0
+[  470.05] [M3] t=539981 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=479/0
+[  470.22] [M3] t=540981 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=480/0
+[  470.28] [RING]FPGA  pend=0 drop=0 oe=0 fe=26733 byt=26733 isr=26733
+[  470.32] GNSS  pend=0 drop=0 oe=0 fe=0 byt=197036 isr=197036
+[  470.40] USND  pend=0 drop=0 oe=0 fe=9207 byt=9207 isr=9207 val=2290 ok=389 bad=0 trg=480 raw=700
+[  472.05] [M3] t=541981 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=481/0
+[  473.04] [M3] t=542981 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=482/0
+[  474.04] [M3] t=543981 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=483/0
+[  475.04] [M3] t=544981 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=484/0
+[  476.04] [M3] t=545981 US=70cm ok | IMU r=-1 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=485/0
+[  476.20] [M3] t=546981 US=70cm ok | IMU r=-1 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=486/0
+[  476.27] [RING]FPGA  pend=0 drop=0 oe=0 fe=27033 byt=27033 isr=27033
+[  476.30] GNSS  pend=0 drop=0 oe=0 fe=0 byt=199250 isr=199250
+[  476.39] USND  pend=0 drop=0 oe=0 fe=9231 byt=9231 isr=9231 val=2296 ok=395 bad=0 trg=486 raw=700
+[  478.03] [M3] t=547981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=487/0
+[  479.03] [M3] t=548981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=488/0
+[  480.03] [M3] t=549981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=489/0
+[  481.02] [M3] t=550981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=490/0
+[  482.02] [M3] t=551981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=491/0
+[  482.26] [M3] t=552981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=492/0
+[  482.29] [RING]FPGA  pend=0 drop=0 oe=0 fe=27336 byt=27336 isr=27336
+[  482.35] GNSS  pend=0 drop=0 oe=0 fe=0 byt=201464 isr=201464
+[  482.44] USND  pend=0 drop=0 oe=0 fe=9255 byt=9255 isr=9255 val=2302 ok=401 bad=0 trg=492 raw=700
+[  484.02] [M3] t=553981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=493/0
+[  485.01] [M3] t=554981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=494/0
+[  486.01] [M3] t=555981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=495/0
+[  487.01] [M3] t=556981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=496/0
+[  488.01] [M3] t=557981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=497/0
+[  488.38] [M3] t=558981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=498/0
+[  488.41] [RING]FPGA  pend=0 drop=0 oe=0 fe=27643 byt=27643 isr=27643
+[  488.48] GNSS  pend=0 drop=0 oe=0 fe=0 byt=203711 isr=203711
+[  488.56] USND  pend=0 drop=0 oe=0 fe=9279 byt=9279 isr=9279 val=2308 ok=407 bad=0 trg=498 raw=700
+[  490.00] [M3] t=559981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=499/0
+[  491.00] [M3] t=560981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=500/0
+[  492.00] [M3] t=561981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=501/0
+[  493.00] [M3] t=562981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=502/0
+[  493.99] [M3] t=563981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=503/0
+[  494.29] [M3] t=564981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=504/0
+[  494.32] [RING]FPGA  pend=0 drop=0 oe=0 fe=27939 byt=27939 isr=27939
+[  494.39] GNSS  pend=0 drop=0 oe=0 fe=0 byt=205900 isr=205900
+[  494.47] USND  pend=0 drop=0 oe=0 fe=9303 byt=9303 isr=9303 val=2314 ok=413 bad=0 trg=504 raw=700
+[  495.99] [M3] t=565981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=505/0
+[  496.99] [M3] t=566981 US=70cm ok | IMU r=2 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=506/0
+[  497.98] [M3] t=567981 US=70cm ok | IMU r=2 p=-26 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=507/0
+[  498.98] [M3] t=568981 US=70cm ok | IMU r=2 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=508/0
+[  499.98] [M3] t=569981 US=70cm ok | IMU r=2 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=509/0
+[  500.15] [M3] t=570981 US=70cm ok | IMU r=2 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=510/0
+[  500.21] [RING]FPGA  pend=0 drop=0 oe=0 fe=28233 byt=28233 isr=28233
+[  500.25] GNSS  pend=0 drop=0 oe=0 fe=0 byt=208114 isr=208114
+[  500.34] USND  pend=0 drop=0 oe=0 fe=9327 byt=9327 isr=9327 val=2320 ok=419 bad=0 trg=510 raw=700
+[  501.98] [M3] t=571981 US=70cm ok | IMU r=2 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=511/0
+[  502.97] [M3] t=572981 US=70cm ok | IMU r=2 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=512/0
+[  503.97] [M3] t=573981 US=70cm ok | IMU r=5 p=-30 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=513/0
+[  504.97] [M3] t=574981 US=70cm ok | IMU r=5 p=-30 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=514/0
+[  505.97] [M3] t=575981 US=70cm ok | IMU r=5 p=-27 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=515/0
+[  506.13] [M3] t=576981 US=70cm ok | IMU r=5 p=-26 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=516/0
+[  506.20] [RING]FPGA  pend=0 drop=0 oe=0 fe=28533 byt=28533 isr=28533
+[  506.23] GNSS  pend=0 drop=0 oe=0 fe=0 byt=210328 isr=210328
+[  506.32] USND  pend=0 drop=0 oe=0 fe=9351 byt=9351 isr=9351 val=2326 ok=425 bad=0 trg=516 raw=700
+[  507.96] [M3] t=577981 US=70cm ok | IMU r=5 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=517/0
+[  508.96] [M3] t=578981 US=70cm ok | IMU r=5 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=518/0
+[  509.96] [M3] t=579981 US=70cm ok | IMU r=5 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=519/0
+[  510.95] [M3] t=580981 US=70cm ok | IMU r=5 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=520/0
+[  511.95] [M3] t=581981 US=70cm ok | IMU r=5 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=521/0
+[  512.28] [M3] t=582981 US=70cm ok | IMU r=5 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=522/0
+[  512.32] [RING]FPGA  pend=0 drop=0 oe=0 fe=28841 byt=28841 isr=28841
+[  512.38] GNSS  pend=0 drop=0 oe=0 fe=0 byt=212542 isr=212542
+[  512.46] USND  pend=0 drop=0 oe=0 fe=9375 byt=9375 isr=9375 val=2332 ok=431 bad=0 trg=522 raw=700
+[  513.95] [M3] t=583981 US=70cm ok | IMU r=5 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=523/0
+[  514.94] [M3] t=584981 US=70cm ok | IMU r=5 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=524/0
+[  515.94] [M3] t=585981 US=70cm ok | IMU r=5 p=-24 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=525/0
+[  516.94] [M3] t=586981 US=70cm ok | IMU r=5 p=-38 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=526/0
+[  517.94] [M3] t=587981 US=70cm ok | IMU r=5 p=-40 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=527/0
+[  518.90] [M3] t=588981 US=70cm ok | IMU r=5 p=-42 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=528/0
+[  518.93] [RING]FPGA  pend=0 drop=0 oe=0 fe=29173 byt=29173 isr=29173
+[  519.00] GNSS  pend=0 drop=0 oe=0 fe=0 byt=215125 isr=215125
+[  519.10] USND  pend=0 drop=0 oe=0 fe=9409 byt=9409 isr=9409 val=2339 ok=438 bad=0 trg=529 raw=700
+[  520.11] [M3] t=590156 US=70cm ok | IMU r=5 p=-43 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=529/0
+[  521.10] [M3] t=591156 US=70cm ok | IMU r=4 p=-44 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=530/0
+[  522.10] [M3] t=592156 US=70cm ok | IMU r=4 p=-45 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=531/0
+[  523.10] [M3] t=593156 US=70cm ok | IMU r=4 p=-45 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=532/0
+[  524.10] [M3] t=594156 US=70cm ok | IMU r=4 p=-45 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=533/0
+[  524.98] [M3] t=595156 US=70cm ok | IMU r=4 p=-45 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=534/0
+[  525.02] [RING]FPGA  pend=0 drop=0 oe=0 fe=29478 byt=29478 isr=29478
+[  525.08] GNSS  pend=0 drop=0 oe=0 fe=0 byt=217339 isr=217339
+[  525.18] USND  pend=0 drop=0 oe=0 fe=9435 byt=9435 isr=9435 val=2345 ok=444 bad=0 trg=535 raw=700
+[  526.20] [M3] t=596259 US=70cm ok | IMU r=4 p=-46 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=535/0
+[  527.19] [M3] t=597259 US=70cm ok | IMU r=4 p=-38 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=536/0
+[  528.19] [M3] t=598259 US=70cm ok | IMU r=3 p=-32 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=537/0
+[  529.19] [M3] t=599259 US=70cm ok | IMU r=3 p=-28 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=538/0
+[  530.19] [M3] t=600259 US=70cm ok | IMU r=3 p=-25 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=539/0
+[  531.03] [M3] t=601259 US=70cm ok | IMU r=3 p=-21 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=540/0
+[  531.06] [RING]FPGA  pend=0 drop=0 oe=0 fe=29781 byt=29781 isr=29781
+[  531.13] GNSS  pend=0 drop=0 oe=0 fe=0 byt=219553 isr=219553
+[  531.23] USND  pend=0 drop=0 oe=0 fe=9459 byt=9459 isr=9459 val=2351 ok=450 bad=0 trg=541 raw=700
+[  532.24] [M3] t=602320 US=70cm ok | IMU r=3 p=-19 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=541/0
+[  533.24] [M3] t=603320 US=70cm ok | IMU r=3 p=-21 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=542/0
+[  534.24] [M3] t=604320 US=70cm ok | IMU r=3 p=-23 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=543/0
+[  535.24] [M3] t=605320 US=70cm ok | IMU r=3 p=-19 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=544/0
+[  536.23] [M3] t=606320 US=70cm ok | IMU r=3 p=-17 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=545/0
+[  537.05] [M3] t=607320 US=70cm ok | IMU r=-10 p=-13 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=546/0
+[  537.08] [RING]FPGA  pend=0 drop=0 oe=0 fe=30083 byt=30083 isr=30083
+[  537.15] GNSS  pend=0 drop=0 oe=0 fe=0 byt=221767 isr=221767
+[  537.25] USND  pend=0 drop=0 oe=0 fe=9483 byt=9483 isr=9483 val=2357 ok=456 bad=0 trg=547 raw=700
+[  538.26] [M3] t=608350 US=70cm ok | IMU r=-7 p=-10 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=547/0
+[  539.26] [M3] t=609350 US=70cm ok | IMU r=-4 p=-12 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=548/0
+[  540.25] [M3] t=610350 US=70cm ok | IMU r=-2 p=-15 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=549/0
+[  541.25] [M3] t=611350 US=70cm ok | IMU r=0 p=-17 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=550/0
+[  542.25] [M3] t=612350 US=68cm ok | IMU r=1 p=-18 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=551/0
+[  543.18] [M3] t=613350 US=68cm ok | IMU r=2 p=-19 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=552/0
+[  543.21] [RING]FPGA  pend=0 drop=0 oe=0 fe=30390 byt=30390 isr=30390
+[  543.28] GNSS  pend=0 drop=0 oe=0 fe=0 byt=223981 isr=223981
+[  543.37] USND  pend=0 drop=0 oe=0 fe=9507 byt=9507 isr=9507 val=2363 ok=462 bad=0 trg=553 raw=685
+[  544.39] [M3] t=614493 US=68cm ok | IMU r=3 p=-20 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=553/0
+[  545.38] [M3] t=615493 US=68cm ok | IMU r=3 p=-21 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=554/0
+[  546.38] [M3] t=616493 US=68cm ok | IMU r=-2 p=-29 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=555/0
+[  547.38] [M3] t=617493 US=70cm ok | IMU r=-2 p=-17 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=556/0
+[  548.38] [M3] t=618493 US=70cm ok | IMU r=-3 p=-10 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=557/0
+[  549.34] [M3] t=619493 US=70cm ok | IMU r=1 p=-11 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=558/0
+[  549.37] [RING]FPGA  pend=0 drop=0 oe=0 fe=30699 byt=30699 isr=30699
+[  549.43] GNSS  pend=0 drop=0 oe=0 fe=0 byt=226195 isr=226195
+[  549.70] USND  pend=0 drop=0 oe=0 fe=9533 byt=9533 isr=9533 val=2369 ok=468 bad=0 trg=559 raw=700
+[  550.72] [M3] t=620843 US=70cm ok | IMU r=5 p=-12 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=560/0
+[  551.72] [M3] t=621843 US=70cm ok | IMU r=6 p=-13 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=561/0
+[  552.72] [M3] t=622843 US=68cm ok | IMU r=7 p=-13 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=562/0
+[  553.71] [M3] t=623843 US=68cm ok | IMU r=8 p=-13 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=563/0
+[  554.71] [M3] t=624843 US=68cm ok | IMU r=9 p=-13 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=564/0
+[  555.33] [M3] t=625843 US=68cm ok | IMU r=9 p=-14 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=565/0
+[  555.36] [RING]FPGA  pend=0 drop=0 oe=0 fe=30999 byt=30999 isr=30999
+[  555.61] GNSS  pend=0 drop=0 oe=0 fe=0 byt=228409 isr=228409
+[  555.67] USND  pend=0 drop=0 oe=0 fe=9557 byt=9557 isr=9557 val=2375 ok=474 bad=0 trg=565 raw=685
+[  556.71] [M3] t=626843 US=68cm ok | IMU r=9 p=-15 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=566/0
+[  557.71] [M3] t=627843 US=68cm ok | IMU r=9 p=-15 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=567/0
+[  558.70] [M3] t=628843 US=68cm ok | IMU r=10 p=-16 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=568/0
+[  559.70] [M3] t=629843 US=70cm ok | IMU r=10 p=-13 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=569/0
+[  560.70] [M3] t=630843 US=70cm ok | IMU r=-1 p=-12 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=570/0
+[  561.61] [M3] t=631843 US=70cm ok | IMU r=-8 p=-1 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=571/0
+[  561.65] [RING]FPGA  pend=0 drop=0 oe=0 fe=31315 byt=31315 isr=31315
+[  561.71] GNSS  pend=0 drop=0 oe=0 fe=0 byt=230881 isr=230881
+[  561.81] USND  pend=0 drop=0 oe=0 fe=9585 byt=9585 isr=9585 val=2382 ok=481 bad=0 trg=572 raw=685
+[  562.83] [M3] t=632975 US=70cm ok | IMU r=-4 p=-3 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=572/0
+[  563.82] [M3] t=633975 US=68cm ok | IMU r=0 p=-5 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=573/0
+[  564.82] [M3] t=634975 US=68cm ok | IMU r=2 p=-6 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=574/0
+[  565.82] [M3] t=635975 US=70cm ok | IMU r=4 p=-7 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=575/0
+[  566.82] [M3] t=636975 US=70cm ok | IMU r=6 p=-8 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=576/0
+[  567.32] [M3] t=637975 US=70cm ok | IMU r=7 p=-8 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=577/0
+[  567.36] [RING]FPGA  pend=0 drop=0 oe=0 fe=31601 byt=31601 isr=31601
+[  567.58] GNSS  pend=0 drop=0 oe=0 fe=0 byt=233009 isr=233009
+[  567.67] USND  pend=0 drop=0 oe=0 fe=9605 byt=9605 isr=9605 val=2387 ok=486 bad=0 trg=577 raw=700
+[  568.81] [M3] t=638975 US=70cm ok | IMU r=8 p=-8 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=578/0
+[  569.81] [M3] t=639975 US=70cm ok | IMU r=8 p=-8 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=579/0
+[  570.81] [M3] t=640975 US=70cm ok | IMU r=8 p=-8 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=580/0
+[  571.81] [M3] t=641975 US=70cm ok | IMU r=8 p=-8 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=581/0
+[  572.80] [M3] t=642975 US=68cm ok | IMU r=8 p=-8 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=582/0
+[  573.30] [M3] t=643975 US=68cm ok | IMU r=8 p=-9 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=583/0
+[  573.33] [RING]FPGA  pend=0 drop=0 oe=0 fe=31901 byt=31901 isr=31901
+[  573.59] GNSS  pend=0 drop=0 oe=0 fe=0 byt=235555 isr=235555
+[  573.66] USND  pend=0 drop=0 oe=0 fe=9629 byt=9629 isr=9629 val=2393 ok=492 bad=0 trg=583 raw=700
+[  574.80] [M3] t=644975 US=68cm ok | IMU r=8 p=-9 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=584/0
+[  575.80] [M3] t=645975 US=70cm ok | IMU r=8 p=-10 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=585/0
+[  576.79] [M3] t=646975 US=70cm ok | IMU r=8 p=-10 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=586/0
+[  577.79] [M3] t=647975 US=70cm ok | IMU r=8 p=-10 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=587/0
+[  578.79] [M3] t=648975 US=70cm ok | IMU r=8 p=-10 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=588/0
+[  579.68] [M3] t=649975 US=70cm ok | IMU r=8 p=-10 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=589/0
+[  579.71] [RING]FPGA  pend=0 drop=0 oe=0 fe=32220 byt=32220 isr=32220
+[  579.77] GNSS  pend=0 drop=0 oe=0 fe=0 byt=238438 isr=238438
+[  579.87] USND  pend=0 drop=0 oe=0 fe=9657 byt=9657 isr=9657 val=2400 ok=499 bad=0 trg=590 raw=700
+[  580.89] [M3] t=651077 US=70cm ok | IMU r=9 p=-9 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=590/0
+[  581.88] [M3] t=652077 US=70cm ok | IMU r=12 p=-9 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=591/0
+[  582.88] [M3] t=653077 US=70cm ok | IMU r=14 p=16 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=592/0
+[  583.88] [M3] t=654077 US=70cm ok | IMU r=12 p=2 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=593/0
+[  584.88] [M3] t=655077 US=70cm ok | IMU r=11 p=-2 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=594/0
+[  585.72] [M3] t=656077 US=70cm ok | IMU r=11 p=-5 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=595/0
+[  585.76] [RING]FPGA  pend=0 drop=0 oe=0 fe=32524 byt=32524 isr=32524
+[  585.82] GNSS  pend=0 drop=0 oe=0 fe=0 byt=241436 isr=241436
+[  585.92] USND  pend=0 drop=0 oe=0 fe=9681 byt=9681 isr=9681 val=2406 ok=505 bad=0 trg=596 raw=700
+[  586.94] [M3] t=657140 US=70cm ok | IMU r=11 p=-7 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=596/0
+[  587.93] [M3] t=658140 US=70cm ok | IMU r=11 p=-8 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=597/0
+[  588.93] [M3] t=659140 US=70cm ok | IMU r=11 p=-9 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=598/0
+[  589.93] [M3] t=660140 US=70cm ok | IMU r=11 p=-10 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=599/0
+[  590.93] [M3] t=661140 US=70cm ok | IMU r=11 p=-11 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=600/0
+[  591.65] [M3] t=662140 US=70cm ok | IMU r=11 p=-11 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=601/0
+[  591.68] [RING]FPGA  pend=0 drop=0 oe=0 fe=32821 byt=32821 isr=32821
+[  591.75] GNSS  pend=1 drop=0 oe=0 fe=0 byt=243908 isr=243908
+[  591.83] USND  pend=0 drop=0 oe=0 fe=9705 byt=9705 isr=9705 val=2412 ok=511 bad=0 trg=602 raw=700
+[  592.92] [M3] t=663140 US=70cm ok | IMU r=11 p=-11 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=602/0
+[  593.92] [M3] t=664140 US=70cm ok | IMU r=11 p=-12 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=603/0
+[  594.92] [M3] t=665140 US=70cm ok | IMU r=11 p=-12 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=604/0
+[  595.91] [M3] t=666140 US=70cm ok | IMU r=11 p=-12 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=605/0
+[  596.91] [M3] t=667140 US=70cm ok | IMU r=11 p=-12 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=606/0
+[  597.72] [M3] t=668140 US=70cm ok | IMU r=11 p=-12 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=607/0
+[  597.76] [RING]FPGA  pend=0 drop=0 oe=0 fe=33125 byt=33125 isr=33125
+[  597.82] GNSS  pend=1 drop=0 oe=0 fe=0 byt=247371 isr=247371
+[  597.92] USND  pend=0 drop=0 oe=0 fe=9729 byt=9729 isr=9729 val=2418 ok=517 bad=0 trg=608 raw=700
+[  598.93] [M3] t=669166 US=70cm ok | IMU r=11 p=-12 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=608/0
+[  599.93] [M3] t=670166 US=70cm ok | IMU r=11 p=-13 v=1 | GNSS q0 f1 s0 hd99.99 la0 lo0 v0 yw=- sp=0 | BB n0 v0 crc0 en1 | LORA d1 ver=0x00000012 | ovr114 late_max=543 tx=609/0
+# ====================================================================
+# Kết thúc: 2026-11-02 12:42:28

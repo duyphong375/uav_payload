@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 import {
   BookmarkPlus,
   CheckCircle2,
@@ -38,7 +38,7 @@ export const TargetDetailsPanel: React.FC<{ className?: string }> = ({ className
         return 'Người gặp nạn (Person)'
       case 'boat':
       case 'lifebuoy':
-        return 'Tàu thuyền (Boat / Vessel)'
+        return 'Phao cứu sinh (Lifebuoy)'
       default:
         return 'Chưa phân loại'
     }
@@ -114,7 +114,7 @@ export const TargetDetailsPanel: React.FC<{ className?: string }> = ({ className
   return (
     <Panel
       title="Mục tiêu cứu nạn (Target)"
-      infoTip="Chi tiết mục tiêu Người gặp nạn hoặc Tàu thuyền phát hiện bởi AI: độ tin cậy, cự ly, góc lệch, tọa độ WGS-84/Local và nút sao chép bàn giao cứu nạn (SAR Handover)."
+      infoTip="Chi tiết mục tiêu Người gặp nạn hoặc Phao cứu sinh phát hiện bởi AI: độ tin cậy, cự ly, góc lệch, tọa độ WGS-84/Local và nút sao chép bàn giao cứu nạn (SAR Handover)."
       icon={<Crosshair className="h-4 w-4 text-[var(--kvc-accent-ink)]" />}
       className={`h-auto shrink-0 shadow-xs border-border ${className}`}
       headerRight={

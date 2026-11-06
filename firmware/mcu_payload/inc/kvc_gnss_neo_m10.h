@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file kvc_gnss_neo_m10.h
  * @brief Driver định vị vệ tinh u-blox M10 (bo breakout chip UBX-M10050) qua UART3 trên MCU Sonix SN34F788.
  *
@@ -37,8 +37,6 @@
  * Nguồn tiêu chí: docs/interfaces/IF_MCU_SENSORS.md §3.3 (Fix Status >= 1,
  * sats >= 5, HDOP <= 2.5) và docs/interfaces/IF_MCU_LORA_RF.md byte 24 bit 0.
  * Các hằng số dưới đây là nguồn duy nhất; không hard-code lại trong code khác.
- *
- * Người phụ trách phân hệ MCU UAV: Nguyễn Tá Duy Phong
  */
 
 #ifndef KVC_GNSS_NEO_M10_H

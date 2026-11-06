@@ -5,7 +5,7 @@ import { MissionProvider } from '@/state/MissionProvider'
 import { ModeContextBar } from './ModeContextBar'
 
 describe('ModeContextBar - Thanh điều khiển ngữ cảnh MOCK/REAL', () => {
-  it('hiển thị Chế độ Mô phỏng và danh sách kịch bản khi ở MOCK', () => {
+  it('hiển thị danh sách kịch bản khi ở MOCK', () => {
     render(
       <TooltipProvider>
         <MissionProvider>
@@ -14,9 +14,10 @@ describe('ModeContextBar - Thanh điều khiển ngữ cảnh MOCK/REAL', () => 
       </TooltipProvider>
     )
 
-    expect(screen.getByText(/Chế độ Mô phỏng/i)).toBeDefined()
     expect(screen.getByLabelText(/Chọn kịch bản mô phỏng/i)).toBeDefined()
     expect(screen.getByText('Khởi động lại')).toBeDefined()
+    // Trạng thái nguồn do AppHeader đảm nhiệm, không lặp ở thanh này
+    expect(screen.queryByText(/Chế độ Mô phỏng/i)).toBeNull()
   })
 
   it('cho phép thay đổi kịch bản mô phỏng qua dropdown', () => {

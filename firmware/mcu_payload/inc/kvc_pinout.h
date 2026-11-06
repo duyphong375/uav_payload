@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file kvc_pinout.h
  * @brief Định nghĩa cấu hình chân phần cứng toàn hệ thống KVC cho MCU Sonix SN34F788.
  * 
@@ -8,8 +8,6 @@
  * - docs/interfaces/IF_MCU_SENSORS.md
  * - docs/interfaces/IF_MCU_LORA_RF.md (IF-02)
  * - docs/hardware/mcu/CHIP_SONIX_SN34F788_MCU.md
- *
- * Người phụ trách: Nguyễn Tá Duy Phong
  */
 
 #ifndef KVC_PINOUT_H

@@ -1,0 +1,508 @@
+# Baseline ÂM — đường blob, KHÔNG có mục tiêu trước ống kính
+#
+# Task        : KVC-FPGA-G6-001 (B2) — nhánh "nền không mục tiêu"
+# Ngày đo     : 02/11/2026, khoảng 01:42 (+07). Giờ lấy từ mốc phiên chat
+#               (2026-11-01T18:42:31Z); nếu người đo có giờ chính xác hơn thì
+#               sửa dòng này, KHÔNG sửa số liệu bên dưới.
+# Người đo    : HUMAN (thao tác trên bo); Kilo ghi nhận nguyên văn output
+# Mức bằng chứng: HARDWARE-VERIFIED cho "link IF-01 + camera phát frame"
+#                 KHÔNG phải HARDWARE-VERIFIED cho A8 (nhịp khung)
+#
+# Kit         : Gowin GW2A-18C trên OneKiwi Primer 20K
+# Camera      : OV2640, XCLK 24 MHz từ J1-12/B13
+# Bitstream   : 86CCF5DD… (RELEASE, BBOX_SOURCE=1, DIAG_MODE=0) — SRAM Program
+# Cổng        : COM8, USB-UART CH340, 38400 8N1
+# Dây         : R13 (J2 pin 11) → RX; GND chung
+# MCU Sonix   : KHÔNG nối
+# Script      : scripts/manual/fpga_uart_capture.py
+#               BẢN TRƯỚC khi sửa block-read (xem ghi chú 1 bên dưới)
+#
+# ─── GHI CHÚ 1: --seconds 15 KHÔNG có hiệu lực ────────────────────────────
+# Vòng lặp cũ gọi ser.read(4096); lệnh này block cho tới khi đủ 4096 byte.
+# Ở 75 B/s (409 khung × 10 B trong ~54,5 s) một lần đọc mất 54,6 s, nên cửa sổ
+# thực tế là 54,53 s chứ không phải 15 s. ĐÃ SỬA trong cùng ngày: chuyển sang
+# đọc theo ser.in_waiting + timeout=0.05, đồng thời in "Thoi gian doc thuc" và
+# "FPS theo wall-clock" cạnh FPS theo timestamp.
+#
+# ─── GHI CHÚ 2: lần đo này KHÔNG có --dump ────────────────────────────────
+# Chỉ còn output console. Muốn có file thô để phân tích lại thì chạy lại với
+# --dump G6.1_blob_baseline_neg_<YYYYMMDD-HHMM>.bin
+#
+# ─── GHI CHÚ 3: 6 byte dư ở cuối KHÔNG phải byte rác ──────────────────────
+# Khung #409 kết thúc tại offset 4090; 6 byte còn lại là phần đầu của khung
+# #410 bị cắt khi đóng cổng COM. Parser gọi chúng là "byte rac bo qua" theo
+# cách đếm byte ngoài khung, không phải lỗi đường truyền.
+#
+# ─── GHI CHÚ 4: log dán thiếu 4 dòng ──────────────────────────────────────
+# Danh sách dưới đây nhảy từ #404 (off=4030) sang #409 (off=4080). Bốn khung
+# #405–#408 (off 4040–4070) có tồn tại — tổng 409 khung và 4090 byte chỉ khớp
+# khi đủ 409 khung N=0 × 10 byte. Phần bị thiếu là do lúc dán log, không phải
+# parser bỏ khung. Nếu cần bản đầy đủ thì capture lại kèm --dump.
+
+[*] Mo COM8 @ 38400 8N1, doc 15.0s ...
+[*] Nhan 4096 byte
+  #    1 off=       0 N= 0 ts=   1936567 crc=09C6 
+  #    2 off=      10 N= 0 ts=   1936701 crc=8B65 
+  #    3 off=      20 N= 0 ts=   1936834 crc=C0C6 
+  #    4 off=      30 N= 0 ts=   1936968 crc=2C05 
+  #    5 off=      40 N= 0 ts=   1937102 crc=D6A4 
+  #    6 off=      50 N= 0 ts=   1937235 crc=1E8D 
+  #    7 off=      60 N= 0 ts=   1937369 crc=AB1E 
+  #    8 off=      70 N= 0 ts=   1937503 crc=3EED 
+  #    9 off=      80 N= 0 ts=   1937636 crc=D123 
+  #   10 off=      90 N= 0 ts=   1937770 crc=9971 
+  #   11 off=     100 N= 0 ts=   1937904 crc=3745 
+  #   12 off=     110 N= 0 ts=   1938037 crc=0F68 
+  #   13 off=     120 N= 0 ts=   1938171 crc=700A 
+  #   14 off=     130 N= 0 ts=   1938304 crc=1B50 
+  #   15 off=     140 N= 0 ts=   1938438 crc=6461 
+  #   16 off=     150 N= 0 ts=   1938572 crc=D1F2 
+  #   17 off=     160 N= 0 ts=   1938705 crc=19DB 
+  #   18 off=     170 N= 0 ts=   1938839 crc=E37A 
+  #   19 off=     180 N= 0 ts=   1938973 crc=0FB9 
+  #   20 off=     190 N= 0 ts=   1939106 crc=2A86 
+  #   21 off=     200 N= 0 ts=   1939240 crc=A825 
+  #   22 off=     210 N= 0 ts=   1939374 crc=5284 
+  #   23 off=     220 N= 0 ts=   1939507 crc=81AC 
+  #   24 off=     230 N= 0 ts=   1939641 crc=343F 
+  #   25 off=     240 N= 0 ts=   1939775 crc=F9AE 
+  #   26 off=     250 N= 0 ts=   1939908 crc=78FC 
+  #   27 off=     260 N= 0 ts=   1940042 crc=5ECE 
+  #   28 off=     270 N= 0 ts=   1940176 crc=F0FA 
+  #   29 off=     280 N= 0 ts=   1940309 crc=A6B7 
+  #   30 off=     290 N= 0 ts=   1940443 crc=D9D5 
+  #   31 off=     300 N= 0 ts=   1940577 crc=C53F 
+  #   32 off=     310 N= 0 ts=   1940710 crc=492A 
+  #   33 off=     320 N= 0 ts=   1940844 crc=CB89 
+  #   34 off=     330 N= 0 ts=   1940978 crc=AF4C 
+  #   35 off=     340 N= 0 ts=   1941111 crc=9761 
+  #   36 off=     350 N= 0 ts=   1941245 crc=22F2 
+  #   37 off=     360 N= 0 ts=   1941379 crc=F5ED 
+  #   38 off=     370 N= 0 ts=   1941512 crc=DF5E 
+  #   39 off=     380 N= 0 ts=   1941646 crc=25FF 
+  #   40 off=     390 N= 0 ts=   1941780 crc=BCFB 
+  #   41 off=     400 N= 0 ts=   1941913 crc=5845 
+  #   42 off=     410 N= 0 ts=   1942047 crc=FBB4 
+  #   43 off=     420 N= 0 ts=   1942181 crc=62CE 
+  #   44 off=     430 N= 0 ts=   1942314 crc=5C28 
+  #   45 off=     440 N= 0 ts=   1942448 crc=F21C 
+  #   46 off=     450 N= 0 ts=   1942582 crc=8D2D 
+  #   47 off=     460 N= 0 ts=   1942715 crc=6993 
+  #   48 off=     470 N= 0 ts=   1942849 crc=A945 
+  #   49 off=     480 N= 0 ts=   1942983 crc=53E4 
+  #   50 off=     490 N= 0 ts=   1943116 crc=C993 
+  #   51 off=     500 N= 0 ts=   1943250 crc=AD56 
+  #   52 off=     510 N= 0 ts=   1943384 crc=2FF5 
+  #   53 off=     520 N= 0 ts=   1943517 crc=4E88 
+  #   54 off=     530 N= 0 ts=   1943651 crc=3132 
+  #   55 off=     540 N= 0 ts=   1943785 crc=84A1 
+  #   56 off=     550 N= 0 ts=   1943918 crc=3F84 
+  #   57 off=     560 N= 0 ts=   1944052 crc=91B0 
+  #   58 off=     570 N= 0 ts=   1944186 crc=B782 
+  #   59 off=     580 N= 0 ts=   1944319 crc=D6FF 
+  #   60 off=     590 N= 0 ts=   1944453 crc=CB11 
+  #   61 off=     600 N= 0 ts=   1944587 crc=31E3 
+  #   62 off=     610 N= 0 ts=   1944720 crc=E963 
+  #   63 off=     620 N= 0 ts=   1944854 crc=24F2 
+  #   64 off=     630 N= 0 ts=   1944987 crc=C04C 
+  #   65 off=     640 N= 0 ts=   1945121 crc=0066 
+  #   66 off=     650 N= 0 ts=   1945255 crc=FAC7 
+  #   67 off=     660 N= 0 ts=   1945388 crc=0ED0 
+  #   68 off=     670 N= 0 ts=   1945522 crc=6A15 
+  #   69 off=     680 N= 0 ts=   1945656 crc=B0D4 
+  #   70 off=     690 N= 0 ts=   1945789 crc=D1A9 
+  #   71 off=     700 N= 0 ts=   1945923 crc=DB8E 
+  #   72 off=     710 N= 0 ts=   1946057 crc=6E1D 
+  #   73 off=     720 N= 0 ts=   1946190 crc=BB58 
+  #   74 off=     730 N= 0 ts=   1946324 crc=156C 
+  #   75 off=     740 N= 0 ts=   1946458 crc=5D3E 
+  #   76 off=     750 N= 0 ts=   1946591 crc=3C43 
+  #   77 off=     760 N= 0 ts=   1946725 crc=20A9 
+  #   78 off=     770 N= 0 ts=   1946859 crc=5FCB 
+  #   79 off=     780 N= 0 ts=   1946992 crc=B07B 
+  #   80 off=     790 N= 0 ts=   1947126 crc=4ADA 
+  #   81 off=     800 N= 0 ts=   1947260 crc=A619 
+  #   82 off=     810 N= 0 ts=   1947393 crc=EADA 
+  #   83 off=     820 N= 0 ts=   1947527 crc=107B 
+  #   84 off=     830 N= 0 ts=   1947661 crc=89D9 
+  #   85 off=     840 N= 0 ts=   1947794 crc=9BA8 
+  #   86 off=     850 N= 0 ts=   1947928 crc=190B 
+  #   87 off=     860 N= 0 ts=   1948062 crc=E3AA 
+  #   88 off=     870 N= 0 ts=   1948195 crc=72AD 
+  #   89 off=     880 N= 0 ts=   1948329 crc=C73E 
+  #   90 off=     890 N= 0 ts=   1948463 crc=0AAF 
+  #   91 off=     900 N= 0 ts=   1948596 crc=D22F 
+  #   92 off=     910 N= 0 ts=   1948730 crc=28DD 
+  #   93 off=     920 N= 0 ts=   1948864 crc=DF3B 
+  #   94 off=     930 N= 0 ts=   1948997 crc=8976 
+  #   95 off=     940 N= 0 ts=   1949131 crc=F614 
+  #   96 off=     950 N= 0 ts=   1949265 crc=0170 
+  #   97 off=     960 N= 0 ts=   1949398 crc=8D65 
+  #   98 off=     970 N= 0 ts=   1949532 crc=0FC6 
+  #   99 off=     980 N= 0 ts=   1949666 crc=5C4D 
+  #  100 off=     990 N= 0 ts=   1949799 crc=C909 
+  #  101 off=    1000 N= 0 ts=   1949933 crc=7C9A 
+  #  102 off=    1010 N= 0 ts=   1950067 crc=2F6F 
+  #  103 off=    1020 N= 0 ts=   1950200 crc=EC48 
+  #  104 off=    1030 N= 0 ts=   1950334 crc=4FB9 
+  #  105 off=    1040 N= 0 ts=   1950468 crc=5257 
+  #  106 off=    1050 N= 0 ts=   1950601 crc=B6E9 
+  #  107 off=    1060 N= 0 ts=   1950735 crc=C9D8 
+  #  108 off=    1070 N= 0 ts=   1950869 crc=67EC 
+  #  109 off=    1080 N= 0 ts=   1951002 crc=590A 
+  #  110 off=    1090 N= 0 ts=   1951136 crc=C070 
+  #  111 off=    1100 N= 0 ts=   1951269 crc=F85D 
+  #  112 off=    1110 N= 0 ts=   1951403 crc=873F 
+  #  113 off=    1120 N= 0 ts=   1951537 crc=1E3B 
+  #  114 off=    1130 N= 0 ts=   1951670 crc=922E 
+  #  115 off=    1140 N= 0 ts=   1951804 crc=0B8C 
+  #  116 off=    1150 N= 0 ts=   1951938 crc=369B 
+  #  117 off=    1160 N= 0 ts=   1952071 crc=60D6 
+  #  118 off=    1170 N= 0 ts=   1952205 crc=D545 
+  #  119 off=    1180 N= 0 ts=   1952339 crc=E8D0 
+  #  120 off=    1190 N= 0 ts=   1952472 crc=2BF7 
+  #  121 off=    1200 N= 0 ts=   1952606 crc=E666 
+  #  122 off=    1210 N= 0 ts=   1952740 crc=7F1C 
+  #  123 off=    1220 N= 0 ts=   1952873 crc=1E32 
+  #  124 off=    1230 N= 0 ts=   1953007 crc=E493 
+  #  125 off=    1240 N= 0 ts=   1953141 crc=7D97 
+  #  126 off=    1250 N= 0 ts=   1953274 crc=7441 
+  #  127 off=    1260 N= 0 ts=   1953408 crc=07CF 
+  #  128 off=    1270 N= 0 ts=   1953542 crc=CA5E 
+  #  129 off=    1280 N= 0 ts=   1953675 crc=2EE0 
+  #  130 off=    1290 N= 0 ts=   1953809 crc=EF86 
+  #  131 off=    1300 N= 0 ts=   1953943 crc=1527 
+  #  132 off=    1310 N= 0 ts=   1954076 crc=E130 
+  #  133 off=    1320 N= 0 ts=   1954210 crc=B2BB 
+  #  134 off=    1330 N= 0 ts=   1954344 crc=5E78 
+  #  135 off=    1340 N= 0 ts=   1954477 crc=3F05 
+  #  136 off=    1350 N= 0 ts=   1954611 crc=6CF0 
+  #  137 off=    1360 N= 0 ts=   1954745 crc=D963 
+  #  138 off=    1370 N= 0 ts=   1954878 crc=D0E6 
+  #  139 off=    1380 N= 0 ts=   1955012 crc=2700 
+  #  140 off=    1390 N= 0 ts=   1955146 crc=6F52 
+  #  141 off=    1400 N= 0 ts=   1955279 crc=0E2F 
+  #  142 off=    1410 N= 0 ts=   1955413 crc=F94B 
+  #  143 off=    1420 N= 0 ts=   1955547 crc=8629 
+  #  144 off=    1430 N= 0 ts=   1955680 crc=5ED7 
+  #  145 off=    1440 N= 0 ts=   1955814 crc=A476 
+  #  146 off=    1450 N= 0 ts=   1955948 crc=3DD4 
+  #  147 off=    1460 N= 0 ts=   1956081 crc=C2CD 
+  #  148 off=    1470 N= 0 ts=   1956215 crc=0F5C 
+  #  149 off=    1480 N= 0 ts=   1956349 crc=BACF 
+  #  150 off=    1490 N= 0 ts=   1956482 crc=7504 
+  #  151 off=    1500 N= 0 ts=   1956616 crc=F7A7 
+  #  152 off=    1510 N= 0 ts=   1956750 crc=0D06 
+  #  153 off=    1520 N= 0 ts=   1956883 crc=778F 
+  #  154 off=    1530 N= 0 ts=   1957017 crc=C21C 
+  #  155 off=    1540 N= 0 ts=   1957151 crc=0F8D 
+  #  156 off=    1550 N= 0 ts=   1957284 crc=E043 
+  #  157 off=    1560 N= 0 ts=   1957418 crc=C671 
+  #  158 off=    1570 N= 0 ts=   1957551 crc=A70C 
+  #  159 off=    1580 N= 0 ts=   1957685 crc=3E08 
+  #  160 off=    1590 N= 0 ts=   1957819 crc=416A 
+  #  161 off=    1600 N= 0 ts=   1957952 crc=29AC 
+  #  162 off=    1610 N= 0 ts=   1958086 crc=D30D 
+  #  163 off=    1620 N= 0 ts=   1958220 crc=51AE 
+  #  164 off=    1630 N= 0 ts=   1958353 crc=AEB7 
+  #  165 off=    1640 N= 0 ts=   1958487 crc=0D46 
+  #  166 off=    1650 N= 0 ts=   1958621 crc=B8D5 
+  #  167 off=    1660 N= 0 ts=   1958754 crc=AADA 
+  #  168 off=    1670 N= 0 ts=   1958888 crc=1F49 
+  #  169 off=    1680 N= 0 ts=   1959022 crc=6078 
+  #  170 off=    1690 N= 0 ts=   1959155 crc=9F61 
+  #  171 off=    1700 N= 0 ts=   1959289 crc=1DC2 
+  #  172 off=    1710 N= 0 ts=   1959423 crc=E763 
+  #  173 off=    1720 N= 0 ts=   1959556 crc=E259 
+  #  174 off=    1730 N= 0 ts=   1959690 crc=AA0B 
+  #  175 off=    1740 N= 0 ts=   1959824 crc=043F 
+  #  176 off=    1750 N= 0 ts=   1959957 crc=4973 
+  #  177 off=    1760 N= 0 ts=   1960091 crc=3611 
+  #  178 off=    1770 N= 0 ts=   1960225 crc=985B 
+  #  179 off=    1780 N= 0 ts=   1960358 crc=144E 
+  #  180 off=    1790 N= 0 ts=   1960492 crc=F88D 
+  #  181 off=    1800 N= 0 ts=   1960626 crc=9C48 
+  #  182 off=    1810 N= 0 ts=   1960759 crc=CA05 
+  #  183 off=    1820 N= 0 ts=   1960893 crc=7F96 
+  #  184 off=    1830 N= 0 ts=   1961027 crc=C711 
+  #  185 off=    1840 N= 0 ts=   1961160 crc=0436 
+  #  186 off=    1850 N= 0 ts=   1961294 crc=C9A7 
+  #  187 off=    1860 N= 0 ts=   1961428 crc=6793 
+  #  188 off=    1870 N= 0 ts=   1961561 crc=DA7D 
+  #  189 off=    1880 N= 0 ts=   1961695 crc=20DC 
+  #  190 off=    1890 N= 0 ts=   1961829 crc=8E96 
+  #  191 off=    1900 N= 0 ts=   1961962 crc=8740 
+  #  192 off=    1910 N= 0 ts=   1962096 crc=4626 
+  #  193 off=    1920 N= 0 ts=   1962230 crc=BC87 
+  #  194 off=    1930 N= 0 ts=   1962363 crc=6F09 
+  #  195 off=    1940 N= 0 ts=   1962497 crc=1C87 
+  #  196 off=    1950 N= 0 ts=   1962631 crc=E626 
+  #  197 off=    1960 N= 0 ts=   1962764 crc=1231 
+  #  198 off=    1970 N= 0 ts=   1962898 crc=76F4 
+  #  199 off=    1980 N= 0 ts=   1963032 crc=46F7 
+  #  200 off=    1990 N= 0 ts=   1963165 crc=278A 
+  #  201 off=    2000 N= 0 ts=   1963299 crc=4331 
+  #  202 off=    2010 N= 0 ts=   1963433 crc=F6A2 
+  #  203 off=    2020 N= 0 ts=   1963566 crc=23E7 
+  #  204 off=    2030 N= 0 ts=   1963700 crc=8DD3 
+  #  205 off=    2040 N= 0 ts=   1963833 crc=5E5D 
+  #  206 off=    2050 N= 0 ts=   1963967 crc=A4FC 
+  #  207 off=    2060 N= 0 ts=   1964101 crc=7F2B 
+  #  208 off=    2070 N= 0 ts=   1964234 crc=76FD 
+  #  209 off=    2080 N= 0 ts=   1964368 crc=EFF9 
+  #  210 off=    2090 N= 0 ts=   1964502 crc=1558 
+  #  211 off=    2100 N= 0 ts=   1964635 crc=A8B6 
+  #  212 off=    2110 N= 0 ts=   1964769 crc=31CC 
+  #  213 off=    2120 N= 0 ts=   1964903 crc=FC5D 
+  #  214 off=    2130 N= 0 ts=   1965036 crc=3F7A 
+  #  215 off=    2140 N= 0 ts=   1965170 crc=DE2F 
+  #  216 off=    2150 N= 0 ts=   1965304 crc=6BBC 
+  #  217 off=    2160 N= 0 ts=   1965437 crc=3DF1 
+  #  218 off=    2170 N= 0 ts=   1965571 crc=848E 
+  #  219 off=    2180 N= 0 ts=   1965705 crc=311D 
+  #  220 off=    2190 N= 0 ts=   1965838 crc=8A38 
+  #  221 off=    2200 N= 0 ts=   1965972 crc=240C 
+  #  222 off=    2210 N= 0 ts=   1966106 crc=C15E 
+  #  223 off=    2220 N= 0 ts=   1966239 crc=A023 
+  #  224 off=    2230 N= 0 ts=   1966373 crc=0E69 
+  #  225 off=    2240 N= 0 ts=   1966507 crc=710B 
+  #  226 off=    2250 N= 0 ts=   1966640 crc=F0DB 
+  #  227 off=    2260 N= 0 ts=   1966774 crc=0A7A 
+  #  228 off=    2270 N= 0 ts=   1966908 crc=88D9 
+  #  229 off=    2280 N= 0 ts=   1967041 crc=2E12 
+  #  230 off=    2290 N= 0 ts=   1967175 crc=5123 
+  #  231 off=    2300 N= 0 ts=   1967309 crc=E4B0 
+  #  232 off=    2310 N= 0 ts=   1967442 crc=C1F1 
+  #  233 off=    2320 N= 0 ts=   1967576 crc=7462 
+  #  234 off=    2330 N= 0 ts=   1967710 crc=D793 
+  #  235 off=    2340 N= 0 ts=   1967843 crc=1FC4 
+  #  236 off=    2350 N= 0 ts=   1967977 crc=9D67 
+  #  237 off=    2360 N= 0 ts=   1968111 crc=67C6 
+  #  238 off=    2370 N= 0 ts=   1968244 crc=9377 
+  #  239 off=    2380 N= 0 ts=   1968378 crc=EC15 
+  #  240 off=    2390 N= 0 ts=   1968512 crc=F1FB 
+  #  241 off=    2400 N= 0 ts=   1968645 crc=C9D6 
+  #  242 off=    2410 N= 0 ts=   1968779 crc=B6B4 
+  #  243 off=    2420 N= 0 ts=   1968913 crc=2FB0 
+  #  244 off=    2430 N= 0 ts=   1969046 crc=A3A5 
+  #  245 off=    2440 N= 0 ts=   1969180 crc=93A6 
+  #  246 off=    2450 N= 0 ts=   1969314 crc=C02D 
+  #  247 off=    2460 N= 0 ts=   1969447 crc=9660 
+  #  248 off=    2470 N= 0 ts=   1969581 crc=23F3 
+  #  249 off=    2480 N= 0 ts=   1969715 crc=1E66 
+  #  250 off=    2490 N= 0 ts=   1969848 crc=DD41 
+  #  251 off=    2500 N= 0 ts=   1969982 crc=10D0 
+  #  252 off=    2510 N= 0 ts=   1970115 crc=B61B 
+  #  253 off=    2520 N= 0 ts=   1970249 crc=6CDA 
+  #  254 off=    2530 N= 0 ts=   1970383 crc=967B 
+  #  255 off=    2540 N= 0 ts=   1970516 crc=79CB 
+  #  256 off=    2550 N= 0 ts=   1970650 crc=06A9 
+  #  257 off=    2560 N= 0 ts=   1970784 crc=C683 
+  #  258 off=    2570 N= 0 ts=   1970917 crc=A7FE 
+  #  259 off=    2580 N= 0 ts=   1971051 crc=EFAC 
+  #  260 off=    2590 N= 0 ts=   1971185 crc=4198 
+  #  261 off=    2600 N= 0 ts=   1971318 crc=481D 
+  #  262 off=    2610 N= 0 ts=   1971452 crc=FD8E 
+  #  263 off=    2620 N= 0 ts=   1971586 crc=2A91 
+  #  264 off=    2630 N= 0 ts=   1971719 crc=12BC 
+  #  265 off=    2640 N= 0 ts=   1971853 crc=A72F 
+  #  266 off=    2650 N= 0 ts=   1971987 crc=F4DA 
+  #  267 off=    2660 N= 0 ts=   1972120 crc=37FD 
+  #  268 off=    2670 N= 0 ts=   1972254 crc=E16D 
+  #  269 off=    2680 N= 0 ts=   1972388 crc=7817 
+  #  270 off=    2690 N= 0 ts=   1972521 crc=AB99 
+  #  271 off=    2700 N= 0 ts=   1972655 crc=5138 
+  #  272 off=    2710 N= 0 ts=   1972789 crc=A65C 
+  #  273 off=    2720 N= 0 ts=   1972922 crc=AF8A 
+  #  274 off=    2730 N= 0 ts=   1973056 crc=6F5C 
+  #  275 off=    2740 N= 0 ts=   1973190 crc=95FD 
+  #  276 off=    2750 N= 0 ts=   1973323 crc=F4D3 
+  #  277 off=    2760 N= 0 ts=   1973457 crc=5AE7 
+  #  278 off=    2770 N= 0 ts=   1973591 crc=9776 
+  #  279 off=    2780 N= 0 ts=   1973724 crc=5451 
+  #  280 off=    2790 N= 0 ts=   1973858 crc=5E8A 
+  #  281 off=    2800 N= 0 ts=   1973992 crc=EB19 
+  #  282 off=    2810 N= 0 ts=   1974125 crc=BD54 
+  #  283 off=    2820 N= 0 ts=   1974259 crc=D991 
+  #  284 off=    2830 N= 0 ts=   1974393 crc=8596 
+  #  285 off=    2840 N= 0 ts=   1974526 crc=0983 
+  #  286 off=    2850 N= 0 ts=   1974660 crc=146D 
+  #  287 off=    2860 N= 0 ts=   1974794 crc=325F 
+  #  288 off=    2870 N= 0 ts=   1974927 crc=5322 
+  #  289 off=    2880 N= 0 ts=   1975061 crc=CA26 
+  #  290 off=    2890 N= 0 ts=   1975195 crc=B544 
+  #  291 off=    2900 N= 0 ts=   1975328 crc=DF1A 
+  #  292 off=    2910 N= 0 ts=   1975462 crc=25BB 
+  #  293 off=    2920 N= 0 ts=   1975596 crc=A718 
+  #  294 off=    2930 N= 0 ts=   1975729 crc=5801 
+  #  295 off=    2940 N= 0 ts=   1975863 crc=FBF0 
+  #  296 off=    2950 N= 0 ts=   1975997 crc=4E63 
+  #  297 off=    2960 N= 0 ts=   1976130 crc=32F0 
+  #  298 off=    2970 N= 0 ts=   1976264 crc=8763 
+  #  299 off=    2980 N= 0 ts=   1976397 crc=CA2F 
+  #  300 off=    2990 N= 0 ts=   1976531 crc=AEEA 
+  #  301 off=    3000 N= 0 ts=   1976665 crc=2C49 
+  #  302 off=    3010 N= 0 ts=   1976798 crc=A05C 
+  #  303 off=    3020 N= 0 ts=   1976932 crc=6076 
+  #  304 off=    3030 N= 0 ts=   1977066 crc=1F14 
+  #  305 off=    3040 N= 0 ts=   1977199 crc=4959 
+  #  306 off=    3050 N= 0 ts=   1977333 crc=E76D 
+  #  307 off=    3060 N= 0 ts=   1977467 crc=1D9F 
+  #  308 off=    3070 N= 0 ts=   1977600 crc=76C5 
+  #  309 off=    3080 N= 0 ts=   1977734 crc=8C64 
+  #  310 off=    3090 N= 0 ts=   1977868 crc=60A7 
+  #  311 off=    3100 N= 0 ts=   1978001 crc=9FBE 
+  #  312 off=    3110 N= 0 ts=   1978135 crc=522F 
+  #  313 off=    3120 N= 0 ts=   1978269 crc=E7BC 
+  #  314 off=    3130 N= 0 ts=   1978402 crc=ADD1 
+  #  315 off=    3140 N= 0 ts=   1978536 crc=1842 
+  #  316 off=    3150 N= 0 ts=   1978670 crc=D5D3 
+  #  317 off=    3160 N= 0 ts=   1978803 crc=2ACA 
+  #  318 off=    3170 N= 0 ts=   1978937 crc=C609 
+  #  319 off=    3180 N= 0 ts=   1979071 crc=3CA8 
+  #  320 off=    3190 N= 0 ts=   1979204 crc=8ACA 
+  #  321 off=    3200 N= 0 ts=   1979338 crc=F5A8 
+  #  322 off=    3210 N= 0 ts=   1979472 crc=DE0C 
+  #  323 off=    3220 N= 0 ts=   1979605 crc=BF71 
+  #  324 off=    3230 N= 0 ts=   1979739 crc=F723 
+  #  325 off=    3240 N= 0 ts=   1979873 crc=6E59 
+  #  326 off=    3250 N= 0 ts=   1980006 crc=BB1C 
+  #  327 off=    3260 N= 0 ts=   1980140 crc=0E8F 
+  #  328 off=    3270 N= 0 ts=   1980274 crc=5D7A 
+  #  329 off=    3280 N= 0 ts=   1980407 crc=3C07 
+  #  330 off=    3290 N= 0 ts=   1980541 crc=A5A5 
+  #  331 off=    3300 N= 0 ts=   1980675 crc=72BA 
+  #  332 off=    3310 N= 0 ts=   1980813 crc=B19D 
+  #  333 off=    3320 N= 0 ts=   1980942 crc=126C 
+  #  334 off=    3330 N= 0 ts=   1981076 crc=BC58 
+  #  335 off=    3340 N= 0 ts=   1981209 crc=6FD6 
+  #  336 off=    3350 N= 0 ts=   1981343 crc=9577 
+  #  337 off=    3360 N= 0 ts=   1981477 crc=899D 
+  #  338 off=    3370 N= 0 ts=   1981610 crc=804B 
+  #  339 off=    3380 N= 0 ts=   1981744 crc=194F 
+  #  340 off=    3390 N= 0 ts=   1981878 crc=E3EE 
+  #  341 off=    3400 N= 0 ts=   1982011 crc=5E00 
+  #  342 off=    3410 N= 0 ts=   1982145 crc=A9E6 
+  #  343 off=    3420 N= 0 ts=   1982279 crc=6477 
+  #  344 off=    3430 N= 0 ts=   1982412 crc=A750 
+  #  345 off=    3440 N= 0 ts=   1982546 crc=37AC 
+  #  346 off=    3450 N= 0 ts=   1982679 crc=56D1 
+  #  347 off=    3460 N= 0 ts=   1982813 crc=D472 
+  #  348 off=    3470 N= 0 ts=   1982947 crc=87F9 
+  #  349 off=    3480 N= 0 ts=   1983080 crc=1D8E 
+  #  350 off=    3490 N= 0 ts=   1983214 crc=E72F 
+  #  351 off=    3500 N= 0 ts=   1983348 crc=7E2B 
+  #  352 off=    3510 N= 0 ts=   1983481 crc=9A95 
+  #  353 off=    3520 N= 0 ts=   1983615 crc=E5A4 
+  #  354 off=    3530 N= 0 ts=   1983749 crc=F84A 
+  #  355 off=    3540 N= 0 ts=   1983882 crc=F19C 
+  #  356 off=    3550 N= 0 ts=   1984016 crc=06F8 
+  #  357 off=    3560 N= 0 ts=   1984150 crc=FC59 
+  #  358 off=    3570 N= 0 ts=   1984283 crc=2FD7 
+  #  359 off=    3580 N= 0 ts=   1984417 crc=B6AD 
+  #  360 off=    3590 N= 0 ts=   1984551 crc=603D 
+  #  361 off=    3600 N= 0 ts=   1984684 crc=A31A 
+  #  362 off=    3610 N= 0 ts=   1984818 crc=F0EF 
+  #  363 off=    3620 N= 0 ts=   1984952 crc=457C 
+  #  364 off=    3630 N= 0 ts=   1985085 crc=7D51 
+  #  365 off=    3640 N= 0 ts=   1985219 crc=4046 
+  #  366 off=    3650 N= 0 ts=   1985353 crc=C2E5 
+  #  367 off=    3660 N= 0 ts=   1985486 crc=4EF0 
+  #  368 off=    3670 N= 0 ts=   1985620 crc=6554 
+  #  369 off=    3680 N= 0 ts=   1985754 crc=1A36 
+  #  370 off=    3690 N= 0 ts=   1985887 crc=4C7B 
+  #  371 off=    3700 N= 0 ts=   1986021 crc=D501 
+  #  372 off=    3710 N= 0 ts=   1986155 crc=F333 
+  #  373 off=    3720 N= 0 ts=   1986288 crc=2BB3 
+  #  374 off=    3730 N= 0 ts=   1986422 crc=E622 
+  #  375 off=    3740 N= 0 ts=   1986556 crc=53B1 
+  #  376 off=    3750 N= 0 ts=   1986689 crc=4710 
+  #  377 off=    3760 N= 0 ts=   1986823 crc=8A81 
+  #  378 off=    3770 N= 0 ts=   1986957 crc=3F12 
+  #  379 off=    3780 N= 0 ts=   1987090 crc=7433 
+  #  380 off=    3790 N= 0 ts=   1987224 crc=C1A0 
+  #  381 off=    3800 N= 0 ts=   1987358 crc=0C31 
+  #  382 off=    3810 N= 0 ts=   1987491 crc=C466 
+  #  383 off=    3820 N= 0 ts=   1987625 crc=F465 
+  #  384 off=    3830 N= 0 ts=   1987759 crc=0EC4 
+  #  385 off=    3840 N= 0 ts=   1987892 crc=E174 
+  #  386 off=    3850 N= 0 ts=   1988026 crc=9E16 
+  #  387 off=    3860 N= 0 ts=   1988160 crc=30A0 
+  #  388 off=    3870 N= 0 ts=   1988293 crc=51DD 
+  #  389 off=    3880 N= 0 ts=   1988427 crc=198F 
+  #  390 off=    3890 N= 0 ts=   1988561 crc=B7BB 
+  #  391 off=    3900 N= 0 ts=   1988694 crc=179F 
+  #  392 off=    3910 N= 0 ts=   1988828 crc=A20C 
+  #  393 off=    3920 N= 0 ts=   1988961 crc=5D6B 
+  #  394 off=    3930 N= 0 ts=   1989095 crc=A7CA 
+  #  395 off=    3940 N= 0 ts=   1989229 crc=4B09 
+  #  396 off=    3950 N= 0 ts=   1989362 crc=5978 
+  #  397 off=    3960 N= 0 ts=   1989496 crc=DBDB 
+  #  398 off=    3970 N= 0 ts=   1989630 crc=217A 
+  #  399 off=    3980 N= 0 ts=   1989763 crc=DF19 
+  #  400 off=    3990 N= 0 ts=   1989897 crc=5DBA 
+  #  401 off=    4000 N= 0 ts=   1990031 crc=A71B 
+  #  402 off=    4010 N= 0 ts=   1990164 crc=26CB 
+  #  403 off=    4020 N= 0 ts=   1990298 crc=59A9 
+  #  404 off=    4030 N= 0 ts=   1990432 crc=F7E3 
+  #  409 off=    4080 N= 0 ts=   1991100 crc=A0EA 
+        [ #405–#408 không có trong bản dán — xem GHI CHÚ 4 ]
+
+================================================================
+  KET QUA KIEM CHUNG
+================================================================
+  Khung hop le     : 409
+  Byte da doc      : 4096
+  Byte trong khung : 4090 (99.9%)
+  Byte rac bo qua  : 6
+
+  N (box/frame)    : min=0 max=0 tb=0.0
+  Timestamp        : 1936567 -> 1991100 ms (54533 ms, TANG DAN OK)
+  FPS do duoc      : 7.5 frame/s
+  Class gap        : (khong co)
+
+
+  KET QUA: PASS — khung IF-01 dung, CRC khop, timestamp ms
+
+# ═══════════════════════════════════════════════════════════════════════════
+# PHÂN TÍCH (Kilo, từ chính log trên — không dùng số liệu ngoài)
+# ═══════════════════════════════════════════════════════════════════════════
+#
+# 1. Nhịp khung theo timestamp
+#      dt = 1991100 − 1936567 = 54533 ms trên 408 khoảng
+#      → 133,66 ms/khung → 7,48 frame/s
+#    Đọc timestamp từng khung: chênh 133 hoặc 134 ms, không có bước nhảy lớn.
+#    `tgl` trong kvc_blob_detect.v:236 chỉ đảo khi frame_seen=1, nên MỌI khung
+#    ở đây đều có pixel thật — camera đang chạy, không phải khung rỗng giả.
+#
+# 2. Nhịp theo wall-clock (tính lại, vì script cũ không in)
+#      Cửa sổ thực = 4096 B ÷ (4090 B / 54,533 s) = 54,6 s
+#      → 409 frame / 54,6 s = 7,49 frame/s
+#    Hai cách tính trùng nhau → timestamp FPGA đúng đơn vị ms, clk_100m đúng
+#    100 MHz. Nếu timestamp sai đơn vị thì hai số này đã lệch nhau.
+#
+# 3. Tải UART
+#      4090 byte × 10 bit ÷ 38400 bps = 1,065 s  →  1,95 % thời gian
+#    Kết luận: KHÔNG nghẽn UART. Nhịp 7,5 Hz là do camera, không do đường truyền.
+#
+# 4. Đối chiếu lần đo 01/11/2026 (evidence/KVC-FPGA-G0G6-20261101-001.md)
+#      Lần 1: ~197 ms/khung  ≈ 5,08 frame/s
+#      Lần 2: ~133,7 ms/khung ≈ 7,48 frame/s
+#    Cùng bitstream, cùng script, khác điều kiện ánh sáng. Nhịp khung THAY ĐỔI
+#    THEO ÁNH SÁNG → củng cố giả thuyết F-01: OV2640 AEC kéo dài exposure khi
+#    thiếu sáng, thời gian phơi vượt frame time nên sensor tự giảm frame rate.
+#    Đây vẫn là SUY LUẬN từ hai điểm đo, chưa phải phép đo exposure.
+#
+# 5. Gate
+#      G0.3 (camera phát VSYNC): ĐẠT về "có frame", KHÔNG đạt ngưỡng 27–33 Hz.
+#      G0.4 (SCCB):             coi như ĐẠT gián tiếp (xem G0G6 §4.1)
+#      G6.1 6.1.10 (blob):      KHÔNG đo trong lần này (N=0 toàn bộ, đúng kỳ vọng
+#                               vì không có mục tiêu)
+#      A8 (25–32 frame/s):      VẪN FAIL — 7,5 frame/s
+#      Trạng thái ghi: "G0 = camera sống / F-01 MỞ (7,5 Hz)"
+#
+# 6. Giới hạn của bằng chứng này
+#      - Không có file .bin thô; không thể kiểm lại CRC bằng công cụ khác.
+#      - Không đo nhiệt độ, không đo XCLK/PCLK bằng scope.
+#      - Không có mục tiêu trong khung → KHÔNG nói gì về chất lượng nhận diện.
+#      - Chưa đủ 1.000 frame cho tiêu chí A6, và chưa soak 10 phút.

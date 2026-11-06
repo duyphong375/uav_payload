@@ -1,97 +1,51 @@
 ﻿import React from 'react'
-import {
-  AlertTriangle,
-  CheckCircle2,
-  FlaskConical,
-  Radio,
-  RotateCcw,
-  Wifi,
-} from 'lucide-react'
-import { APP_CONFIG } from '@/config/appConfig'
-import { Badge } from '@/components/ui/badge'
+import { FlaskConical, RotateCcw, Wifi } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { MockLocationControl } from '@/features/map/MockLocationControl'
+import { isAgeStale } from '@/lib/stale'
 import { MOCK_SCENARIOS } from '@/mocks/scenarios'
 import { useMission } from '@/state/MissionProvider'
 
+/**
+ * Thanh ngữ cảnh chỉ giữ những gì AppHeader KHÔNG có:
+ * chọn kịch bản MOCK và các thao tác nhanh của chế độ hiện tại.
+ *
+ * Trạng thái nguồn (MOCK/REAL), kết nối WS và mô tả gateway đã hiển thị ở
+ * AppHeader + trang Thiết bị, nên không lặp lại ở đây (PLAN-KVC-GCS-UI-CONSISTENCY-002).
+ */
 export const ModeContextBar: React.FC = () => {
-  const {
-    state,
-    selectedScenarioId,
-    setSelectedScenarioId,
-    reconnect,
-  } = useMission()
-
-  const { source_mode, ws_connected, rx_age_ms, is_stale } = state
+  const { state, selectedScenarioId, setSelectedScenarioId, reconnect } = useMission()
+  const { source_mode, rx_age_ms, is_stale } = state
   const isMock = source_mode === 'MOCK'
 
-  const currentScenario = MOCK_SCENARIOS.find((s) => s.id === selectedScenarioId)
-
-  const isLive = state.hardware_link.status === 'CONNECTED' && !is_stale && rx_age_ms <= 3000
-
-  // REAL + live: không có hành động nào cần thiết (không chọn kịch bản,
-  // không khôi phục lỗi) nên ẩn hẳn thanh này để trả lại 36px chiều cao cho dữ liệu.
+  // REAL + dữ liệu tươi: không có thao tác nào cần thiết, trả lại chiều cao cho dữ liệu.
+  const isLive = state.hardware_link.status === 'CONNECTED' && !isAgeStale(rx_age_ms, is_stale)
   if (!isMock && isLive) {
     return null
   }
 
+  const currentScenario = MOCK_SCENARIOS.find((s) => s.id === selectedScenarioId)
+
   return (
     <div
-      className={`border-b px-3 sm:px-4 py-1.5 transition-colors flex flex-wrap items-center justify-between gap-2 text-xs select-none ${
+      className={`border-b px-3 sm:px-4 py-1.5 flex flex-wrap items-center justify-between gap-2 text-xs select-none ${
         isMock
           ? 'bg-[var(--kvc-mock-bg)] border-[var(--kvc-mock-line)] text-[var(--kvc-mock-ink)]'
-          : isLive
-          ? 'bg-[var(--kvc-ok-bg)] border-[var(--kvc-ok-line)] text-[var(--kvc-ok-ink)]'
-          : 'bg-[var(--kvc-crit-bg)] border-[var(--kvc-crit-line)] text-[var(--kvc-crit-ink)]'
+          : 'bg-[var(--kvc-warn-bg)] border-[var(--kvc-warn-line)] text-[var(--kvc-warn-ink)]'
       }`}
     >
-      {/* 1. Bên trái: Huy hiệu chế độ & Thông tin kịch bản */}
+      {/* Trái: chọn kịch bản (MOCK) hoặc mô tả gateway (REAL chưa live) */}
       <div className="flex items-center gap-2 min-w-0">
         {isMock ? (
-          <div className="flex items-center gap-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--kvc-mock)] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--kvc-mock)]"></span>
-            </span>
-            <span className="font-bold tracking-tight text-[var(--kvc-mock-ink)] uppercase text-[11px] flex items-center gap-1">
+          <>
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider shrink-0">
               <FlaskConical className="h-3.5 w-3.5" />
-              Chế độ Mô phỏng [{APP_CONFIG.MOCK_TRANSPORT === 'LOCAL' ? 'LOCAL' : 'BACKEND'}]
+              Kịch bản
             </span>
-            <span className="text-muted-foreground hidden sm:inline">•</span>
-          </div>
-        ) : isLive ? (
-          <div className="flex items-center gap-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[var(--kvc-ok)] opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--kvc-ok)]"></span>
-            </span>
-            <span className="font-bold tracking-tight text-[var(--kvc-ok-ink)] uppercase text-[11px] flex items-center gap-1">
-              <Radio className="h-3.5 w-3.5" />
-              Trực tiếp từ thiết bị (Live)
-            </span>
-            <span className="text-muted-foreground hidden sm:inline">•</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5">
-            <span className="relative flex h-2 w-2">
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-[var(--kvc-crit)]"></span>
-            </span>
-            <span className="font-bold tracking-tight text-[var(--kvc-crit-ink)] uppercase text-[11px] flex items-center gap-1">
-              <Radio className="h-3.5 w-3.5" />
-              REAL: ESP32 Chưa Kết Nối
-            </span>
-            <span className="text-muted-foreground hidden sm:inline">•</span>
-          </div>
-        )}
-
-        {/* Tùy biến ngữ cảnh */}
-        {isMock ? (
-          <div className="flex items-center gap-2 min-w-0">
-            <span className="text-muted-foreground text-xs hidden md:inline">Kịch bản:</span>
             <select
               value={selectedScenarioId}
               onChange={(e) => setSelectedScenarioId(e.target.value)}
-              className="bg-background text-foreground text-xs font-semibold border border-border/80 rounded-kvc-control px-2.5 py-1 min-h-[32px] max-w-[220px] sm:max-w-xs truncate focus:outline-none focus:ring-2 focus:ring-[var(--kvc-mock)] cursor-pointer"
+              className="bg-background text-foreground text-xs font-semibold border border-border/80 rounded-kvc-control px-2.5 py-1 min-h-[30px] max-w-[220px] sm:max-w-xs truncate focus:outline-none focus:ring-2 focus:ring-[var(--kvc-mock)] cursor-pointer"
               aria-label="Chọn kịch bản mô phỏng"
             >
               {MOCK_SCENARIOS.map((sc) => (
@@ -100,66 +54,41 @@ export const ModeContextBar: React.FC = () => {
                 </option>
               ))}
             </select>
-            {currentScenario?.tags && (
-              <div className="hidden xl:flex items-center gap-1">
-                {currentScenario.tags.map((tag) => (
-                  <Badge
-                    key={tag}
-                    variant="secondary"
-                    className="text-xs px-1.5 py-0.5 font-normal bg-[var(--kvc-mock-bg)] text-[var(--kvc-mock-ink)] border-[var(--kvc-mock-line)]"
-                  >
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 text-xs font-mono">
-            <span className="text-muted-foreground hidden md:inline">Gateway ESP32:</span>
-            <span className="text-foreground font-semibold">
-              {state.hardware_link.port || (state.hardware_link.status === 'CONNECTED' ? 'ESP32 Ingress' : 'Chưa cấu hình Ingress')}
-            </span>
-            <span className="text-muted-foreground hidden lg:inline">•</span>
-            <span className="hidden lg:inline text-muted-foreground">
-              Độ trễ:{' '}
-              <span
-                className={`font-semibold ${
-                  is_stale || rx_age_ms > 3000
-                    ? 'text-[var(--kvc-crit-ink)]'
-                    : rx_age_ms > 1000
-                    ? 'text-[var(--kvc-warn-ink)]'
-                    : 'text-[var(--kvc-ok-ink)]'
-                }`}
-              >
-                {Math.round(rx_age_ms ?? 0)}ms
+            {currentScenario?.tags && currentScenario.tags.length > 0 && (
+              <span className="hidden xl:inline text-[11px] text-muted-foreground truncate">
+                {currentScenario.tags.join(' · ')}
               </span>
+            )}
+          </>
+        ) : (
+          <span className="text-[11px] font-mono text-muted-foreground">
+            Gateway:{' '}
+            <span className="font-semibold text-foreground">
+              {state.hardware_link.port || 'Chưa cấu hình Ingress'}
             </span>
-          </div>
+          </span>
         )}
       </div>
 
-      {/* 2. Bên phải: Các nút thao tác nhanh (Diễn tập cứu nạn / Mock Location / Reconnect) */}
+      {/* Phải: thao tác nhanh */}
       <div className="flex items-center gap-2 shrink-0 flex-wrap">
         {isMock ? (
           <>
             <Button
               variant="default"
               size="sm"
-              onClick={() => {
-                setSelectedScenarioId('NORMAL_GPS_TARGET')
-              }}
-              className="min-h-[32px] h-8 px-3 text-xs gap-1.5 bg-[var(--kvc-mock-fill)] hover:bg-[var(--kvc-mock-fill)]/90 text-[var(--kvc-text-on-fill)] font-semibold shadow-xs cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--kvc-mock)]"
-              title="Kích hoạt nhanh kịch bản diễn tập tìm kiếm cứu nạn (3-click demo)"
+              onClick={() => setSelectedScenarioId('NORMAL_GPS_TARGET')}
+              className="min-h-[32px] h-8 px-3 text-xs gap-1.5 bg-[var(--kvc-mock-fill)] hover:bg-[var(--kvc-mock-fill)]/90 text-[var(--kvc-text-on-fill)] font-semibold shadow-xs cursor-pointer"
+              title="Kích hoạt nhanh kịch bản diễn tập tìm kiếm cứu nạn"
             >
-              <span>Diễn tập cứu nạn</span>
+              Diễn tập cứu nạn
             </Button>
             <MockLocationControl />
             <Button
               variant="outline"
               size="sm"
               onClick={reconnect}
-              className="min-h-[32px] h-8 px-2.5 text-xs gap-1 border-[var(--kvc-mock-line)] hover:bg-[var(--kvc-mock-bg)] text-[var(--kvc-mock-ink)] font-semibold cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--kvc-mock)]"
+              className="min-h-[32px] h-8 px-2.5 text-xs gap-1 border-[var(--kvc-mock-line)] hover:bg-[var(--kvc-mock-bg)] text-[var(--kvc-mock-ink)] font-semibold cursor-pointer"
               title="Khởi động lại kịch bản mô phỏng từ đầu"
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -167,44 +96,16 @@ export const ModeContextBar: React.FC = () => {
             </Button>
           </>
         ) : (
-          <>
-            <div
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-kvc-control text-xs font-semibold border ${
-                !ws_connected
-                  ? 'bg-[var(--kvc-crit-bg)] border-[var(--kvc-crit-line)] text-[var(--kvc-crit-ink)]'
-                  : isLive
-                  ? 'bg-[var(--kvc-ok-bg)] border-[var(--kvc-ok-line)] text-[var(--kvc-ok-ink)]'
-                  : 'bg-[var(--kvc-crit-bg)] border-[var(--kvc-crit-line)] text-[var(--kvc-crit-ink)]'
-              }`}
-            >
-              {!ws_connected ? (
-                <>
-                  <AlertTriangle className="h-3.5 w-3.5 " />
-                  <span>MẤT BACKEND WS</span>
-                </>
-              ) : isLive ? (
-                <>
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  <span>ESP32 LIVE</span>
-                </>
-              ) : (
-                <>
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                  <span>ESP32 CHƯA KẾT NỐI</span>
-                </>
-              )}
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={reconnect}
-              className="min-h-[32px] h-8 px-2.5 text-xs gap-1 border-[var(--kvc-ok-line)] hover:bg-[var(--kvc-ok-bg)] text-[var(--kvc-ok-ink)] font-semibold cursor-pointer focus-visible:ring-2 focus-visible:ring-[var(--kvc-ok)]"
-              title="Thử kết nối lại WebSocket trạm mặt đất"
-            >
-              <Wifi className="h-3.5 w-3.5" />
-              <span>Kết nối lại</span>
-            </Button>
-          </>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={reconnect}
+            className="min-h-[32px] h-8 px-2.5 text-xs gap-1 border-[var(--kvc-warn-line)] hover:bg-[var(--kvc-warn-bg)] text-[var(--kvc-warn-ink)] font-semibold cursor-pointer"
+            title="Thử kết nối lại WebSocket trạm mặt đất"
+          >
+            <Wifi className="h-3.5 w-3.5" />
+            <span>Kết nối lại</span>
+          </Button>
         )}
       </div>
     </div>

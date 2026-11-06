@@ -13,6 +13,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { InfoTip } from '@/components/shared/InfoTip'
+import { AMBER_AGE_MS, isAgeStale, staleSeconds, staleSecondsText } from '@/lib/stale'
 import { useMission } from '@/state/MissionProvider'
 
 interface CurrentPositionPanelProps {
@@ -37,6 +38,9 @@ export const CurrentPositionPanel: React.FC<CurrentPositionPanelProps> = ({
 
   const [isCollapsed, setIsCollapsed] = useState(false)
 
+  const stale = isAgeStale(rx_age_ms, is_stale)
+  const amber = !stale && rx_age_ms > AMBER_AGE_MS
+
   const hasGpsFix = Boolean(
     camera_position.is_valid &&
     camera_position.latitude !== null &&
@@ -53,11 +57,11 @@ export const CurrentPositionPanel: React.FC<CurrentPositionPanelProps> = ({
         isError: true,
       }
     }
-    if (is_stale || rx_age_ms > 3000) {
+    if (stale) {
       return {
         label: 'DỮ LIỆU CŨ',
         variant: 'secondary' as const,
-        reason: `Dữ liệu telemetry quá cũ (>3000ms, hiện tại: ${rx_age_ms}ms).`,
+        reason: `Dữ liệu telemetry quá cũ (${staleSecondsText()}, hiện tại: ${rx_age_ms}ms).`,
         isError: false,
       }
     }
@@ -217,27 +221,29 @@ export const CurrentPositionPanel: React.FC<CurrentPositionPanelProps> = ({
             <div className="flex items-center justify-between p-2 rounded-kvc-control bg-muted/20 border border-border/30">
               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 Độ trễ tín hiệu:
-                <InfoTip text="Thời gian trôi qua từ gói tin gần nhất của tải UAV: Dưới 1s (Xanh) là trực tiếp, 1-3s (Vàng) là nghẽn sóng, trên 3s (Đỏ) là mất tín hiệu." />
+                <InfoTip
+                  text={`Thời gian trôi qua từ gói tin gần nhất của tải UAV: Dưới 1s (Xanh) là trực tiếp, 1-${staleSeconds()}s (Vàng) là nghẽn sóng, trên ${staleSeconds()}s (Đỏ) là mất tín hiệu.`}
+                />
               </span>
               <span
                 className={`font-mono font-bold flex items-center gap-1.5 ${
-                  rx_age_ms > 3000
+                  stale
                     ? 'text-destructive'
-                    : rx_age_ms > 1000
+                    : amber
                     ? 'text-[var(--kvc-warn-ink)]'
                     : 'text-[var(--kvc-ok-ink)]'
                 }`}
               >
                 <span
                   className={`h-2 w-2 rounded-full shrink-0 ${
-                    rx_age_ms > 3000
+                    stale
                       ? 'bg-destructive '
-                      : rx_age_ms > 1000
+                      : amber
                       ? 'bg-[var(--kvc-warn)]'
                       : 'bg-[var(--kvc-ok)]'
                   }`}
                 />
-                {rx_age_ms > 3000 ? `${(rx_age_ms / 1000).toFixed(1)}s (Mất tín hiệu)` : `${rx_age_ms} ms`}
+                {stale ? `${(rx_age_ms / 1000).toFixed(1)}s (Mất tín hiệu)` : `${rx_age_ms} ms`}
               </span>
             </div>
           </div>

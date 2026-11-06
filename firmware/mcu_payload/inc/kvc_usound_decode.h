@@ -17,8 +17,6 @@
  *   byte 3: Checksum = (0xFF + Data_H + Data_L) & 0xFF
  *
  * Distance_mm = (Data_H << 8) | Data_L ; Distance_cm = Distance_mm / 10.
- *
- * Người phụ trách: Nguyễn Tá Duy Phong
  */
 
 #ifndef KVC_USOUND_DECODE_H

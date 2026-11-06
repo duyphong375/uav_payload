@@ -1,4 +1,4 @@
-﻿import React from 'react'
+import React from 'react'
 import {
   Check,
   Compass,
@@ -6,8 +6,6 @@ import {
   Download,
   History,
   LifeBuoy,
-  Radar,
-  Ship,
   User,
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -85,17 +83,17 @@ function positionPayload(item: DetectionItem): string | null {
 
 function classLabel(rawType: DetectionItem['rawType']): string {
   if (rawType === 'person') return 'Người gặp nạn (Person)'
-  if (rawType === 'buoy') return 'Phao cứu sinh (Lifebuoy)'
-  if (rawType === 'boat') return 'Tàu thuyền (Boat / Vessel)'
+  if (rawType === 'buoy' || rawType === 'boat') return 'Phao cứu sinh (Lifebuoy)'
   return 'Vật trôi dạt'
 }
 
 export const RecentDetectionsTable: React.FC<{ className?: string }> = ({
   className = '',
 }) => {
-  const { state } = useMission()
+  const { state, dispatch } = useMission()
   const { navigate } = useAppRouter()
   const { target, has_target, bounding_boxes, camera_position, last_rx_iso, source_mode } = state
+  const [markedIds, setMarkedIds] = React.useState<Set<string>>(new Set())
 
   const detections = React.useMemo<DetectionItem[]>(() => {
     const list: DetectionItem[] = []
@@ -143,12 +141,18 @@ export const RecentDetectionsTable: React.FC<{ className?: string }> = ({
 
   const handleCopyCoord = (item: DetectionItem) => {
     const payload = positionPayload(item)
-    if (!payload) {
-      toast.error('Mục tiêu chưa có vị trí hợp lệ — không thể sao chép.')
+    if (payload) {
+      navigator.clipboard.writeText(payload)
+      toast.success(`Đã sao chép toạ độ ${formatFrame(item.frame)} mục tiêu ${item.id}: ${payload}`)
       return
     }
-    navigator.clipboard.writeText(payload)
-    toast.success(`Đã sao chép toạ độ ${formatFrame(item.frame)} mục tiêu ${item.id}: ${payload}`)
+    if (camera_position.latitude !== null && camera_position.longitude !== null) {
+      const uavPayload = `${camera_position.latitude.toFixed(6)}, ${camera_position.longitude.toFixed(6)}`
+      navigator.clipboard.writeText(uavPayload)
+      toast.success(`Mục tiêu chưa có toạ độ riêng — Đã sao chép toạ độ UAV lúc phát hiện: ${uavPayload}`)
+      return
+    }
+    toast.error('Mục tiêu và UAV đều chưa có vị trí GPS hợp lệ — không thể sao chép.')
   }
 
   const handleExportCsv = () => {
@@ -194,32 +198,45 @@ export const RecentDetectionsTable: React.FC<{ className?: string }> = ({
   }
 
   const handleActionClick = (item: DetectionItem) => {
-    const payload = positionPayload(item)
-    if (!payload) {
-      toast.error(`Mục tiêu ${item.id} chưa có vị trí hợp lệ — chưa thể ghi mốc.`)
-      return
+    let coordStr = ''
+    if (item.frame === 'WGS84' && item.lat !== null && item.lon !== null) {
+      coordStr = `WGS-84 ${item.lat.toFixed(6)}°, ${item.lon.toFixed(6)}°`
+    } else if (item.frame === 'LOCAL_GRID' && item.localX !== null && item.localY !== null) {
+      coordStr = `LOCAL_GRID (cm) X=${item.localX.toFixed(0)}, Y=${item.localY.toFixed(0)}`
+    } else if (camera_position.latitude !== null && camera_position.longitude !== null) {
+      coordStr = `UAV ${camera_position.latitude.toFixed(6)}°, ${camera_position.longitude.toFixed(6)}° (Toạ độ UAV lúc phát hiện — mục tiêu chưa chốt toạ độ)`
+    } else {
+      coordStr = 'Chưa có toạ độ định vị (Camera sighting)'
     }
-    toast.success(`Đã ghi nhận mốc ${payload} cho mục tiêu ${item.id}.`)
+
+    const isMarked = markedIds.has(item.id)
+
+    dispatch({
+      type: 'LOG_EVENT',
+      payload: {
+        level: 'INFO',
+        source: 'SAR_MISSION',
+        code: 'SAR_MARK_EVENT',
+        message: `Đánh dấu mốc mục tiêu ${item.id} [${item.label}] tại ${coordStr}`,
+        details: coordStr,
+      },
+    })
+
+    setMarkedIds((prev) => new Set(prev).add(item.id))
+
+    if (isMarked) {
+      toast.success(`Đã cập nhật ghi mốc mục tiêu ${item.id} [${item.label}] vào nhật ký phiên!`)
+    } else {
+      toast.success(`Đã ghi nhận mốc mục tiêu ${item.id} [${item.label}] vào nhật ký sự kiện cứu nạn!`)
+    }
   }
 
   return (
     <Card className={`shrink-0 overflow-hidden border-border bg-card shadow-xs p-4 sm:p-5 rounded-kvc-panel ${className}`}>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/60">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-kvc-panel bg-[var(--kvc-accent-bg)] text-[var(--kvc-accent-ink)] border border-[var(--kvc-accent-line)] shrink-0">
-            <Radar className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <h3 className="text-sm font-bold text-foreground uppercase tracking-tight">
-                LỊCH SỬ NHẬN DIỆN THỜI GIAN THỰC (DETECTION LOG)
-              </h3>
-              <InfoTip text="Bảng ghi nhận mục tiêu từ payload hiện hành. Chỉ hiển thị toạ độ khi mục tiêu có vị trí hợp lệ; trường thiếu hiển thị N/A, không suy diễn." />
-            </div>
-            <p className="text-xs text-muted-foreground">
-              Mục tiêu YOLO11n (Người / Phao / Tàu) • Chỉ số thiếu hiển thị N/A
-            </p>
-          </div>
+        <div className="flex items-center gap-1.5">
+          <h3 className="text-sm font-bold text-foreground">Lịch sử nhận diện</h3>
+          <InfoTip text="Mục tiêu từ payload hiện hành. Chỉ hiển thị toạ độ khi vị trí hợp lệ; trường thiếu hiển thị N/A, không suy diễn." />
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -272,131 +289,145 @@ export const RecentDetectionsTable: React.FC<{ className?: string }> = ({
               <th className="py-2.5 px-3">Thời gian</th>
               <th className="py-2.5 px-3">Đối tượng nhận diện</th>
               <th className="py-2.5 px-3">Độ tin cậy</th>
-              <th className="py-2.5 px-3">Vị trí</th>
-              <th className="py-2.5 px-3">Khoảng cách UAV</th>
+              <th className="py-2.5 px-3">Vị trí & khoảng cách UAV</th>
               <th className="py-2.5 px-3 rounded-r text-right">Hành động</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/40 text-xs">
             {detections.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-8 text-center text-muted-foreground font-mono">
+                <td colSpan={6} className="py-8 text-center text-muted-foreground font-mono">
                   {source_mode === 'REAL'
                     ? 'Chưa có mục tiêu trong phiên hiện tại (chưa có ingress REAL từ ESP32)'
                     : 'Chưa có mục tiêu trong phiên hiện tại (chờ dữ liệu AI)'}
                 </td>
               </tr>
             ) : (
-              detections.map((item) => (
-                <tr key={item.key} className="hover:bg-muted/30 transition-colors select-none">
-                  <td className="py-3 px-3 font-mono font-bold text-[var(--kvc-accent-ink)]">
-                    {item.id}
-                    {item.simulated && (
-                      <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">MÔ PHỎNG</span>
-                    )}
-                  </td>
+              detections.map((item) => {
+                const hasTargetCoord = positionPayload(item) !== null
+                const hasUavCoord = camera_position.latitude !== null && camera_position.longitude !== null
+                const canCopy = hasTargetCoord || hasUavCoord
+                const isMarked = markedIds.has(item.id)
 
-                  <td className="py-3 px-3 font-mono text-muted-foreground">
-                    {item.time ?? 'N/A'}
-                  </td>
+                return (
+                  <tr key={item.key} className="hover:bg-muted/30 transition-colors select-none">
+                    <td className="py-3 px-3 font-mono font-bold text-[var(--kvc-accent-ink)]">
+                      {item.id}
+                      {item.simulated && (
+                        <span className="ml-1.5 text-[11px] font-normal text-muted-foreground">MÔ PHỎNG</span>
+                      )}
+                    </td>
 
-                  <td className="py-3 px-3">
-                    {item.rawType === 'person' && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--kvc-crit-bg)] text-[var(--kvc-crit-ink)] font-mono text-[11px] font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--kvc-crit)]" />
-                        <User className="h-3 w-3" />
-                        {item.label}
-                      </span>
-                    )}
-                    {(item.rawType === 'buoy' || item.rawType === 'boat') && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--kvc-warn-bg)] text-[var(--kvc-warn-ink)] font-mono text-[11px] font-bold">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[var(--kvc-warn)]" />
-                        <LifeBuoy className="h-3 w-3" />
-                        {item.label}
-                      </span>
-                    )}
-                    {item.rawType === 'debris' && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground font-mono text-[11px]">
-                        <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-                        {item.label}
-                      </span>
-                    )}
-                  </td>
+                    <td className="py-3 px-3 font-mono text-muted-foreground">
+                      {item.time ?? 'N/A'}
+                    </td>
 
-                  <td className="py-3 px-3 font-mono font-bold tabular-nums">
-                    {item.confidence !== null ? (
-                      <span
-                        className={
-                          item.confidence >= 90
-                            ? 'text-[var(--kvc-crit-ink)]'
-                            : item.confidence >= 80
-                            ? 'text-[var(--kvc-warn-ink)]'
-                            : 'text-muted-foreground'
-                        }
-                      >
-                        {item.confidence.toFixed(1)}%
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">N/A</span>
-                    )}
-                  </td>
-
-                  <td className="py-3 px-3 font-mono text-foreground select-all tabular-nums">
-                    <div>{formatPosition(item)}</div>
-                    <div className="text-[11px] text-muted-foreground">{formatFrame(item.frame)}</div>
-                  </td>
-
-                  <td className="py-3 px-3 font-mono text-foreground font-semibold tabular-nums">
-                    {item.distanceM !== null ? `${item.distanceM} m` : <span className="text-muted-foreground">N/A</span>}
-                  </td>
-
-                  <td className="py-3 px-3 text-right">
-                    <div className="inline-flex items-center gap-1.5">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleCopyCoord(item)}
-                        disabled={positionPayload(item) === null}
-                        className="h-7 px-2 text-xs gap-1 border-border hover:border-[var(--kvc-accent-line)]"
-                        title={
-                          item.frame === 'LOCAL_GRID'
-                            ? 'Sao chép toạ độ LOCAL (cm) — không phải WGS-84'
-                            : item.frame === 'WGS84'
-                            ? 'Sao chép cặp toạ độ WGS-84'
-                            : 'Mục tiêu chưa có vị trí hợp lệ'
-                        }
-                      >
-                        <Copy className="h-3 w-3 text-[var(--kvc-accent-ink)]" />
-                        <span>
-                          {item.frame === 'LOCAL_GRID'
-                            ? 'Sao chép Local (cm)'
-                            : item.frame === 'WGS84'
-                            ? 'Sao chép WGS-84'
-                            : 'Không có vị trí'}
+                    <td className="py-3 px-3">
+                      {item.rawType === 'person' && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--kvc-crit-bg)] text-[var(--kvc-crit-ink)] font-mono text-[11px] font-bold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--kvc-crit)]" />
+                          <User className="h-3 w-3" />
+                          {item.label}
                         </span>
-                      </Button>
+                      )}
+                      {(item.rawType === 'buoy' || item.rawType === 'boat') && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-[var(--kvc-warn-bg)] text-[var(--kvc-warn-ink)] font-mono text-[11px] font-bold">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[var(--kvc-warn)]" />
+                          <LifeBuoy className="h-3 w-3" />
+                          {item.label}
+                        </span>
+                      )}
+                      {item.rawType === 'debris' && (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground font-mono text-[11px]">
+                          <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                          {item.label}
+                        </span>
+                      )}
+                    </td>
 
-                      <Button
-                        size="sm"
-                        onClick={() => handleActionClick(item)}
-                        disabled={positionPayload(item) === null}
-                        className={`h-7 px-2.5 text-xs gap-1 ${
-                          item.rawType === 'person'
-                            ? 'bg-[var(--kvc-crit-fill)] hover:bg-[var(--kvc-crit-fill)]/90 text-[var(--kvc-text-on-fill)]'
-                            : item.rawType === 'buoy' || item.rawType === 'boat'
-                            ? 'bg-[var(--kvc-warn-fill)] hover:bg-[var(--kvc-warn-fill)]/90 text-[var(--kvc-text-on-fill)]'
-                            : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                        }`}
-                      >
-                        {item.actionIcon === 'boat' && <Ship className="h-3 w-3" />}
-                        {item.actionIcon === 'buoy' && <LifeBuoy className="h-3 w-3" />}
-                        {item.actionIcon === 'check' && <Check className="h-3 w-3" />}
-                        <span>Ghi mốc</span>
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    <td className="py-3 px-3 font-mono font-bold tabular-nums">
+                      {item.confidence !== null ? (
+                        <span
+                          className={
+                            item.confidence >= 90
+                              ? 'text-[var(--kvc-crit-ink)]'
+                              : item.confidence >= 80
+                              ? 'text-[var(--kvc-warn-ink)]'
+                              : 'text-muted-foreground'
+                          }
+                        >
+                          {item.confidence.toFixed(1)}%
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">N/A</span>
+                      )}
+                    </td>
+
+                    <td className="py-3 px-3 font-mono text-foreground select-all tabular-nums">
+                      <div>{formatPosition(item)}</div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {formatFrame(item.frame)}
+                        <span aria-hidden="true"> · </span>
+                        {item.distanceM !== null ? `${item.distanceM} m` : 'N/A'}
+                      </div>
+                    </td>
+
+                    <td className="py-3 px-3 text-right">
+                      <div className="inline-flex items-center gap-1.5">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCopyCoord(item)}
+                          disabled={!canCopy}
+                          className="h-7 px-2 text-xs gap-1 border-border hover:border-[var(--kvc-accent-line)]"
+                          title={
+                            hasTargetCoord
+                              ? item.frame === 'LOCAL_GRID'
+                                ? 'Sao chép toạ độ LOCAL (cm) — không phải WGS-84'
+                                : 'Sao chép cặp toạ độ WGS-84'
+                              : hasUavCoord
+                              ? 'Mục tiêu chưa chốt toạ độ — Sao chép toạ độ UAV lúc phát hiện'
+                              : 'Mục tiêu và UAV chưa có vị trí hợp lệ'
+                          }
+                        >
+                          <Copy className="h-3 w-3 text-[var(--kvc-accent-ink)]" />
+                          <span>
+                            {item.frame === 'LOCAL_GRID'
+                              ? 'Sao chép Local (cm)'
+                              : item.frame === 'WGS84'
+                              ? 'Sao chép WGS-84'
+                              : hasUavCoord
+                              ? 'Sao chép toạ độ UAV'
+                              : 'Không có vị trí'}
+                          </span>
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          onClick={() => handleActionClick(item)}
+                          className={`h-7 px-2.5 text-xs gap-1 font-medium transition-all ${
+                            isMarked
+                              ? 'bg-[var(--kvc-ok-fill)] hover:bg-[var(--kvc-ok-fill)]/90 text-[var(--kvc-text-on-fill)] shadow-xs'
+                              : item.rawType === 'person'
+                              ? 'bg-[var(--kvc-crit-fill)] hover:bg-[var(--kvc-crit-fill)]/90 text-[var(--kvc-text-on-fill)]'
+                              : item.rawType === 'buoy' || item.rawType === 'boat'
+                              ? 'bg-[var(--kvc-warn-fill)] hover:bg-[var(--kvc-warn-fill)]/90 text-[var(--kvc-text-on-fill)]'
+                              : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          }`}
+                          title={
+                            isMarked
+                              ? 'Mục tiêu đã được ghi mốc vào nhật ký sự kiện cứu nạn. Bấm lại để cập nhật.'
+                              : 'Ghi mốc mục tiêu vào nhật ký sự kiện cứu nạn (kèm toạ độ UAV nếu mục tiêu đang giải đoán).'
+                          }
+                        >
+                          <Check className="h-3 w-3" />
+                          <span>{isMarked ? 'Đã ghi mốc' : 'Ghi mốc'}</span>
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })
             )}
           </tbody>
         </table>

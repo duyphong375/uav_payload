@@ -216,6 +216,14 @@ if ($null -eq $gpp) {
             (Join-Path $gwSrc 'session_id.cpp'),
             '-o', (Join-Path $outDir 'test_session_id.exe'))) `
         -OutputExe (Join-Path $outDir 'test_session_id.exe')
+
+    # IF-03: chi phuc vu dung path /telemetry (thu vien WebSockets nhan moi path).
+    Invoke-TestBinary -Name 'Gateway test_ws_route' -Compiler $gpp.Source `
+        -Arguments ($gwCommon + @(
+            (Join-Path $gwTest 'test_ws_route.cpp'),
+            (Join-Path $gwSrc 'ws_route.cpp'),
+            '-o', (Join-Path $outDir 'test_ws_route.exe'))) `
+        -OutputExe (Join-Path $outDir 'test_ws_route.exe')
 }
 
 # --- 3. Gateway build ---

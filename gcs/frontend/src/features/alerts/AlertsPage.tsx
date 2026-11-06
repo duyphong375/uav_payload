@@ -1,4 +1,4 @@
-﻿import React, { useMemo, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import {
   AlertCircle,
   AlertTriangle,
@@ -7,6 +7,7 @@ import {
   FilterX,
   Radio,
   ShieldCheck,
+  Trash2,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAppRouter } from '@/app/routes'
@@ -69,7 +70,6 @@ export const AlertsPage: React.FC = () => {
     <div className="flex-1 flex flex-col p-3 sm:p-5 gap-3.5 sm:gap-4 overflow-y-auto max-w-7xl mx-auto w-full select-none">
       {/* 1. Header Trang Cảnh Báo */}
       <PageHeader
-        breadcrumb="Dữ liệu · Cảnh báo hệ thống"
         title="Trung tâm cảnh báo kỹ thuật"
         infoTip="Hệ thống giám sát và quản lý toàn bộ cảnh báo về ngắt kết nối LoRa/Wi-Fi, độ lệch cảm biến siêu âm và khóa vệ tinh GNSS."
         subtitle="Tiếp nhận, phân loại và xử lý các sự cố an toàn tải nhiệm vụ, cảm biến và kênh truyền."
@@ -95,6 +95,27 @@ export const AlertsPage: React.FC = () => {
                 <span>Tiếp nhận tất cả ({unackCount})</span>
               </Button>
             )}
+            {activeAlerts.length > 0 && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Bạn có chắc chắn muốn xóa toàn bộ ${activeAlerts.length} cảnh báo đang mở không?`
+                    )
+                  ) {
+                    dispatch({ type: 'CLEAR_ALERTS' })
+                    toast.success('Đã xóa toàn bộ cảnh báo')
+                  }
+                }}
+                className="h-8 text-xs gap-1.5 border-destructive/40 text-destructive hover:bg-destructive/10 hover:border-destructive cursor-pointer"
+                title="Xóa toàn bộ cảnh báo đang mở"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Xóa tất cả ({activeAlerts.length})</span>
+              </Button>
+            )}
             <Button
               size="sm"
               onClick={() => navigate('/mission')}
@@ -109,13 +130,13 @@ export const AlertsPage: React.FC = () => {
 
       {/* 2. Thẻ Tóm Tắt Thống Kê Nhanh (3 Cards) */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <Card className="border-border bg-card shadow-xs">
-          <CardContent className="p-3.5 flex items-center justify-between">
+        <Card className="border-border bg-card shadow-2xs hover:border-primary/40 transition-colors">
+          <CardContent className="p-4 flex items-center justify-between">
             <div className="flex flex-col">
-              <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
+              <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">
                 Tổng cảnh báo mở
               </span>
-              <span className="text-2xl font-bold font-mono text-foreground mt-0.5">
+              <span className="text-2xl font-bold font-mono text-foreground mt-1">
                 {activeAlerts.length}
               </span>
             </div>
@@ -125,41 +146,79 @@ export const AlertsPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card shadow-xs">
-          <CardContent className="p-3.5 flex items-center justify-between">
+        <Card
+          className={`border-border bg-card shadow-2xs transition-colors ${
+            unackCount > 0
+              ? 'border-[var(--kvc-warn-line)] bg-[var(--kvc-warn-bg)]/20'
+              : 'hover:border-border/80'
+          }`}
+        >
+          <CardContent className="p-4 flex items-center justify-between">
             <div className="flex flex-col">
-              <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-                Chưa tiếp nhận
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">
+                  Chưa tiếp nhận
+                </span>
+                {unackCount > 0 && (
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded font-bold bg-[var(--kvc-warn-bg)] text-[var(--kvc-warn-ink)] border border-[var(--kvc-warn-line)]">
+                    CẦN XỬ LÝ
+                  </span>
+                )}
+              </div>
               <span
-                className={`text-2xl font-bold font-mono mt-0.5 ${
-                  unackCount > 0 ? 'text-[var(--kvc-warn-ink)]' : 'text-foreground'
+                className={`text-2xl font-bold font-mono mt-1 ${
+                  unackCount > 0 ? 'text-[var(--kvc-warn-ink)] font-black' : 'text-foreground'
                 }`}
               >
                 {unackCount}
               </span>
             </div>
-            <div className="p-2.5 rounded-kvc-panel bg-[var(--kvc-warn-bg)] border border-[var(--kvc-warn-line)] text-[var(--kvc-warn-ink)]">
+            <div
+              className={`p-2.5 rounded-kvc-panel border ${
+                unackCount > 0
+                  ? 'bg-[var(--kvc-warn-bg)] border-[var(--kvc-warn-line)] text-[var(--kvc-warn-ink)]'
+                  : 'bg-muted/40 border-border text-muted-foreground'
+              }`}
+            >
               <AlertTriangle className="h-5 w-5" />
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-border bg-card shadow-xs">
-          <CardContent className="p-3.5 flex items-center justify-between">
+        <Card
+          className={`border-border bg-card shadow-2xs transition-colors ${
+            criticalCount > 0
+              ? 'border-[var(--kvc-crit-line)] bg-[var(--kvc-crit-bg)]/20'
+              : 'hover:border-border/80'
+          }`}
+        >
+          <CardContent className="p-4 flex items-center justify-between">
             <div className="flex flex-col">
-              <span className="text-[11px] text-muted-foreground font-medium uppercase tracking-wider">
-                Mức độ nguy cấp
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider">
+                  Mức độ nguy cấp
+                </span>
+                {criticalCount > 0 && (
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded font-bold bg-[var(--kvc-crit-bg)] text-[var(--kvc-crit-ink)] border border-[var(--kvc-crit-line)] animate-pulse">
+                    NGUY HIỂM
+                  </span>
+                )}
+              </div>
               <span
-                className={`text-2xl font-bold font-mono mt-0.5 ${
+                className={`text-2xl font-bold font-mono mt-1 ${
                   criticalCount > 0 ? 'text-[var(--kvc-crit-ink)]' : 'text-foreground'
                 }`}
               >
                 {criticalCount}
               </span>
             </div>
-            <div className="p-2.5 rounded-kvc-panel bg-[var(--kvc-crit-bg)] border border-[var(--kvc-crit-line)] text-[var(--kvc-crit-ink)]">
+            <div
+              className={`p-2.5 rounded-kvc-panel border ${
+                criticalCount > 0
+                  ? 'bg-[var(--kvc-crit-bg)] border-[var(--kvc-crit-line)] text-[var(--kvc-crit-ink)]'
+                  : 'bg-muted/40 border-border text-muted-foreground'
+              }`}
+            >
               <AlertCircle className="h-5 w-5" />
             </div>
           </CardContent>

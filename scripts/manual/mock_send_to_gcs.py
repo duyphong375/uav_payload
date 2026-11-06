@@ -1,4 +1,4 @@
-﻿"""Công cụ giả lập phát gói tin Telemetry (Người / Tàu thuyền) gửi tới GCS Backend.
+"""Công cụ giả lập phát gói tin Telemetry (Người / Tàu thuyền) gửi tới GCS Backend.
 
 Dùng để test hiển thị Dashboard mà không cần phần cứng ESP32.
 Chạy bằng: python scripts/mock_send_to_gcs.py
@@ -10,6 +10,19 @@ import urllib.request
 import json
 
 BACKEND_INGRESS_URL = "http://127.0.0.1:8000/api/ingress/envelope"
+
+
+def crc16_ccitt_false(data: bytes) -> int:
+    """CRC-16/CCITT-FALSE theo IF-02: poly 0x1021, init 0xFFFF, xorout 0."""
+    crc = 0xFFFF
+    for byte in data:
+        crc ^= byte << 8
+        for _ in range(8):
+            if crc & 0x8000:
+                crc = ((crc << 1) ^ 0x1021) & 0xFFFF
+            else:
+                crc = (crc << 1) & 0xFFFF
+    return crc
 
 
 def make_rf_payload(
@@ -47,8 +60,8 @@ def make_rf_payload(
     # Pack Roll & Pitch vào 4 byte reserved (đơn vị 0.1 độ, ví dụ 12 = 1.2°)
     reserved_bytes = struct.pack("<hh", int(round(roll_deg * 10)), int(round(pitch_deg * 10)))
 
-    raw_bytes = struct.pack(
-        fmt,
+    raw_header = struct.pack(
+        "<2sBBIIIhhHBBBB4s",
         b"\xaa\x55",
         1,  # Msg ID
         seq_num % 256,
@@ -63,9 +76,10 @@ def make_rf_payload(
         sensor_flags,
         status_reserved,
         reserved_bytes,
-        0xABCD,  # CRC16
     )
-    return raw_bytes.hex()
+    crc = crc16_ccitt_false(raw_header)
+    del fmt
+    return (raw_header + struct.pack("<H", crc)).hex()
 
 
 def send_packet(seq: int, class_id: int, name: str, lat: float, lon: float, conf: int, lidar: int, bat: float):
@@ -121,8 +135,8 @@ def main():
         # (class_id, name, conf, lat_offset, lon_offset, lidar, battery)
         (1, "🧍 NGƯỜI GẶP NẠN (Person)", 92, 0.000000, 0.000000, 240, 12.4),
         (1, "🧍 NGƯỜI GẶP NẠN (Person)", 95, 0.000020, 0.000030, 235, 12.3),
-        (2, "🚤 TÀU THUYỀN / CA-NÔ (Boat)", 89, 0.000250, 0.000350, 280, 12.2),
-        (2, "🚤 TÀU THUYỀN / CA-NÔ (Boat)", 93, 0.000280, 0.000380, 275, 12.1),
+        (2, "🛟 PHAO CỨU SINH (Lifebuoy - Màu cam)", 89, 0.000250, 0.000350, 280, 12.2),
+        (2, "🛟 PHAO CỨU SINH (Lifebuoy - Màu cam)", 93, 0.000280, 0.000380, 275, 12.1),
         (0, "🌊 ĐANG QUÉT (Không có mục tiêu)", 0, 0.0, 0.0, 310, 12.0),
     ]
 

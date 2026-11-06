@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 import anyio
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 
 import logging
 import sys
@@ -23,6 +24,7 @@ if not any(isinstance(h, logging.StreamHandler) for h in kvc_logger.handlers):
     kvc_logger.propagate = False
 
 _BACKEND_DIR = Path(__file__).resolve().parent
+STREAM_PATH = "/video/stream"
 if str(_BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(_BACKEND_DIR))
 
@@ -34,6 +36,7 @@ try:
     from .schemas import ReplaySeekRequest, ReplaySpeedRequest, ReplayStartRequest
     from .sqlite_logger import SQLiteLogger
     from .state import Hub, MissionStore
+    from .video_relay import VideoRelay, build_status_when_disabled, BOUNDARY, encode_part
 except (ImportError, ValueError):
     from config import Settings, _env_bool, _env_str
     from esp32_ingress import inject_envelope, parse_rf_payload, run_esp32_ingress
@@ -42,6 +45,7 @@ except (ImportError, ValueError):
     from schemas import ReplaySeekRequest, ReplaySpeedRequest, ReplayStartRequest
     from sqlite_logger import SQLiteLogger
     from state import Hub, MissionStore
+    from video_relay import VideoRelay, build_status_when_disabled, BOUNDARY, encode_part
 
 
 async def send_events(websocket, client, hub):
@@ -98,7 +102,11 @@ def create_app(
             rx_time = store.times["rx"]
             if rx_time is not None and (now - rx_time) >= (timeout_sec * 1000):
                 old_session = store.session_id
-                hub.rotate_session()
+                hub.rotate_session(
+                    source_mode="REAL",
+                    original_source_mode="REAL",
+                    inference_device=store.inference_device,
+                )
                 hub.publish(
                     "ALERT_EVENT",
                     alert={
@@ -134,6 +142,11 @@ def create_app(
             sleeper=replay_sleeper, hardware=hardware,
         )
         app.state.replay = replay
+        video_relay = None
+        if settings.enable_video_relay:
+            video_relay = VideoRelay(hub, settings)
+            video_relay.start()
+        app.state.video_relay = video_relay
         ingress_task = None
         if settings.enable_esp32_ingress:
             ingress_task = asyncio.create_task(
@@ -150,6 +163,8 @@ def create_app(
             if watchdog_task:
                 watchdog_task.cancel()
                 await asyncio.gather(watchdog_task, return_exceptions=True)
+            if video_relay:
+                await video_relay.stop()
             if ingress_task:
                 ingress_task.cancel()
                 await asyncio.gather(ingress_task, return_exceptions=True)
@@ -166,8 +181,48 @@ def create_app(
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://127.0.0.1:5173", "http://localhost:5173"],
-        allow_methods=["GET", "POST"], allow_headers=["Accept", "Content-Type"],
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"], allow_headers=["Accept", "Content-Type"],
     )
+
+    @app.get(STREAM_PATH)
+    async def video_stream():
+        if not settings.enable_video_relay:
+            raise HTTPException(status_code=503, detail="Video relay is disabled")
+        relay = getattr(app.state, "video_relay", None)
+        if relay is None:
+            raise HTTPException(status_code=503, detail="Video relay is disabled")
+
+        # Trước 03/11/2026 route này mở một kết nối MỚI tới camera cho mỗi
+        # người xem, nên camera phải phục vụ `1 + số_người_xem` kết nối và chia
+        # khung cho từng client. Nay nó đăng ký vào relay: camera chỉ thấy MỘT
+        # kết nối, mọi người xem nhận cùng một luồng khung.
+        queue = relay.subscribe()
+        try:
+            first = await asyncio.wait_for(
+                queue.get(), timeout=settings.video_frame_timeout_sec
+            )
+        except asyncio.TimeoutError:
+            relay.unsubscribe(queue)
+            raise HTTPException(status_code=503, detail="Video source not connected")
+
+        async def stream_generator():
+            # Khung đầu đã lấy khỏi hàng đợi để biết nguồn sống; phát nó trước
+            # rồi mới chuyển sang vòng đọc phần còn lại.
+            yield encode_part(first)
+            async for chunk in relay.stream_to(queue):
+                yield chunk
+
+        return StreamingResponse(
+            stream_generator(),
+            media_type=f"multipart/x-mixed-replace; boundary={BOUNDARY}",
+        )
+
+    @app.get("/api/video/status")
+    async def video_status():
+        relay = getattr(app.state, "video_relay", None)
+        if relay is not None:
+            return relay.status()
+        return build_status_when_disabled()
 
     @app.post("/api/ingress/envelope")
     async def ingress_envelope(payload: dict):
@@ -237,6 +292,37 @@ def create_app(
             "new_session_id": snapshot["session_id"],
             "persistence": "PENDING" if hub.logger else "DISABLED",
         }
+
+    @app.delete("/api/sessions/{session_id}")
+    async def delete_session(session_id: str):
+        hub = app.state.hub
+        if hub.store.session_id == session_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Không thể xóa phiên đang hoạt động. Hãy tạo phiên mới trước.",
+            )
+        if app.state.replay and app.state.replay.active and app.state.replay.session_id == session_id:
+            raise HTTPException(
+                status_code=409,
+                detail="Không thể xóa phiên đang phát lại.",
+            )
+        if not hub.logger:
+            raise HTTPException(status_code=404, detail="Hệ thống lưu trữ không khả dụng.")
+        try:
+            success = hub.logger.delete_session(session_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        if not success:
+            raise HTTPException(status_code=404, detail="Phiên không tồn tại hoặc đã bị xóa.")
+        return {"ok": True, "deleted_session_id": session_id}
+
+    @app.delete("/api/sessions")
+    async def delete_all_sessions():
+        hub = app.state.hub
+        if not hub.logger:
+            raise HTTPException(status_code=404, detail="Hệ thống lưu trữ không khả dụng.")
+        deleted = hub.logger.delete_all_sessions(active_session_id=hub.store.session_id)
+        return {"ok": True, "deleted_count": len(deleted), "deleted_sessions": deleted}
 
     def require_replay():
         if app.state.replay is None:
@@ -329,7 +415,7 @@ def create_app(
         url = payload.get("url")
         if not url:
             raise HTTPException(status_code=400, detail="Missing 'url'")
-        settings.esp32_ws_url = url
+        object.__setattr__(settings, "esp32_ws_url", url)
         hub = app.state.hub
         if hasattr(app.state, "ingress_task") and app.state.ingress_task:
             app.state.ingress_task.cancel()
@@ -433,7 +519,13 @@ if __name__ == "__main__":
         import os
         os.environ["KVC_ENABLE_MOCK"] = "0"
     enable_esp32 = False if args.no_esp32 else _env_bool("KVC_ENABLE_ESP32", True)
-    esp32_url = args.esp32_url or _env_str("KVC_ESP32_WS_URL", "ws://10.136.131.101:8080/telemetry")
+    # Mặc định PHẢI khớp Settings.esp32_ws_url (config.py) và IF-03 §2: SoftAP
+    # của gateway là 192.168.4.1. Trước 03/11/2026 chỗ này hardcode IP LAN của
+    # một máy cụ thể, nên chạy `python -m gcs.backend.main` mà không truyền
+    # --esp32-url thì ingress đi sai địa chỉ dù config.py đã đúng.
+    esp32_url = args.esp32_url or _env_str(
+        "KVC_ESP32_WS_URL", "ws://192.168.4.1:8080/telemetry"
+    )
 
     settings_kwargs = {
         "enable_mock": enable_mock,

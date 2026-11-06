@@ -1,12 +1,10 @@
-﻿/**
+/**
  * @file kvc_fpga_bbox.c
  * @brief Hiện thực driver thu nhận và giải mã BBox từ FPGA qua UART1 trên MCU Sonix SN34F788.
  *
  * Đối chiếu tài liệu đặc tả chuẩn:
  * - docs/interfaces/IF_FPGA_MCU_UART.md (IF-01)
  * - docs/hardware/wiring/KVC_MASTER_PINOUT_WIRING.md (Mục 3.5: P2.3 URXD1, P2.2 UTXD1)
- *
- * Người phụ trách phân hệ MCU UAV: Nguyễn Tá Duy Phong
  */
 
 #include "kvc_fpga_bbox.h"

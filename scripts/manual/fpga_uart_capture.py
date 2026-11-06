@@ -15,7 +15,8 @@ Kiem tra:
   - Timestamp don vi ms, tang dan
   - CRC-16/CCITT-FALSE (Little-Endian)
   - Truong BBox: X/Y uint16 LE, W/H uint8, class uint8, confidence uint8
-  - Thong ke: so frame, so byte, CRC loi, N trung binh, FPS do duoc
+  - Thong ke: so frame, so byte, CRC loi, N trung binh, FPS theo timestamp
+    IF-01 VA FPS theo wall-clock (hai so phai trung nhau)
 
 KHONG ket noi MCU. KHONG ghi vao bo. Chi doc.
 
@@ -59,6 +60,14 @@ def crc16_ccitt_false(data: bytes) -> int:
         for _ in range(8):
             crc = ((crc << 1) ^ 0x1021) & 0xFFFF if (crc & 0x8000) else ((crc << 1) & 0xFFFF)
     return crc
+
+
+def parse_file(path: str) -> bytes:
+    """Doc file HEX hoac file nhi phan .bin."""
+    if path.endswith(".bin"):
+        with open(path, "rb") as f:
+            return f.read()
+    return parse_hex_file(path)
 
 
 def parse_hex_file(path: str) -> bytes:
@@ -135,6 +144,65 @@ def iter_frames(buf: bytes):
         i += total
 
 
+def analyze_intervals(deltas):
+    """
+    Tim chu ky co so P sao cho moi khoang la boi so nguyen cua P.
+
+    OV2640 co the keo mot frame dai gap nhieu lan frame ngan nhat (AEC). Khi do
+    FPS trung binh che mat su that: 4,2 fps co the la 15 fps bi bo 3/4 so frame,
+    hoac 15 fps nhung moi frame dai gap 3 lan. Ham nay tim P va bao rms.
+
+    Tra ve (P, rms, histogram, ty_le_khop) hoac None neu khong du du lieu.
+    """
+    if len(deltas) < 8:
+        return None
+
+    d_min = min(deltas)
+    # P khong the lon hon khoang nho nhat; thu tu 0,5*d_min den d_min.
+    # Duyet TU LON XUONG va chi nhan rms tot hon ro ret (> 0,02 ms) de khi
+    # nhieu P cho cung rms (vd stream deu 10 ms: P=10 va P=5 cung rms=0) ta
+    # giu P LON NHAT — do moi la chu ky frame, khong phai uoc so cua no.
+    lo = max(1.0, d_min * 0.5)
+    hi = float(d_min)
+    step = max(0.005, (hi - lo) / 400.0)
+
+    best = None
+    p = hi
+    while p >= lo:
+        err = 0.0
+        for d in deltas:
+            m = max(1, int(round(d / p)))
+            err += (d - m * p) ** 2
+        rms = (err / len(deltas)) ** 0.5
+        if best is None or rms < best[1] - 0.02:
+            best = (p, rms)
+        p -= step
+
+    if best is None:
+        return None
+
+    P, rms = best
+    mult = hist_multiples(deltas, P)
+    # "khop" = khoang co so nguyen gan nhat sai lech < 5 % P
+    good = sum(1 for d in deltas
+               if abs(d - max(1, int(round(d / P))) * P) < 0.05 * P)
+    frac = good / len(deltas)
+    hist = sorted(((deltas.count(d), d) for d in set(deltas)), reverse=True)
+    return P, rms, hist, frac
+
+
+def hist_multiples(deltas, P):
+    """Dem so khoang ung voi tung boi so nguyen cua P."""
+    out = {}
+    for d in deltas:
+        m = max(1, int(round(d / P)))
+        if abs(d - m * P) < 0.08 * P:
+            out[m] = out.get(m, 0) + 1
+        else:
+            out["le"] = out.get("le", 0) + 1
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser(
         description="Doc va kiem chung khung IF-01 tu FPGA")
@@ -151,11 +219,15 @@ def main():
                     help="chi in tong ket, khong in tung frame")
     args = ap.parse_args()
 
+    # Thoi gian doc thuc do bang dong ho he thong, doc lap voi timestamp FPGA.
+    # None = khong do duoc (che do --file).
+    t_wall = None
+
     if args.file:
         if not os.path.exists(args.file):
             print(f"[!] Khong tim thay file: {args.file}")
             return 1
-        buf = parse_hex_file(args.file)
+        buf = parse_file(args.file)
         print(f"[*] Doc {len(buf)} byte tu {args.file}")
     else:
         try:
@@ -164,18 +236,26 @@ def main():
             print("[!] Thieu pyserial: pip install pyserial")
             return 1
         print(f"[*] Mo {args.port} @ {args.baud} 8N1, doc {args.seconds}s ...")
-        ser = serial.Serial(args.port, args.baud, timeout=0.2)
+        # timeout nho + doc theo in_waiting: KHONG block cho du 4096 byte.
+        # Truoc day ser.read(4096) block toi khi du buffer; o 75 B/s phai mat
+        # ~54,6 s, nen --seconds bi vo hieu va FPS in ra sai lech hoan toan.
+        ser = serial.Serial(args.port, args.baud, timeout=0.05)
         buf = bytearray()
         t0 = time.time()
         try:
-            while time.time() - t0 < args.seconds:
-                chunk = ser.read(4096)
-                if chunk:
-                    buf.extend(chunk)
+            while True:
+                n_wait = ser.in_waiting
+                if n_wait:
+                    buf.extend(ser.read(n_wait))
+                else:
+                    time.sleep(0.005)
+                if time.time() - t0 >= args.seconds:
+                    break
         finally:
             ser.close()
+        t_wall = time.time() - t0
         buf = bytes(buf)
-        print(f"[*] Nhan {len(buf)} byte")
+        print(f"[*] Nhan {len(buf)} byte trong {t_wall:.2f}s")
 
     if args.dump:
         io.open(args.dump, "wb").write(buf)
@@ -238,7 +318,35 @@ def main():
     print(f"  Timestamp        : {ts_first} -> {ts_last} ms "
           f"({dt_ms} ms, {'TANG DAN OK' if ts_ok else 'KHONG TANG DAN'})")
     if dt_ms > 0:
-        print(f"  FPS do duoc      : {1000.0*(n-1)/dt_ms:.1f} frame/s")
+        print(f"  FPS do duoc (timestamp): {1000.0*(n-1)/dt_ms:.1f} frame/s")
+    fps_wall = None
+    if t_wall and t_wall > 0:
+        # n frame tron ven trong cua so t_wall -> sai so +/-1 frame khi cua so ngan
+        fps_wall = n / t_wall
+        print(f"  Thoi gian doc thuc: {t_wall:.2f} s "
+              f"({args.seconds:.2f} s yeu cau)")
+        print(f"  FPS theo wall-clock: {fps_wall:.1f} frame/s")
+
+    # ── Phan bo khoang giua cac khung ──
+    # FPS trung binh che giau dao dong. Voi OV2640, AEC co the keo mot frame
+    # dai gap 2-6 lan frame ngan nhat, nen phai xem phan bo moi thay duoc.
+    deltas = [frames[i + 1]["ts"] - frames[i]["ts"] for i in range(n - 1)]
+    lattice = analyze_intervals(deltas)
+    if lattice:
+        P, rms, hist, frac = lattice
+        print(f"  Khoang (mode)    : {hist[0][1]} ms "
+              f"({hist[0][0]}/{len(deltas)} = "
+              f"{100.0*hist[0][0]/len(deltas):.0f}%)")
+        print(f"  Khoang min/max   : {min(deltas)} / {max(deltas)} ms")
+        print(f"  Luoi chu ky      : P={P:.2f} ms ({1000.0/P:.2f} frame/s), "
+              f"rms={rms:.2f} ms, {100.0*frac:.0f}% khoang khop")
+        boi = ", ".join(f"{m}x:{c}" for m, c in
+                        sorted(hist_multiples(deltas, P).items()))
+        print(f"  Boi so           : {boi}")
+        if len(hist_multiples(deltas, P)) > 1:
+            print("  CANH BAO: nhieu boi so -> nhip khung KHONG deu; "
+                  "xem A6 cua PLAN-005 (AEC / chia xung)")
+
     print(f"  Class gap        : {classes if classes else '(khong co)'}")
     print()
 
@@ -275,6 +383,22 @@ def main():
     if bad_conf:
         print(f"  CANH BAO: {len(bad_conf)} box co confidence > 100 "
               f"(vd {bad_conf[0]['conf']}) — kiem tra clamp 0..100")
+
+    # Timestamp phai troi dung 1 ms cho moi 1 ms thuc. So truc tiep do dai
+    # cua so (dt_ms) voi wall-clock, dung so FPS: fps_wall dung n (khong phai
+    # n-1) nen sai so luong tu +/-1 frame, khong hop de lam nguong 10 %.
+    # Dung sai 2 chu ky khung WALL-CLOCK (khong lay tu dt_ms — neu timestamp
+    # sai don vi thi chu ky suy ra cung sai theo, nguong se tu vo hieu).
+    if n >= 2 and t_wall and t_wall > 0:
+        dt_s = dt_ms / 1000.0
+        chu_ky_wall = t_wall / n
+        dung_sai = max(0.5, 2.0 * chu_ky_wall)
+        lech_s = abs(dt_s - t_wall)
+        if lech_s > dung_sai:
+            print(f"  CANH BAO: timestamp troi {dt_s:.2f}s nhung wall-clock "
+                  f"{t_wall:.2f}s (lech {lech_s:.2f}s > {dung_sai:.2f}s) — "
+                  f"timestamp khong phai ms hoac cua so doc sai")
+            ok = False
 
     print()
     if ok:

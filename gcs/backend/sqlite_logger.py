@@ -8,7 +8,7 @@ import re
 import sqlite3
 import threading
 from concurrent.futures import Future
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -79,13 +79,19 @@ class LogRequest:
     ticket: Future
 
 
+@dataclass
+class CloseSessionCommand:
+    session_id: str
+    done: threading.Event = field(default_factory=threading.Event)
+
+
 class SQLiteLogger:
     """Owns all write connections on one thread; producers only use put_nowait."""
 
     def __init__(self, storage_dir: Path, queue_capacity: int = 1024):
         self.storage_dir = Path(storage_dir)
         self.queue_capacity = queue_capacity
-        self._queue: queue.Queue[LogRequest] = queue.Queue(maxsize=queue_capacity)
+        self._queue: queue.Queue[LogRequest | CloseSessionCommand] = queue.Queue(maxsize=queue_capacity)
         self._thread: threading.Thread | None = None
         self._stop = threading.Event()
         self._ready = threading.Event()
@@ -178,6 +184,15 @@ class SQLiteLogger:
                 try:
                     request = self._queue.get(timeout=0.05)
                 except queue.Empty:
+                    continue
+                if isinstance(request, CloseSessionCommand):
+                    if current_session == request.session_id and connection is not None:
+                        connection.close()
+                        connection = None
+                        current_session = None
+                        with self._connection_lock:
+                            self._connection = None
+                    request.done.set()
                     continue
                 with self._lock:
                     self._inflight += 1
@@ -315,6 +330,52 @@ class SQLiteLogger:
     def sessions(self) -> list[dict[str, Any]]:
         with self._lock:
             return [dict(item) for _, item in sorted(self._sessions.items())]
+
+    def delete_session(self, session_id: str) -> bool:
+        session_id = self._validate_session_id(session_id)
+        path = self._db_path(session_id)
+        with self._lock:
+            exists_in_memory = session_id in self._sessions
+        if not exists_in_memory and not path.exists():
+            return False
+
+        if self._thread is not None and self._thread.is_alive() and not self._stop.is_set():
+            cmd = CloseSessionCommand(session_id)
+            try:
+                self._queue.put(cmd, timeout=1.0)
+                cmd.done.wait(timeout=2.0)
+            except (queue.Full, Exception):
+                pass
+
+        deleted = False
+        for p in [path, Path(str(path) + "-wal"), Path(str(path) + "-shm")]:
+            if p.exists():
+                try:
+                    p.unlink()
+                    deleted = True
+                except OSError:
+                    pass
+
+        with self._lock:
+            self._sessions.pop(session_id, None)
+
+        return deleted or exists_in_memory
+
+    def delete_all_sessions(self, active_session_id: str | None = None) -> list[str]:
+        with self._lock:
+            candidates = list(self._sessions.keys())
+        if self.storage_dir.exists():
+            for p in self.storage_dir.glob("*.db"):
+                sid = p.stem
+                if _SAFE_SESSION.fullmatch(sid) and sid not in candidates:
+                    candidates.append(sid)
+        deleted: list[str] = []
+        for sid in candidates:
+            if active_session_id and sid == active_session_id:
+                continue
+            if self.delete_session(sid):
+                deleted.append(sid)
+        return deleted
 
     def status(self) -> dict[str, Any]:
         with self._lock:

@@ -6,8 +6,6 @@
  * - docs/hardware/wiring/KVC_MASTER_PINOUT_WIRING.md (Mục 2 & 3.1)
  * - firmware/mcu_payload/inc/kvc_pinout.h
  * - firmware/mcu_payload/inc/kvc_telemetry.h (IF-02)
- *
- * Người phụ trách: Nguyễn Tá Duy Phong
  */
 
 #include "SN34F780.h"

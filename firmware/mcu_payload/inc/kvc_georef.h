@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file kvc_georef.h
  * @brief Chiếu BBox ảnh xuống mặt nước để ra toạ độ mục tiêu (georeferencing).
  *
@@ -49,8 +49,6 @@
  *   - `m_per_deg_lon` phụ thuộc vĩ độ; giá trị mặc định ứng với ~16° Bắc. Dùng
  *     `kvc_geo_config_for_latitude()` khi triển khai ở vĩ độ khác.
  * Vì vậy kết quả chỉ là georef XẤP XỈ, chưa đủ nghiệm thu độ chính xác cứu nạn.
- *
- * Người phụ trách: Nguyễn Tá Duy Phong
  */
 
 #ifndef KVC_GEOREF_H

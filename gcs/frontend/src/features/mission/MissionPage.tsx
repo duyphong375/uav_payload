@@ -1,10 +1,8 @@
-﻿import React, { useState } from 'react'
+import React, { useState } from 'react'
 import {
   AlertCircle,
   AlertTriangle,
   ChevronDown,
-  ChevronUp,
-  Columns,
   Compass,
   Radio,
   Video,
@@ -13,48 +11,89 @@ import {
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { InfoTip } from '@/components/shared/InfoTip'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { GpsMapPanel } from '@/features/map/GpsMapPanel'
+import { MapGnssBanner } from '@/features/map/MapGnssBanner'
+import { MapLayerSwitcher } from '@/features/map/MapLayerSwitcher'
 import { LocalRadarPanel } from '@/features/radar/LocalRadarPanel'
 import { VideoPanel } from '@/features/video/VideoPanel'
+import { useHeightTier } from '@/lib/viewport'
 import { useMission } from '@/state/MissionProvider'
 import { BottomTacticalDock } from './BottomTacticalDock'
 import { FloatingMapControls } from './FloatingMapControls'
 
-export type ViewportMode = 'MAP' | 'RADAR' | 'SPLIT'
+export type ViewportMode = 'MAP' | 'RADAR' | 'VIDEO'
+
+const VIEWPORT_MODES: Array<{
+  mode: ViewportMode
+  icon: React.ReactNode
+  label: string
+  shortLabel: string
+  ariaLabel: string
+}> = [
+  {
+    mode: 'MAP',
+    icon: <Compass className="h-3.5 w-3.5" />,
+    label: 'Bản đồ WGS-84',
+    shortLabel: 'Bản đồ',
+    ariaLabel: 'Xem Bản đồ WGS-84',
+  },
+  {
+    mode: 'RADAR',
+    icon: <Radio className="h-3.5 w-3.5" />,
+    label: 'Radar Local (cm)',
+    shortLabel: 'Radar',
+    ariaLabel: 'Xem Radar Local (Hệ Local)',
+  },
+  {
+    mode: 'VIDEO',
+    icon: <Video className="h-3.5 w-3.5" />,
+    label: 'Video Stream (ESP32-S3-CAM)',
+    shortLabel: 'Video Stream',
+    ariaLabel: 'Xem Video Stream từ ESP32-S3-CAM',
+  },
+]
 
 /** Overlay chrome dùng chung cho thanh nổi trên bản đồ: một lớp kính duy nhất. */
 const overlayChrome =
   'kvc-on-overlay bg-[var(--kvc-overlay)] border border-[var(--kvc-line-strong)] text-[var(--kvc-text-on-overlay)]'
-
-const sourceBadgeClass = (mode: string) => {
-  if (mode === 'MOCK') return 'border-[var(--kvc-mock-line)] text-[var(--kvc-mock-ink)] bg-[var(--kvc-mock-bg)]'
-  return 'border-[var(--kvc-ok-line)] text-[var(--kvc-ok-ink)] bg-[var(--kvc-ok-bg)]'
-}
 
 const modeButtonClass = (active: boolean) =>
   active
     ? 'bg-[var(--kvc-accent-fill)] text-[var(--kvc-text-on-fill)] border-[var(--kvc-accent)]'
     : 'text-[var(--kvc-text-on-overlay-muted)] border-transparent hover:text-[var(--kvc-text-on-overlay)] hover:bg-[var(--kvc-surface-2)]/25'
 
-export const MissionPage: React.FC = () => {
-  const { state, selectedScenarioId, dispatch } = useMission()
-  const { source_mode, session_id, ws_connected, target, alerts } = state
+const readTopBarPreference = (): boolean | null => {
+  try {
+    const saved = localStorage.getItem('kvc_topbar_collapsed')
+    return saved === null ? null : saved === 'true'
+  } catch {
+    return null
+  }
+}
 
-  // Chế độ hiển thị khung nhìn định vị (Bản đồ WGS-84 | Radar Hệ Local | Chia đôi)
+export const MissionPage: React.FC = () => {
+  const { state, dispatch } = useMission()
+  const { target, alerts } = state
+  const heightTier = useHeightTier()
+
+  // Chế độ hiển thị khung nhìn định vị (Bản đồ WGS-84 | Radar Hệ Local | Video)
   const [viewportMode, setViewportMode] = useState<ViewportMode>('MAP')
+
+  // Lớp nền bản đồ: bản đồ số (2D) hoặc ảnh vệ tinh (3D). State nằm ở đây để
+  // nút chuyển lớp được bố trí trong overlay rail, không nổi riêng trong khung
+  // bản đồ (nơi nó từng đè lên dock/PiP ở màn hình nhỏ).
+  const [mapLayerMode, setMapLayerMode] = useState<'2D' | '3D'>('2D')
 
   // Bật/tắt video phụ dạng PiP (mặc định thu gọn để tối đa diện tích bản đồ)
   const [showVideoFeed, setShowVideoFeed] = useState<boolean>(false)
 
-  // Bật/tắt dạng thanh thu của thanh điều khiển trên cùng để tăng diện tích hiển thị bản đồ
+  // Thanh thu của thanh điều khiển trên cùng để tăng diện tích hiển thị bản đồ.
+  // Màn hình thấp (laptop 768 px có thanh trình duyệt, hoặc zoom 125 %) mặc định
+  // thu gọn; lựa chọn thủ công của người vận hành vẫn được ưu tiên nếu đã lưu.
   const [isTopBarCollapsed, setIsTopBarCollapsed] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('kvc_topbar_collapsed') === 'true'
-    } catch {
-      return false
-    }
+    const saved = readTopBarPreference()
+    if (saved !== null) return saved
+    return heightTier !== 'regular'
   })
 
   const toggleTopBarCollapse = () => {
@@ -68,6 +107,11 @@ export const MissionPage: React.FC = () => {
       return next
     })
   }
+
+  // Cửa sổ quá thấp thì đóng PiP: dock đã chiếm đáy, giữ PiP sẽ đè lên nhau.
+  React.useEffect(() => {
+    if (heightTier === 'tight') setShowVideoFeed(false)
+  }, [heightTier])
 
   // Phím tắt 'T' để thu gọn / mở rộng nhanh thanh điều khiển nổi
   React.useEffect(() => {
@@ -92,19 +136,19 @@ export const MissionPage: React.FC = () => {
   }, [])
 
   const isLocalGrid = target?.coordinate_frame === 'LOCAL_GRID'
+  const hasGpsFix =
+    state.camera_position.is_valid &&
+    state.camera_position.latitude !== null &&
+    state.camera_position.longitude !== null
 
   // Lọc các cảnh báo nguy cấp đang hoạt động chưa tiếp nhận
   const criticalAlert = alerts.find(
     (a) => a.active && (a.level === 'CRITICAL' || a.level === 'WARN') && !a.acknowledged
   )
 
-  // Tên kịch bản hoặc phiên làm việc
-  const sessionOrScenarioName =
-    source_mode === 'MOCK'
-      ? selectedScenarioId
-        ? `Kịch bản: ${selectedScenarioId}`
-        : 'Mô phỏng độc lập'
-      : `Phiên: ${session_id || 'Chưa có phiên'}`
+  const gnssBanner = !hasGpsFix && viewportMode === 'MAP'
+  const localGridNotice = isLocalGrid && viewportMode === 'MAP'
+  const hasBannerRow = Boolean(criticalAlert) || gnssBanner || localGridNotice
 
   // Kích hoạt Đặt lại khung nhìn về vị trí UAV
   const handleTriggerResetView = () => {
@@ -119,309 +163,231 @@ export const MissionPage: React.FC = () => {
 
   return (
     <div className="relative flex-1 w-full h-full min-h-0 overflow-hidden select-none bg-[var(--kvc-bg)]">
-      {/* 1. KHUNG BẢN ĐỒ / RADAR ĐỘC LẬP TỪNG CHẾ ĐỘ HOẶC SONG SONG */}
+      {/* 1. KHUNG BẢN ĐỒ / RADAR / VIDEO — chiếm toàn bộ, nằm dưới lớp rail */}
       <div className="w-full h-full min-h-0 overflow-hidden">
-        {viewportMode === 'MAP' && <GpsMapPanel hideHeader />}
+        {viewportMode === 'MAP' && <GpsMapPanel hideHeader layerMode={mapLayerMode} />}
         {viewportMode === 'RADAR' && (
           <LocalRadarPanel onSwitchToMap={() => setViewportMode('MAP')} hideHeader />
         )}
-        {viewportMode === 'SPLIT' && (
-          <div className="w-full flex flex-col md:flex-row gap-2 h-full min-h-0 overflow-hidden p-1 sm:p-2">
-            <div className="flex-1 h-1/2 md:h-full min-h-0 overflow-hidden relative rounded-kvc-panel border border-[var(--kvc-line-strong)] bg-[var(--kvc-surface)]">
-              <div className="absolute top-14 left-3 z-[var(--kvc-z-map-overlay)] px-2.5 py-0.5 rounded-kvc-control bg-[var(--kvc-surface-2)] text-[11px] font-mono text-[var(--kvc-text-muted)] font-semibold border border-[var(--kvc-line)]">
-                BẢN ĐỒ WGS-84
-              </div>
-              <GpsMapPanel hideHeader />
-            </div>
-            <div className="flex-1 h-1/2 md:h-full min-h-0 overflow-hidden relative rounded-kvc-panel border border-[var(--kvc-line-strong)] bg-[var(--kvc-surface)]">
-              <div className="absolute top-14 left-3 z-[var(--kvc-z-map-overlay)] px-2.5 py-0.5 rounded-kvc-control bg-[var(--kvc-surface-2)] text-[11px] font-mono text-[var(--kvc-text-muted)] font-semibold border border-[var(--kvc-line)]">
-                RADAR LOCAL (cm)
-              </div>
-              <LocalRadarPanel onSwitchToMap={() => setViewportMode('MAP')} hideHeader />
-            </div>
+        {viewportMode === 'VIDEO' && (
+          <div className="w-full h-full min-h-0 overflow-hidden relative bg-[var(--kvc-bg)]">
+            <VideoPanel hideHeader osdPosition="top-right" />
           </div>
         )}
       </div>
 
-      {/* 2. DẢI CẢNH BÁO NỔI TRUNG TÂM */}
-      <div className="absolute top-14 left-1/2 -translate-x-1/2 z-[var(--kvc-z-banner)] w-[92%] max-w-xl pointer-events-auto flex flex-col gap-1.5 items-center">
-        {criticalAlert && (
+      {/* 2. OVERLAY RAIL — mọi lớp nổi nằm trong MỘT lưới có ô cố định.
+          Trước đây mỗi lớp tự đặt `absolute` với offset riêng nên chồng nhau khi
+          màn hình hẹp hoặc thấp. Lưới 3 hàng (trên / giữa / dưới) tách banner,
+          PiP và dock ra các hàng khác nhau, nên chúng đẩy nhau thay vì đè nhau.
+          `pointer-events-none` để bản đồ vẫn nhận chuột ở vùng trống. */}
+      <div
+        className="pointer-events-none absolute inset-0 z-[var(--kvc-z-panel)] p-2 sm:p-3
+                   grid grid-cols-[minmax(0,1fr)_auto] grid-rows-[auto_minmax(0,1fr)_auto]
+                   gap-2"
+      >
+        {/* Hàng 1, cột 1: thanh công cụ khung nhìn + PiP xếp dọc trong luồng */}
+        <div className="pointer-events-none flex flex-col items-start gap-2 min-w-0 min-h-0 justify-self-start max-w-max">
           <div
-            className={`w-full px-3 py-1 rounded-kvc-control border flex items-center justify-between gap-2 text-xs ${
-              criticalAlert.level === 'CRITICAL'
-                ? 'bg-[var(--kvc-crit-bg)] border-[var(--kvc-crit-line)] text-[var(--kvc-crit-ink)]'
-                : 'bg-[var(--kvc-warn-bg)] border-[var(--kvc-warn-line)] text-[var(--kvc-warn-ink)]'
-            }`}
-            role="alert"
+            data-overlay="viewport-toolbar"
+            className={`pointer-events-auto flex items-center gap-1 p-1 rounded-kvc-panel ${overlayChrome} shrink-0 max-w-full`}
           >
-            <div className="flex items-center gap-1.5 min-w-0">
-              {criticalAlert.level === 'CRITICAL' ? (
-                <AlertCircle className="h-4 w-4 shrink-0" />
-              ) : (
-                <AlertTriangle className="h-4 w-4 shrink-0" />
-              )}
-              <span className="font-mono font-bold shrink-0">[{criticalAlert.code}]</span>
-              <span className="truncate">{criticalAlert.message}</span>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => dispatch({ type: 'ACKNOWLEDGE_ALERT', payload: criticalAlert.id })}
-              className="h-5 px-2 text-[11px] font-semibold shrink-0 border-current hover:bg-transparent"
-            >
-              Tiếp nhận (ACK)
-            </Button>
-          </div>
-        )}
-
-        {isLocalGrid && viewportMode === 'MAP' && (
-          <div className="bg-[var(--kvc-accent-bg)] border border-[var(--kvc-accent-line)] px-3 py-1 rounded-full text-xs text-[var(--kvc-accent-ink)] flex items-center gap-2">
-            <span>
-              Gói tin hệ LOCAL_GRID (#{target?.track_id ?? 'N/A'}: X={target?.local_x_cm ?? 'N/A'}cm, Y={target?.local_y_cm ?? 'N/A'}cm)
-            </span>
-            <button
-              type="button"
-              onClick={() => setViewportMode('RADAR')}
-              className="text-xs font-bold underline hover:no-underline cursor-pointer ml-1"
-            >
-              Xem Radar &rarr;
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* 3. THANH ĐIỀU KHIỂN NỔI TRÊN BẢN ĐỒ */}
-      {isTopBarCollapsed ? (
-        <div
-          className={`absolute top-3 left-3 z-[var(--kvc-z-panel)] flex items-center gap-1.5 p-1 rounded-kvc-panel ${overlayChrome} pointer-events-auto`}
-        >
-          <div className="flex items-center bg-[var(--kvc-surface-2)]/20 p-0.5 rounded-kvc-control border border-[var(--kvc-line)]/40 h-7">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewportMode('MAP')}
-              className={`h-6 px-1.5 text-[11px] gap-1 font-semibold cursor-pointer border ${modeButtonClass(viewportMode === 'MAP')}`}
-              aria-label="Xem Bản đồ WGS-84"
-            >
-              <Compass className="h-3 w-3" />
-              <span className="hidden md:inline">GPS</span>
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewportMode('RADAR')}
-              className={`h-6 px-1.5 text-[11px] gap-1 font-semibold cursor-pointer border ${modeButtonClass(viewportMode === 'RADAR')}`}
-              aria-label="Xem Radar Local (Hệ Local)"
-            >
-              <Radio className="h-3 w-3" />
-              <span className="hidden md:inline">Radar</span>
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setViewportMode('SPLIT')}
-              className={`h-6 px-1 text-[11px] gap-1 font-semibold hidden xl:inline-flex cursor-pointer border ${modeButtonClass(viewportMode === 'SPLIT')}`}
-              aria-label="Xem Chia đôi Bản đồ và Radar"
-            >
-              <Columns className="h-3 w-3" />
-            </Button>
-          </div>
-
-          <Badge
-            variant="outline"
-            className="text-[11px] px-1.5 py-0 h-5 font-mono border-[var(--kvc-line-strong)] text-[var(--kvc-text-on-overlay-muted)]"
-          >
-            {source_mode}
-          </Badge>
-
-          {source_mode !== 'MOCK' && !ws_connected && (
-            <Badge variant="destructive" className="text-[11px] px-1.5 py-0 h-5 font-mono">
-              MẤT KẾT NỐI
-            </Badge>
-          )}
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowVideoFeed(!showVideoFeed)}
-            className={`h-6 w-6 cursor-pointer border ${
-              showVideoFeed
-                ? 'bg-[var(--kvc-accent-bg)] text-[var(--kvc-accent-ink)] border-[var(--kvc-accent-line)]'
-                : 'text-[var(--kvc-text-on-overlay-muted)] border-transparent hover:text-[var(--kvc-text-on-overlay)] hover:bg-[var(--kvc-surface-2)]/25'
-            }`}
-            title={showVideoFeed ? 'Thu gọn video PiP' : 'Mở video quang học PiP'}
-            aria-label="Bật tắt Video phụ"
-          >
-            {showVideoFeed ? <Video className="h-3 w-3" /> : <VideoOff className="h-3 w-3" />}
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={toggleTopBarCollapse}
-            className="h-6 px-2 text-[11px] gap-1 font-semibold text-[var(--kvc-accent-ink)] hover:bg-[var(--kvc-surface-2)]/25 rounded-kvc-control cursor-pointer ml-1"
-            aria-label="Mở rộng thanh điều khiển"
-            title="Mở rộng đầy đủ thanh điều khiển tác chiến (Phím T)"
-          >
-            <ChevronDown className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Mở rộng</span>
-          </Button>
-        </div>
-      ) : (
-        <div className="absolute top-3 left-3 right-3 z-[var(--kvc-z-panel)] flex items-center justify-between gap-2 pointer-events-none">
-          {/* Góc trên trái: tiêu đề, nguồn, kết nối, phiên */}
-          <div
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-kvc-panel ${overlayChrome} max-w-[calc(100vw-420px)] pointer-events-auto`}
-          >
-            <h1 className="text-xs sm:text-sm font-bold tracking-tight text-[var(--kvc-text-on-overlay)] truncate">
-              Giám sát định vị tải nhiệm vụ
-            </h1>
-            <InfoTip text="Bàn làm việc tác chiến trực tiếp: khung nhìn bản đồ toàn chiều rộng, radar hệ local, mục tiêu phát hiện Người/Tàu và dock bàn giao cứu nạn SAR." />
-
-            <Badge
-              variant="outline"
-              className={`text-[11px] px-1.5 py-0 h-4.5 font-mono shrink-0 ${sourceBadgeClass(source_mode)}`}
-            >
-              Nguồn: {source_mode}
-            </Badge>
-
-            {source_mode !== 'MOCK' && !ws_connected && (
-              <Badge variant="destructive" className="text-[11px] px-1.5 py-0 h-4.5 font-mono shrink-0">
-                MẤT KẾT NỐI
-              </Badge>
-            )}
-
-            <span className="text-[11px] font-mono text-[var(--kvc-text-on-overlay-muted)] truncate hidden xl:inline max-w-[160px]">
-              • {sessionOrScenarioName}
-            </span>
-          </div>
-
-          {/* Góc trên phải: chuyển viewport + video PiP + thu gọn */}
-          <div className={`flex items-center gap-1.5 p-1 rounded-kvc-panel ${overlayChrome} pointer-events-auto`}>
-            <div className="flex items-center bg-[var(--kvc-surface-2)]/20 p-0.5 rounded-kvc-control border border-[var(--kvc-line)]/40 h-7">
+            {isTopBarCollapsed ? (
               <Button
                 variant="ghost"
-                size="sm"
-                onClick={() => setViewportMode('MAP')}
-                className={`h-6 px-2 text-[11px] gap-1 font-semibold cursor-pointer border ${modeButtonClass(viewportMode === 'MAP')}`}
-                aria-label="Xem Bản đồ WGS-84"
+                size="icon"
+                onClick={toggleTopBarCollapse}
+                className="h-7 w-7 text-[var(--kvc-text-on-overlay-muted)] hover:bg-[var(--kvc-surface-2)]/25 rounded-kvc-control cursor-pointer"
+                aria-label="Mở rộng thanh điều khiển"
+                title="Hiện thanh điều khiển khung nhìn (Phím T)"
               >
-                <Compass className="h-3 w-3" />
-                <span className="hidden sm:inline">Bản đồ GPS (WGS-84)</span>
-                <span className="sm:hidden">GPS</span>
+                <ChevronDown className="h-3.5 w-3.5 rotate-180" />
               </Button>
+            ) : (
+              <>
+                <div className="flex items-center bg-[var(--kvc-surface-2)]/20 p-0.5 rounded-kvc-control border border-[var(--kvc-line)]/40 h-7">
+                  {VIEWPORT_MODES.map(({ mode, icon, shortLabel, ariaLabel }) => (
+                    <Button
+                      key={mode}
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setViewportMode(mode)}
+                      className={`h-6 px-2 text-[11px] gap-1 font-semibold cursor-pointer border ${modeButtonClass(viewportMode === mode)}`}
+                      aria-label={ariaLabel}
+                      aria-pressed={viewportMode === mode}
+                    >
+                      {icon}
+                      <span className="hidden md:inline">{shortLabel}</span>
+                    </Button>
+                  ))}
+                </div>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setViewportMode('RADAR')}
-                className={`h-6 px-2 text-[11px] gap-1 font-semibold cursor-pointer border ${modeButtonClass(viewportMode === 'RADAR')}`}
-                aria-label="Xem Radar Local (Hệ Local)"
-              >
-                <Radio className="h-3 w-3" />
-                <span className="hidden sm:inline">Radar Local (cm)</span>
-                <span className="sm:hidden">Radar</span>
-              </Button>
+                {viewportMode !== 'VIDEO' && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowVideoFeed(!showVideoFeed)}
+                    className={`h-7 w-7 cursor-pointer border ${
+                      showVideoFeed
+                        ? 'bg-[var(--kvc-accent-bg)] text-[var(--kvc-accent-ink)] border-[var(--kvc-accent-line)]'
+                        : 'text-[var(--kvc-text-on-overlay-muted)] border-transparent hover:text-[var(--kvc-text-on-overlay)] hover:bg-[var(--kvc-surface-2)]/25'
+                    }`}
+                    title={showVideoFeed ? 'Thu gọn video PiP' : 'Mở video quang học PiP'}
+                    aria-label="Bật tắt Video phụ"
+                  >
+                    {showVideoFeed ? (
+                      <Video className="h-3.5 w-3.5" />
+                    ) : (
+                      <VideoOff className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                )}
 
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setViewportMode('SPLIT')}
-                className={`h-6 px-2 text-[11px] gap-1 font-semibold inline-flex cursor-pointer border ${modeButtonClass(viewportMode === 'SPLIT')}`}
-                aria-label="Xem Hai Khung Riêng Song Song (Bản đồ + Radar)"
-              >
-                <Columns className="h-3 w-3" />
-                <span className="hidden md:inline">Hai khung song song</span>
-                <span className="md:hidden">Song song</span>
-              </Button>
-            </div>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowVideoFeed(!showVideoFeed)}
-              className={`h-7 px-2 text-[11px] gap-1 font-medium cursor-pointer border ${
-                showVideoFeed
-                  ? 'bg-[var(--kvc-accent-bg)] text-[var(--kvc-accent-ink)] border-[var(--kvc-accent-line)]'
-                  : 'text-[var(--kvc-text-on-overlay-muted)] border-transparent hover:text-[var(--kvc-text-on-overlay)] hover:bg-[var(--kvc-surface-2)]/25'
-              }`}
-              title={showVideoFeed ? 'Thu gọn video PiP' : 'Mở video quang học PiP'}
-              aria-label="Bật tắt Video phụ"
-            >
-              {showVideoFeed ? <Video className="h-3.5 w-3.5" /> : <VideoOff className="h-3.5 w-3.5" />}
-              <span className="hidden sm:inline">Video PiP</span>
-            </Button>
-
-            <Tooltip>
-              <TooltipTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={toggleTopBarCollapse}
-                  className="h-7 px-2 text-[11px] gap-1 text-[var(--kvc-accent-ink)] hover:bg-[var(--kvc-surface-2)]/25 rounded-kvc-control cursor-pointer border border-[var(--kvc-accent-line)] font-semibold"
+                  className="h-7 w-7 text-[var(--kvc-text-on-overlay-muted)] hover:bg-[var(--kvc-surface-2)]/25 rounded-kvc-control cursor-pointer"
                   aria-label="Thu gọn thanh điều khiển"
-                  title="Thu gọn thanh điều khiển để tăng tối đa diện tích bản đồ (Phím T)"
+                  title="Ẩn thanh điều khiển để xem bản đồ trọn vẹn (Phím T)"
                 >
-                  <ChevronUp className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Thu gọn</span>
+                  <ChevronDown className="h-3.5 w-3.5" />
                 </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">
-                <p className="text-xs">Thu gọn thanh điều khiển để tăng tối đa diện tích bản đồ (Phím T)</p>
-              </TooltipContent>
-            </Tooltip>
+              </>
+            )}
           </div>
-        </div>
-      )}
 
-      {/* 5. GÓC DƯỚI BÊN TRÁI: dock tác chiến */}
-      <BottomTacticalDock
-        showVideoFeed={showVideoFeed}
-        onToggleVideoFeed={() => setShowVideoFeed(!showVideoFeed)}
-      />
-
-      {/* 6. GÓC DƯỚI BÊN PHẢI: điều khiển khung nhìn */}
-      <FloatingMapControls
-        onResetView={handleTriggerResetView}
-        onFocusTarget={handleTriggerFocusTarget}
-      />
-
-      {/* 7. KHUNG NỔI VIDEO PICTURE-IN-PICTURE (PiP) */}
-      {showVideoFeed && (
-        <div
-          className="absolute top-13 left-3 z-[var(--kvc-z-panel)] w-72 sm:w-80 md:w-96 rounded-kvc-panel border border-[var(--kvc-line-strong)] bg-[var(--kvc-surface)] overflow-hidden flex flex-col"
-          role="dialog"
-          aria-modal="false"
-          aria-label="Cửa sổ Video PiP"
-        >
-          <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--kvc-surface-2)] border-b border-[var(--kvc-line)]">
-            <span className="text-xs font-semibold text-[var(--kvc-text)] flex items-center gap-1.5">
-              <Video className="h-3.5 w-3.5 text-[var(--kvc-accent-ink)]" />
-              Video tham chiếu
-              <Badge
-                variant="outline"
-                className="text-[11px] px-1 py-0 h-4 font-mono text-[var(--kvc-accent-ink)] border-[var(--kvc-accent-line)]"
-              >
-                PiP
-              </Badge>
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowVideoFeed(false)}
-              className="h-6 w-6 text-[var(--kvc-text-muted)] hover:text-[var(--kvc-text)] cursor-pointer"
-              title="Đóng video PiP"
+          {/* PiP nằm ngay dưới thanh công cụ TRONG CÙNG cột, không phải lớp
+              absolute riêng; nhờ vậy nó không bao giờ đè lên banner cảnh báo
+              và bị chặn chiều cao theo khung nhìn thấp. */}
+          {showVideoFeed && viewportMode !== 'VIDEO' && (
+            <div
+              data-overlay="video-pip"
+              className="pointer-events-auto w-[min(22rem,100%)] max-h-[min(32dvh,18rem)] rounded-kvc-panel border border-[var(--kvc-line-strong)] bg-[var(--kvc-surface)] overflow-hidden flex flex-col min-h-0 shrink"
+              role="dialog"
+              aria-modal="false"
+              aria-label="Cửa sổ Video PiP"
             >
-              <X className="h-3.5 w-3.5" />
-            </Button>
+              <div className="flex items-center justify-between px-3 py-1.5 bg-[var(--kvc-surface-2)] border-b border-[var(--kvc-line)] shrink-0">
+                <span className="text-xs font-semibold text-[var(--kvc-text)] flex items-center gap-1.5 min-w-0">
+                  <Video className="h-3.5 w-3.5 shrink-0 text-[var(--kvc-accent-ink)]" />
+                  <span className="truncate">Video tham chiếu</span>
+                  <Badge
+                    variant="outline"
+                    className="text-[11px] px-1 py-0 h-4 font-mono text-[var(--kvc-accent-ink)] border-[var(--kvc-accent-line)] shrink-0"
+                  >
+                    PiP
+                  </Badge>
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowVideoFeed(false)}
+                  className="h-6 w-6 shrink-0 text-[var(--kvc-text-muted)] hover:text-[var(--kvc-text)] cursor-pointer"
+                  title="Đóng video PiP"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+              <div className="flex-1 min-h-0 overflow-hidden">
+                <VideoPanel hideHeader />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Hàng 1, cột 2: Góc trên bên phải — Cụm cảnh báo nổi (Alert Corner).
+            Đưa toàn bộ cảnh báo (criticalAlert, gnssBanner, localGridNotice) về
+            1 góc màn hình thay vì chiếm toàn bộ dải giữa màn hình, giúp tầm nhìn
+            bản đồ / radar luôn thông thoáng. */}
+        {hasBannerRow && (
+          <div
+            data-overlay="alert-corner"
+            className="col-start-2 row-start-1 justify-self-end self-start pointer-events-auto flex flex-col items-end gap-1.5 max-w-[min(26rem,calc(100vw-18rem))] min-w-0 z-30"
+          >
+            {criticalAlert && (
+              <div
+                data-overlay="alert-banner"
+                className={`w-auto max-w-full px-3 py-1.5 rounded-kvc-control border flex items-center justify-between gap-2 text-xs shadow-md backdrop-blur-sm ${
+                  criticalAlert.level === 'CRITICAL'
+                    ? 'bg-[var(--kvc-crit-bg)] border-[var(--kvc-crit-line)] text-[var(--kvc-crit-ink)]'
+                    : 'bg-[var(--kvc-warn-bg)] border-[var(--kvc-warn-line)] text-[var(--kvc-warn-ink)]'
+                }`}
+                role="alert"
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  {criticalAlert.level === 'CRITICAL' ? (
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                  ) : (
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                  )}
+                  <span className="font-mono font-bold shrink-0">[{criticalAlert.code}]</span>
+                  <span className="truncate max-w-[180px] sm:max-w-[240px]" title={criticalAlert.message}>
+                    {criticalAlert.message}
+                  </span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => dispatch({ type: 'ACKNOWLEDGE_ALERT', payload: criticalAlert.id })}
+                  className="h-5 px-2 text-[11px] font-semibold shrink-0 border-current hover:bg-transparent cursor-pointer"
+                >
+                  Tiếp nhận (ACK)
+                </Button>
+              </div>
+            )}
+
+            {gnssBanner && <MapGnssBanner cameraPosition={state.camera_position} />}
+
+            {localGridNotice && (
+              <div className="bg-[var(--kvc-accent-bg)] border border-[var(--kvc-accent-line)] px-3 py-1 rounded-full text-xs text-[var(--kvc-accent-ink)] flex items-center gap-2 max-w-full shadow-md">
+                <span className="truncate max-w-[200px] sm:max-w-[260px]">
+                  Hệ LOCAL_GRID (#{target?.track_id ?? 'N/A'}: X=
+                  {target?.local_x_cm ?? 'N/A'}cm, Y={target?.local_y_cm ?? 'N/A'}cm)
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setViewportMode('RADAR')}
+                  className="text-xs font-bold underline hover:no-underline cursor-pointer ml-1 shrink-0"
+                >
+                  Xem Radar &rarr;
+                </button>
+              </div>
+            )}
           </div>
-          <div className="h-48 sm:h-56 md:h-60 overflow-hidden">
-            <VideoPanel />
+        )}
+
+        {/* Hàng 3: dock tác chiến, cụm điều khiển khung nhìn và nút đổi lớp bản
+            đồ nằm CHUNG một hàng flex, nên chúng đẩy nhau thay vì chồng lên
+            nhau ở màn hình hẹp. */}
+        <div className="col-span-2 row-start-3 flex items-end justify-between gap-2 min-w-0">
+          <div className="min-w-0 max-w-[min(100%,36rem)]">
+            <BottomTacticalDock
+              anchored={false}
+              showVideoFeed={showVideoFeed}
+              onToggleVideoFeed={() => setShowVideoFeed(!showVideoFeed)}
+            />
+          </div>
+          {/* Màn hình hẹp: xếp nút đổi lớp và cụm điều khiển thành một cột dọc
+              để nhường bề rộng cho dock; từ `sm` trở lên mới đặt cạnh nhau. */}
+          <div className="flex flex-col items-end gap-1.5 shrink-0 sm:flex-row sm:items-end sm:gap-2">
+            {viewportMode === 'MAP' && (
+              <MapLayerSwitcher
+                anchored={false}
+                mode={mapLayerMode}
+                onToggle={() => setMapLayerMode((prev) => (prev === '2D' ? '3D' : '2D'))}
+              />
+            )}
+            {viewportMode === 'MAP' && (
+              <FloatingMapControls
+                anchored={false}
+                onResetView={handleTriggerResetView}
+                onFocusTarget={handleTriggerFocusTarget}
+              />
+            )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }

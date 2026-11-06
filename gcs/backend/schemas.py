@@ -52,6 +52,7 @@ class Diagnostics(StrictModel):
     ingress_drops_total: Nonnegative = 0
     logger_drops_total: Nonnegative = 0
     client_drops_total: Nonnegative = 0
+    rf_reject_count: Nonnegative = 0
     data_loss_latched: bool = False
     logger_status: Literal["OK", "LOG_DEGRADED", "STORAGE_ERROR"] = "LOG_DEGRADED"
 
@@ -102,6 +103,24 @@ class ReplayMetadata(StrictModel):
     duration_ms: Nonnegative
 
 
+class VideoStatus(StrictModel):
+    """IF-05: trạng thái kênh video phụ do BACKEND đo, không phải client tự suy.
+
+    `source_kind` chỉ có NONE/RELAY vì IF-03 cấm trình duyệt nối trực tiếp
+    ESP32. Muốn thêm DIRECT phải có HUMAN duyệt sửa kiến trúc.
+
+    `frame_count` là số khung backend thực sự nhận được. Không suy ra FPS từ
+    nó ở backend; client cũng KHÔNG được hiển thị FPS khi chưa đo (contract P6).
+    """
+
+    source_kind: Literal["NONE", "RELAY"] = "NONE"
+    stream_path: str | None = None
+    is_connected: bool = False
+    frame_count: Nonnegative = 0
+    last_frame_age_ms: Nonnegative | None = None
+    error_message: str | None = None
+
+
 class ReplayStartRequest(StrictModel):
     session_id: Annotated[str, Field(min_length=1, max_length=128)]
     speed: Literal[0.5, 1.0, 2.0] = 1.0
@@ -118,11 +137,18 @@ class ReplaySpeedRequest(StrictModel):
 class Event(StrictModel):
     event_type: Literal[
         "SNAPSHOT", "TELEMETRY_UPDATE", "TARGET_UPDATE", "ALERT_EVENT",
-        "LINK_STATUS", "SYSTEM_DIAGNOSTICS", "REPLAY_TICK",
+        "LINK_STATUS", "SYSTEM_DIAGNOSTICS", "REPLAY_TICK", "VIDEO_STATUS",
     ]
     schema_version: Literal["1.0.0"] = "1.0.0"
     session_id: Annotated[str, Field(min_length=1)]
-    source_mode: Literal["MOCK", "REPLAY"] = "MOCK"
+    # KVC-DUAL-CAMERA-20261102 (T-05): thêm "REAL".
+    #
+    # Trước đây Literal chỉ có MOCK/REPLAY nên dữ liệu thật từ ESP32 Gateway
+    # buộc phải gắn nhãn MOCK (và kéo theo inference_device phải là SIMULATED
+    # để qua validator). Hệ quả: SQLite lưu bằng chứng sai, UI phải tự ghi đè
+    # source_mode = "REAL" ở client — che giấu sự thật thay vì sửa nguồn.
+    # Nay REAL là một giá trị hợp lệ của hợp đồng; nguồn thật khai đúng nhãn.
+    source_mode: Literal["MOCK", "REAL", "REPLAY"] = "MOCK"
     original_source_mode: Literal["REAL", "MOCK", "UNKNOWN"] = "MOCK"
     inference_device: Literal["FPGA_GW2A", "PC_REFERENCE", "SIMULATED", "UNKNOWN"] = "SIMULATED"
     sender_session_id: Annotated[int, Field(ge=1, le=4294967295)] | None = None
@@ -147,6 +173,7 @@ class Event(StrictModel):
     camera_position: CameraPosition | None = None
     bounding_boxes: list[BoundingBox] | None = None
     replay_metadata: ReplayMetadata | None = None
+    video: VideoStatus | None = None
 
     @model_validator(mode="after")
     def validate_domains(self):
@@ -159,11 +186,15 @@ class Event(StrictModel):
             "LINK_STATUS": {"hardware_link"},
             "SYSTEM_DIAGNOSTICS": {"diagnostics"},
             "REPLAY_TICK": {"replay_metadata"},
+            "VIDEO_STATUS": {"video"},
         }
         all_domains = set.union(*domains.values()) | {"alerts", "replay_metadata"}
         supplied = self.model_fields_set & all_domains
         if self.event_type == "SNAPSHOT":
-            required = all_domains - {"alert"}
+            # `video` KHÔNG bắt buộc: kênh video (IF-05) là live-only và không
+            # được replay. Bản ghi cũ không chứa trường này; `MissionStore`
+            # vẫn tự reset về NONE khi áp một SNAPSHOT.
+            required = all_domains - {"alert", "video"}
             if not required <= supplied:
                 raise ValueError("SNAPSHOT must provide all application domains")
             for value in (self.telemetry, self.target, self.hardware_link, self.diagnostics):

@@ -516,4 +516,266 @@ describe('missionReducer - Quản lý trạng thái Mission GCS', () => {
     expect(stopped.alerts).toEqual([])
     expect(stopped.replay).toBeNull()
   })
+
+  describe('IF-05 — kênh video phụ', () => {
+    const realState: MissionState = {
+      ...INITIAL_MISSION_STATE,
+      source_mode: 'REAL',
+      ws_connected: true,
+    }
+
+    it('VIDEO_STATUS bật RELAY thì gắn URL tương đối và không đổi source_mode', () => {
+      const next = receive(realState, {
+        event_type: 'VIDEO_STATUS',
+        source_mode: 'REAL',
+        video: {
+          source_kind: 'RELAY',
+          stream_path: '/video/stream',
+          is_connected: true,
+          frame_count: 42,
+          last_frame_age_ms: 120,
+          error_message: null,
+        },
+      })
+
+      expect(next.source_mode).toBe('REAL') // provenance video độc lập với telemetry
+      expect(next.video.source_kind).toBe('RELAY')
+      expect(next.video.url).toBe('/video/stream')
+      expect(next.video.is_connected).toBe(true)
+      expect(next.video.frame_count).toBe(42)
+      // Chưa ghép cặp thời gian -> overlay phải tắt, không vẽ bbox lệch khung.
+      expect(next.video.has_overlay).toBe(false)
+    })
+
+    it('VIDEO_STATUS NONE thì xoá URL và đánh dấu mất kết nối', () => {
+      const relayed = receive(realState, {
+        event_type: 'VIDEO_STATUS',
+        source_mode: 'REAL',
+        video: { source_kind: 'RELAY', stream_path: '/video/stream', is_connected: true, frame_count: 5 },
+      })
+      const dropped = receive(relayed, {
+        event_type: 'VIDEO_STATUS',
+        source_mode: 'REAL',
+        video: { source_kind: 'NONE', is_connected: false, frame_count: 5, error_message: 'ReadTimeout' },
+      })
+
+      expect(dropped.video.source_kind).toBe('NONE')
+      expect(dropped.video.url).toBeNull()
+      expect(dropped.video.is_connected).toBe(false)
+      expect(dropped.video.error_message).toBe('ReadTimeout')
+    })
+
+    it('telemetry vẫn cập nhật khi video mất kết nối', () => {
+      const offline = receive(realState, {
+        event_type: 'VIDEO_STATUS',
+        source_mode: 'REAL',
+        video: { source_kind: 'NONE', is_connected: false, frame_count: 0 },
+      })
+      const withTelemetry = receive(offline, {
+        event_type: 'TELEMETRY_UPDATE',
+        source_mode: 'REAL',
+        telemetry: { battery_pct: 63, gps_valid: true },
+      })
+
+      expect(withTelemetry.telemetry.battery_pct).toBe(63)
+      expect(withTelemetry.video.is_connected).toBe(false)
+    })
+
+    it('packet VIDEO_STATUS không được sửa domain telemetry', () => {
+      const base = receive(realState, {
+        event_type: 'TELEMETRY_UPDATE',
+        source_mode: 'REAL',
+        telemetry: { battery_pct: 88 },
+      })
+      const next = receive(base, {
+        event_type: 'VIDEO_STATUS',
+        source_mode: 'REAL',
+        telemetry: { battery_pct: 1 },
+        video: { source_kind: 'RELAY', stream_path: '/video/stream', is_connected: true, frame_count: 1 },
+      })
+
+      expect(next.telemetry.battery_pct).toBe(88)
+    })
+
+    it('VIDEO_STATUS cập nhật video độc lập ngay cả khi packet source_mode khác state.source_mode', () => {
+      const next = receive(realState, {
+        event_type: 'VIDEO_STATUS',
+        source_mode: 'MOCK',
+        video: {
+          source_kind: 'RELAY',
+          stream_path: '/video/stream',
+          is_connected: true,
+          frame_count: 100,
+        },
+      })
+
+      expect(next.source_mode).toBe('REAL')
+      expect(next.video.source_kind).toBe('RELAY')
+      expect(next.video.url).toBe('/video/stream')
+      expect(next.video.is_connected).toBe(true)
+      expect(next.video.frame_count).toBe(100)
+    })
+
+    it('SNAPSHOT MOCK vẫn cập nhật video cho phiên REAL mà không ghi đè telemetry REAL', () => {
+      const baseWithRealTelemetry: MissionState = {
+        ...realState,
+        telemetry: { ...realState.telemetry, battery_pct: 99 },
+      }
+      const next = receive(baseWithRealTelemetry, {
+        event_type: 'SNAPSHOT',
+        source_mode: 'MOCK',
+        session_id: 'SES-MOCK-999',
+        telemetry: { battery_pct: 10 },
+        video: {
+          source_kind: 'RELAY',
+          stream_path: '/video/stream',
+          is_connected: true,
+          frame_count: 55,
+        },
+      })
+
+      expect(next.source_mode).toBe('REAL')
+      expect(next.telemetry.battery_pct).toBe(99)
+      expect(next.video.source_kind).toBe('RELAY')
+      expect(next.video.url).toBe('/video/stream')
+      expect(next.video.is_connected).toBe(true)
+      expect(next.video.frame_count).toBe(55)
+    })
+
+    it('SNAPSHOT cũ không có trường video thì giữ nguyên, không bịa trạng thái', () => {
+      const next = receive(realState, {
+        event_type: 'SNAPSHOT',
+        source_mode: 'REAL',
+        session_id: INITIAL_MISSION_STATE.session_id,
+      })
+      expect(next.video.source_kind).toBe('NONE')
+      expect(next.video.url).toBeNull()
+    })
+
+    it('TICK_AGE làm già last_frame_age_ms', () => {
+      const relayed = receive(realState, {
+        event_type: 'VIDEO_STATUS',
+        source_mode: 'REAL',
+        video: { source_kind: 'RELAY', stream_path: '/video/stream', is_connected: true, frame_count: 3, last_frame_age_ms: 100 },
+      })
+      const aged = missionReducer(relayed, { type: 'TICK_AGE', payload: 500 })
+      expect(aged.video.last_frame_age_ms).toBe(600)
+    })
+
+    it('reset nguồn xoá trạng thái video', () => {
+      const relayed = receive(realState, {
+        event_type: 'VIDEO_STATUS',
+        source_mode: 'REAL',
+        video: { source_kind: 'RELAY', stream_path: '/video/stream', is_connected: true, frame_count: 9 },
+      })
+      const reset = missionReducer(relayed, { type: 'SET_SOURCE_MODE', payload: 'MOCK' })
+      expect(reset.video.source_kind).toBe('NONE')
+      expect(reset.video.url).toBeNull()
+      expect(reset.video.frame_count).toBe(0)
+    })
+
+    it('SNAPSHOT REAL + video NONE không rơi về pattern MOCK', () => {
+      // Nguồn telemetry REAL nhưng kênh IF-05 chưa có. `source_type` phải là
+      // NONE để VideoPanel không hiển thị pattern mô phỏng như ảnh thật.
+      const next = receive(
+        { ...realState, video: { ...INITIAL_MISSION_STATE.video, source_type: 'MOCK' } },
+        {
+          event_type: 'SNAPSHOT',
+          source_mode: 'REAL',
+          session_id: realState.session_id,
+          video: { source_kind: 'NONE', stream_path: null, is_connected: false, frame_count: 0 },
+        }
+      )
+
+      expect(next.source_mode).toBe('REAL')
+      expect(next.video.source_kind).toBe('NONE')
+      expect(next.video.source_type).toBe('NONE')
+      expect(next.video.url).toBeNull()
+      expect(next.video.is_connected).toBe(false)
+      // Không có nguồn thì không được khai báo là có overlay.
+      expect(next.video.has_overlay).toBe(false)
+    })
+
+    it('VIDEO_STATUS NONE trên phiên REAL cũng không giữ source_type MOCK', () => {
+      const next = receive(
+        { ...realState, video: { ...INITIAL_MISSION_STATE.video, source_type: 'MOCK' } },
+        {
+          event_type: 'VIDEO_STATUS',
+          source_mode: 'REAL',
+          video: { source_kind: 'NONE', is_connected: false, frame_count: 0 },
+        }
+      )
+
+      expect(next.video.source_type).toBe('NONE')
+    })
+
+    it('chỉ RELAY mới đặt source_type LIVE và gắn stream_path', () => {
+      const next = receive(realState, {
+        event_type: 'VIDEO_STATUS',
+        source_mode: 'REAL',
+        video: { source_kind: 'RELAY', stream_path: '/video/stream', is_connected: true, frame_count: 1 },
+      })
+      expect(next.video.source_type).toBe('LIVE')
+      expect(next.video.url).toBe('/video/stream')
+    })
+  })
+
+  describe('quản lý xoá nhật ký sự kiện', () => {
+    it('CLEAR_EVENT_LOGS làm rỗng mảng event_logs', () => {
+      const stateWithLogs = {
+        ...INITIAL_MISSION_STATE,
+        event_logs: [
+          {
+            id: 'l1',
+            timestamp_iso: '2026-11-04T12:00:00Z',
+            level: 'INFO' as const,
+            source: 'SYSTEM',
+            code: 'TEST_1',
+            message: 'Test 1',
+            session_id: 'SES-01',
+          },
+          {
+            id: 'l2',
+            timestamp_iso: '2026-11-04T12:01:00Z',
+            level: 'WARN' as const,
+            source: 'OPERATOR',
+            code: 'TEST_2',
+            message: 'Test 2',
+            session_id: 'SES-01',
+          },
+        ],
+      }
+      const next = missionReducer(stateWithLogs, { type: 'CLEAR_EVENT_LOGS' })
+      expect(next.event_logs).toEqual([])
+    })
+
+    it('DELETE_EVENT_LOG chỉ xoá đúng mục theo id', () => {
+      const stateWithLogs = {
+        ...INITIAL_MISSION_STATE,
+        event_logs: [
+          {
+            id: 'l1',
+            timestamp_iso: '2026-11-04T12:00:00Z',
+            level: 'INFO' as const,
+            source: 'SYSTEM',
+            code: 'TEST_1',
+            message: 'Test 1',
+            session_id: 'SES-01',
+          },
+          {
+            id: 'l2',
+            timestamp_iso: '2026-11-04T12:01:00Z',
+            level: 'WARN' as const,
+            source: 'OPERATOR',
+            code: 'TEST_2',
+            message: 'Test 2',
+            session_id: 'SES-01',
+          },
+        ],
+      }
+      const next = missionReducer(stateWithLogs, { type: 'DELETE_EVENT_LOG', payload: 'l1' })
+      expect(next.event_logs).toHaveLength(1)
+      expect(next.event_logs[0].id).toBe('l2')
+    })
+  })
 })
